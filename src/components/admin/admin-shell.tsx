@@ -70,7 +70,7 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
   const closeMore = () => dialogRef.current?.close();
 
   const items: NavItem[] = [
-    { key: "overview", href: "/admin", label: "Overview", short: "Home", icon: LayoutDashboard },
+    { key: "overview", href: "/admin", label: "Today", short: "Today", icon: LayoutDashboard },
     { key: "review", href: "/admin/listings?status=PENDING", label: "Review", short: "Review", icon: ClipboardCheck, count: counts.pending, tone: "amber" },
     { key: "listings", href: "/admin/listings", label: "Listings", short: "Listings", icon: Map },
     { key: "sellers", href: "/admin/sellers", label: "Sellers", short: "Sellers", icon: Users },

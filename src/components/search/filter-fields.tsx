@@ -39,7 +39,7 @@ export function FilterFields({ f, cities, idPrefix }: { f: SearchFilters; cities
 
       <fieldset>
         <legend className="mb-3 text-sm font-bold text-ink">Land type</legend>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-wrap gap-2">
           <TypeOption value="" label="All types" checked={!f.type} />
           {(Object.keys(LAND_TYPES) as LandType[]).map((t) => (
             <TypeOption key={t} value={t} label={LAND_TYPES[t].short} checked={f.type === t} icon={<LandTypeIcon type={t} className="size-4" />} />
@@ -124,7 +124,7 @@ function TypeOption({ value, label, checked, icon }: { value: string; label: str
   return (
     <label className="cursor-pointer">
       <input type="radio" name="type" value={value} defaultChecked={checked} className="peer sr-only" />
-      <span className="flex h-12 items-center gap-2 rounded-xl border border-line-strong bg-white px-3.5 text-sm font-semibold text-ink-soft transition peer-checked:border-brand-600 peer-checked:bg-brand-50 peer-checked:text-brand-800 peer-checked:ring-1 peer-checked:ring-brand-600 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-400">
+      <span className="flex h-10 items-center gap-1.5 rounded-full border border-line-strong bg-white px-3.5 text-sm font-semibold whitespace-nowrap text-ink-soft transition peer-checked:border-brand-600 peer-checked:bg-brand-50 peer-checked:text-brand-800 peer-checked:ring-1 peer-checked:ring-brand-600 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-400">
         {icon}
         {label}
       </span>
