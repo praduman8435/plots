@@ -1,26 +1,148 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Plots design tokens — green & white, premium and calm.
+ * White surfaces, one confident emerald, soft mint tints for sections,
+ * hairline borders, generous radii, soft layered shadows.
+ */
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Brand: emerald green */
+  --color-brand-50: #edf9f2;
+  --color-brand-100: #d5f1e1;
+  --color-brand-200: #ade3c5;
+  --color-brand-300: #77cea1;
+  --color-brand-400: #3fb37a;
+  --color-brand-500: #16975d;
+  --color-brand-600: #0b7d4c;
+  --color-brand-700: #0a643e;
+  --color-brand-800: #0b4f33;
+  --color-brand-900: #0a412b;
+  --color-brand-950: #04251a;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* Neutrals (very slightly green-tinted so greys sit well next to the brand) */
+  --color-canvas: #ffffff;
+  --color-mist: #f5faf7; /* section backgrounds */
+  --color-line: #e5ece8;
+  --color-line-strong: #d0dbd5;
+  --color-ink: #0e1a14;
+  --color-ink-soft: #33413a;
+  --color-muted: #66756d;
+  --color-faint: #96a39c;
+
+  --color-whatsapp: #25d366;
+  --color-gold: #b7791f;
+  --color-danger: #c2410c;
+
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+
+  --shadow-soft: 0 1px 2px rgb(14 26 20 / 0.04), 0 2px 8px -2px rgb(14 26 20 / 0.06);
+  --shadow-card: 0 1px 2px rgb(14 26 20 / 0.04), 0 8px 24px -8px rgb(14 26 20 / 0.12);
+  --shadow-lift: 0 2px 6px rgb(14 26 20 / 0.05), 0 24px 48px -16px rgb(14 26 20 / 0.22);
+  --shadow-brand: 0 8px 24px -8px rgb(11 125 76 / 0.55);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-fade-up: fade-up 0.5s var(--ease-out-soft) both;
+  --animate-sheet-up: sheet-up 0.32s var(--ease-out-soft) both;
+  --animate-fade-in: fade-in 0.2s ease-out both;
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes sheet-up {
+    from { transform: translateY(100%); }
+    to { transform: none; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: var(--color-brand-200);
+    color: var(--color-brand-950);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+
+  /* Native <dialog> used for bottom sheets */
+  dialog::backdrop {
+    background: rgb(4 37 26 / 0.45);
+    backdrop-filter: blur(2px);
+  }
+  dialog[open] {
+    animation: var(--animate-fade-in);
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility container-page {
+  width: 100%;
+  max-width: 78rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 40rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (width >= 64rem) {
+    padding-inline: 2rem;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* Topographic contour pattern — a quiet "land" motif for hero bands. */
+@utility bg-contours {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.07' stroke-width='1.2'%3E%3Cpath d='M-50 120c80-40 160 30 250 0s170-70 260-20 160 40 200 10'/%3E%3Cpath d='M-50 170c90-40 170 30 260 0s160-60 250-15 160 45 200 10'/%3E%3Cpath d='M-50 220c100-35 180 35 270 5s150-55 240-12 160 48 200 12'/%3E%3Cpath d='M-50 300c80-30 170 40 260 10s170-70 260-25 150 40 190 8'/%3E%3Cpath d='M-50 350c90-30 170 40 260 12s160-62 250-20 150 42 190 10'/%3E%3Cpath d='M-50 430c80-40 160 30 250 0s170-70 260-20 160 40 200 10'/%3E%3Cpath d='M-50 480c90-40 170 30 260 0s160-60 250-15 160 45 200 10'/%3E%3Cpath d='M-50 540c100-35 180 35 270 5s150-55 240-12 160 48 200 12'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 600px 600px;
 }

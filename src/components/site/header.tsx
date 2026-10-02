@@ -1,0 +1,39 @@
+import Link from "next/link";
+import { ButtonLink } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
+
+const nav = [
+  { href: "/search", label: "Search land" },
+  { href: "/chandigarh", label: "Chandigarh" },
+  { href: "/azamgarh", label: "Azamgarh" },
+  { href: "/seller", label: "Seller login" },
+];
+
+export function SiteHeader() {
+  return (
+    <header className="sticky top-0 z-40 border-b border-line/70 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/75">
+      <div className="container-page flex h-16 items-center justify-between gap-4 lg:h-[72px]">
+        <Logo />
+        <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+          {nav.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-full px-4 py-2 text-[15px] font-medium text-ink-soft transition hover:bg-brand-50 hover:text-brand-800"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="flex items-center gap-2">
+          <ButtonLink href="/sell" size="sm" className="hidden md:inline-flex">
+            Sell your land
+          </ButtonLink>
+          <ButtonLink href="/sell" variant="soft" size="sm" className="md:hidden">
+            Sell land
+          </ButtonLink>
+        </div>
+      </div>
+    </header>
+  );
+}

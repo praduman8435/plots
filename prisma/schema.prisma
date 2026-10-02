@@ -1,0 +1,397 @@
+// Plots — land marketplace MVP schema.
+// Design notes and rationale: docs/PLAN.md §4
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum SellerType {
+  OWNER
+  BROKER
+}
+
+enum LandType {
+  RESIDENTIAL_PLOT
+  AGRICULTURAL
+  COMMERCIAL
+  INDUSTRIAL
+  OTHER
+}
+
+/// Seller identity (KYC) — we keep only the outcome, never the Aadhaar number.
+enum IdentityStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+/// Units as sellers actually speak them. Bigha/Biswa and Marla/Kanal vary by
+/// region, so conversion uses City.bighaInSqft / City.marlaInSqft
+/// (1 Biswa = 1/20 Bigha, 1 Kanal = 20 Marla).
+enum AreaUnit {
+  SQFT
+  SQYD // "gaj"
+  SQM
+  ACRE // also "killa" in Punjab
+  HECTARE
+  BIGHA
+  BISWA
+  MARLA // Punjab / Haryana / Chandigarh
+  KANAL
+}
+
+/// UI labels: Pending approval · Live · Unavailable/Hidden · Sold · Rejected.
+enum ListingStatus {
+  PENDING // awaiting admin approval
+  ACTIVE // live — visible to buyers
+  HIDDEN // not shown: no reply to availability check (reactivate with YES), or hidden by admin/seller
+  SOLD
+  REJECTED
+}
+
+enum HiddenReason {
+  AVAILABILITY_UNCONFIRMED
+  BY_ADMIN
+  BY_SELLER
+}
+
+enum ListingSource {
+  WHATSAPP // seller chatted with the WhatsApp listing assistant
+  WEB // seller used "Add plot" in the seller portal
+  ADMIN // admin created it on the seller's behalf
+}
+
+enum ContactChannel {
+  WHATSAPP
+  CALL
+}
+
+enum MessageDirection {
+  INBOUND // seller → us
+  OUTBOUND // us → seller (bot or admin)
+}
+
+// ───────────────────────────── Sellers ─────────────────────────────
+
+/// Owners and brokers. Buyers never need an account.
+model Seller {
+  id String @id @default(cuid())
+
+  /// Permanent, public-facing Seller ID (e.g. SLR-7A41K2) — see
+  /// src/lib/seller-code.ts. Sellers type it to sign in to the seller
+  /// portal, but it is an IDENTIFIER, not a credential: sign-in always
+  /// needs the WhatsApp/SMS code sent to the registered number.
+  code String @unique
+
+  name            String
+  /// E.164 (+91XXXXXXXXXX) — see src/lib/phone.ts. Also the WhatsApp number.
+  phone           String     @unique
+  sellerType      SellerType @default(OWNER) /// self-declared; publicly OWNER shows as "Seller", never "Owner"
+  phoneVerifiedAt DateTime? /// trust badge: "Phone verified"
+  isBlocked       Boolean    @default(false)
+
+  // Identity verification (KYC). Only the outcome is stored — never the Aadhaar number.
+  identityStatus     IdentityStatus @default(UNVERIFIED)
+  identityVerifiedAt DateTime? /// trust badge: "Identity verified"
+  identityProvider   String? /// e.g. "mock", "digilocker"
+  identityReference  String? /// provider's verification id
+  identityMasked     String? /// e.g. "XXXX XXXX 4321" — admin only
+
+  /// Web sign-up finished (name → OTP → identity step). Null = sign-up in progress.
+  onboardedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  properties   Property[]
+  sessions     SellerSession[]
+  conversation WhatsAppConversation?
+  kycAttempts  KycAttempt[]
+
+  @@map("sellers")
+}
+
+/// One identity-verification attempt with a provider (audit trail). Never holds the ID number.
+model KycAttempt {
+  id          String         @id @default(cuid())
+  sellerId    String
+  provider    String
+  status      IdentityStatus @default(PENDING)
+  providerRef String?
+  masked      String? /// e.g. "XXXX XXXX 4321"
+  failReason  String?
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, createdAt])
+  @@map("kyc_attempts")
+}
+
+/// Same shape as the shop's CustomerSession: only the SHA-256 of a random
+/// token is stored; the raw token lives in an httpOnly cookie.
+model SellerSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  sellerId   String
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@map("seller_sessions")
+}
+
+/// One active challenge per phone+purpose. Only a scrypt hash of the code is stored.
+model OtpChallenge {
+  id              String    @id @default(cuid())
+  phoneNormalized String
+  purpose         String
+  codeHash        String
+  expiresAt       DateTime
+  attemptCount    Int       @default(0)
+  consumedAt      DateTime?
+  /// Requesting client IP, only when a trusted proxy header is configured (see request-ip.ts).
+  ip              String?
+  createdAt       DateTime  @default(now())
+
+  @@index([phoneNormalized, purpose, createdAt])
+  @@index([createdAt])
+  @@index([ip, createdAt])
+  @@map("otp_challenges")
+}
+
+// ───────────────────────────── Admin ─────────────────────────────
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String /// scrypt "salt:hash" — see src/lib/scrypt-hash.ts
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions AdminSession[]
+
+  @@map("admin_users")
+}
+
+model AdminSession {
+  id          String   @id @default(cuid())
+  tokenHash   String   @unique
+  adminUserId String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@map("admin_sessions")
+}
+
+/// Login attempts for rate limiting /admin/login, keyed "email:<email>" (always) and "ip:<ip>" (trusted proxy only).
+model AdminLoginAttempt {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+  @@map("admin_login_attempts")
+}
+
+// ───────────────────────────── Marketplace ─────────────────────────────
+
+/// A market we operate in. Powers /[city] landing pages and location filters.
+/// We launch one city at a time (isLive).
+model City {
+  id          String   @id @default(cuid())
+  slug        String   @unique /// "azamgarh" → /azamgarh
+  name        String
+  district    String
+  state       String
+  latitude    Float
+  longitude   Float
+  bighaInSqft Float /// regional bigha size, e.g. ~27,000 sq ft in eastern UP
+  marlaInSqft Float @default(272.25) /// 272.25 sq ft (revenue) — some urban sectors use 225
+  headline    String? /// SEO/landing copy override
+  intro       String? /// short paragraph for the city page
+  isLive      Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  properties Property[]
+
+  @@map("cities")
+}
+
+model Property {
+  id       String        @id @default(cuid())
+  /// Short reference buyers and sellers can say over the phone, e.g. "P-7Q2M4K".
+  code     String        @unique
+  slug     String        @unique /// "2-bigha-agricultural-land-in-sathiyaon-azamgarh-7q2m4k"
+  sellerId String
+  cityId   String
+  source   ListingSource @default(WEB)
+
+  title       String /// auto-generated from facts; admin can edit
+  description String
+  landType    LandType
+  features    String[] /// one-tap chips: "Road facing", "Boundary wall", "Electricity"…
+
+  // Location: city (structured) → locality/village (free text) → optional point.
+  locality  String /// area / mohalla / landmark
+  village   String?
+  latitude  Float? /// shown approximately (~500 m circle), never as an exact pin
+  longitude Float?
+
+  // Size exactly as the seller said it, plus normalised sq ft for filter/sort.
+  area     Float
+  areaUnit AreaUnit
+  areaSqft Float
+
+  price           BigInt /// total asking price in INR
+  priceNegotiable Boolean @default(true)
+
+  // Lifecycle
+  status          ListingStatus @default(PENDING)
+  hiddenReason    HiddenReason?
+  rejectionReason String?
+  publishedAt     DateTime? /// first time it went ACTIVE
+  soldAt          DateTime?
+
+  // Weekly availability check (see runAvailabilityChecks). Never faked:
+  lastConfirmedAt         DateTime? /// seller explicitly said "still available" (YES / dashboard)
+  lastAvailabilityCheckAt DateTime? /// last time we tried to send a check
+  availabilityCheckSentAt DateTime? /// check delivered and awaiting a reply — starts the 24h timer
+  availabilityResponseAt  DateTime? /// last YES/NO reply
+  /// max(publishedAt, lastConfirmedAt) — "recently active" sort key for buyers
+  freshnessAt             DateTime?
+
+  viewCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  seller    Seller          @relation(fields: [sellerId], references: [id])
+  city      City            @relation(fields: [cityId], references: [id])
+  images    PropertyImage[]
+  enquiries Enquiry[]
+
+  @@index([status, cityId, landType])
+  @@index([status, price])
+  @@index([status, areaSqft])
+  @@index([status, publishedAt])
+  @@index([status, freshnessAt])
+  @@index([status, availabilityCheckSentAt])
+  @@index([sellerId])
+  @@map("properties")
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String
+  /// Path served by /media/[...key] (uploads) or under /public (seed photos).
+  url        String
+  width      Int?
+  height     Int?
+  position   Int      @default(0) /// 0 = cover image
+  createdAt  DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, position])
+  @@map("property_images")
+}
+
+/// One row per "Contact seller" tap — the marketplace's core metric.
+model Enquiry {
+  id         String         @id @default(cuid())
+  propertyId String
+  buyerName  String
+  buyerPhone String /// E.164
+  channel    ContactChannel
+  source     String? /// where the tap happened: "detail" | "card"
+  createdAt  DateTime       @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, createdAt])
+  @@index([createdAt])
+  @@map("enquiries")
+}
+
+// ───────────────────────────── WhatsApp ─────────────────────────────
+
+/// One thread per WhatsApp number. Holds the listing assistant's state
+/// machine (step + draft) so a seller can list a plot by chatting.
+model WhatsAppConversation {
+  id            String    @id @default(cuid())
+  phone         String    @unique /// E.164
+  profileName   String? /// WhatsApp display name
+  sellerId      String?   @unique
+  /// Listing assistant step — see src/server/whatsapp/bot.ts
+  step          String    @default("IDLE")
+  /// Partially collected listing (validated on submit).
+  draft         Json?
+  lastInboundAt DateTime? /// WhatsApp only allows free-form replies within 24h of this
+  unreadCount   Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  seller   Seller?           @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+  messages WhatsAppMessage[]
+
+  @@index([updatedAt])
+  @@map("whatsapp_conversations")
+}
+
+model WhatsAppMessage {
+  id             String           @id @default(cuid())
+  conversationId String
+  direction      MessageDirection
+  /// "text" | "image" | "location" | "interactive" | "template"
+  type           String
+  body           String?
+  mediaUrl       String? /// our stored copy of an inbound photo
+  /// Meta's message id — unique so webhook retries are processed once.
+  waMessageId    String?          @unique
+  /// "bot" | "admin" | "system" for outbound; null for inbound
+  sentBy         String?
+  createdAt      DateTime         @default(now())
+
+  conversation WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("whatsapp_messages")
+}
+
+// ───────────────────────────── Analytics ─────────────────────────────
+
+/// Minimal product analytics to validate the marketplace funnel:
+/// visit → property_view → whatsapp_click/call_click, and
+/// listing_started → listing_submitted → listing_approved, availability_yes/no/no_response.
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  name       String
+  /// Anonymous per-browser id (no PII). Null for server-side events.
+  visitorId  String?
+  sellerId   String?
+  propertyId String?
+  props      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([createdAt])
+  @@map("analytics_events")
+}
