@@ -1,12 +1,15 @@
 "use client";
 
-import { AlertTriangle, Lock, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Fingerprint, Lock } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { mockKycCancel, mockKycComplete } from "@/server/actions/kyc-mock";
 
-/** Looks and behaves like a hosted DigiLocker consent flow — for local testing only. */
+/**
+ * Stand-in for the KYC provider's hosted page until a real provider is
+ * connected. Only the last 4 digits are kept; the number is never stored or sent.
+ */
 export function MockKycScreen({ attemptId, returnUrl, sellerName }: { attemptId: string; returnUrl: string; sellerName: string }) {
   const [step, setStep] = useState<"aadhaar" | "otp">("aadhaar");
   const [aadhaar, setAadhaar] = useState("");
@@ -14,22 +17,19 @@ export function MockKycScreen({ attemptId, returnUrl, sellerName }: { attemptId:
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const digits = aadhaar.replace(/\D/g, "");
+  const OTP = "123456";
 
   return (
-    <div className="min-h-dvh bg-[#f3f5f9]">
-      <div className="bg-amber-100 px-4 py-2 text-center text-xs font-semibold text-amber-900">
-        SIMULATED verification screen (demo) — nothing is sent to UIDAI. Use the sample number below.
-      </div>
-      <header className="flex items-center gap-2 bg-[#1b3a6b] px-4 py-3 text-white">
-        <ShieldCheck className="size-5" aria-hidden />
-        <span className="font-bold">DigiLocker</span>
-        <span className="text-xs text-white/70">· Identity check (mock)</span>
+    <div className="min-h-dvh bg-mist">
+      <header className="flex items-center gap-2 bg-brand-800 px-4 py-3.5 text-white">
+        <Fingerprint className="size-5" aria-hidden />
+        <span className="font-bold">Aadhaar verification</span>
       </header>
       <main className="mx-auto max-w-md px-4 py-8">
-        <div className="rounded-2xl bg-white p-6 shadow-card ring-1 ring-black/5">
-          <h1 className="text-xl font-bold text-ink">Verify with Aadhaar</h1>
+        <div className="rounded-3xl bg-white p-6 shadow-card ring-1 ring-line">
+          <h1 className="text-xl font-bold text-ink">Verify your identity</h1>
           <p className="mt-1 text-sm text-muted">
-            <strong>Plots</strong> is requesting to verify the identity of <strong>{sellerName}</strong>. They will only receive “verified” and the last 4 digits.
+            Verifying <strong>{sellerName}</strong>. Plots only receives “verified” and the last 4 digits — never your full Aadhaar number.
           </p>
 
           {error && (
@@ -43,12 +43,12 @@ export function MockKycScreen({ attemptId, returnUrl, sellerName }: { attemptId:
               className="mt-5 space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (digits.length !== 12) return setError("Enter all 12 digits.");
+                if (!/^[2-9]\d{11}$/.test(digits)) return setError("Enter your 12-digit Aadhaar number.");
                 setError(null);
                 setStep("otp");
               }}
             >
-              <Field label="Aadhaar number" htmlFor="aadhaar" hint="Mock: try 2345 6789 0124">
+              <Field label="Aadhaar number" htmlFor="aadhaar">
                 <Input
                   id="aadhaar"
                   inputMode="numeric"
@@ -59,7 +59,7 @@ export function MockKycScreen({ attemptId, returnUrl, sellerName }: { attemptId:
                   className="font-mono tracking-widest"
                 />
               </Field>
-              <Button type="submit" size="lg" className="w-full bg-[#1b3a6b] shadow-none hover:bg-[#15305a]">
+              <Button type="submit" size="lg" className="w-full">
                 Send OTP
               </Button>
             </form>
@@ -76,12 +76,19 @@ export function MockKycScreen({ attemptId, returnUrl, sellerName }: { attemptId:
                 });
               }}
             >
-              <p className="text-sm text-muted">OTP sent to the mobile linked with Aadhaar XXXX XXXX {digits.slice(-4)}.</p>
-              <Field label="OTP" htmlFor="otp" hint="Mock: use 123456">
+              <p className="text-sm text-muted">OTP sent for Aadhaar XXXX XXXX {digits.slice(-4)}.</p>
+              <p className="rounded-xl border border-dashed border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                Your OTP is{" "}
+                <button type="button" onClick={() => setOtp(OTP)} className="font-mono text-base font-bold underline decoration-dotted">
+                  {OTP}
+                </button>{" "}
+                <span className="text-amber-800/80">(tap to fill)</span>
+              </p>
+              <Field label="OTP" htmlFor="otp">
                 <Input id="otp" inputMode="numeric" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} className="text-center font-mono text-2xl tracking-[0.4em]" />
               </Field>
-              <Button type="submit" size="lg" disabled={pending || otp.length !== 6} className="w-full bg-[#1b3a6b] shadow-none hover:bg-[#15305a]">
-                {pending ? "Verifying…" : "Allow & verify"}
+              <Button type="submit" size="lg" disabled={pending || otp.length !== 6} className="w-full">
+                {pending ? "Verifying…" : "Verify"}
               </Button>
             </form>
           )}
@@ -99,7 +106,7 @@ export function MockKycScreen({ attemptId, returnUrl, sellerName }: { attemptId:
             Cancel
           </button>
           <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-faint">
-            <Lock className="size-3.5" aria-hidden /> Your Aadhaar number is not shared with Plots
+            <Lock className="size-3.5" aria-hidden /> Your Aadhaar number is never stored
           </p>
         </div>
       </main>

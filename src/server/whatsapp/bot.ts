@@ -1448,7 +1448,7 @@ async function nudgeIdentity(t: Turn, s: Seller) {
     {
       type: "text",
       previewUrl: false,
-      text: `One small step, ${firstName(s.name)}: verify your identity so buyers see *✓ Identity verified* on your listings.\n\nIt takes 2 minutes with DigiLocker. We never show your Aadhaar to anyone.\n\n${site.url}/seller/verify`,
+      text: `One small step, ${firstName(s.name)}: verify your identity so buyers see *✓ Identity verified* on your listings.\n\nIt takes 2 minutes, once. We never show your Aadhaar to anyone.\n\n${site.url}/seller/verify`,
     },
     "system",
   );

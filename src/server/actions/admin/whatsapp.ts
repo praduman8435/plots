@@ -7,10 +7,10 @@ import { formatPrice } from "@/lib/format";
 import { placeName } from "@/lib/land";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { changeListingStatus, plotsAwaitingAvailability } from "@/server/listings/service";
-import { MAX_UPLOAD_BYTES } from "@/server/storage";
-import { describeStep, toBotStep, type BotReply } from "@/server/whatsapp/bot";
+import { toBotStep, type BotReply } from "@/server/whatsapp/bot";
+import { emptyChatState, inboundFromForm, loadChatState, type ChatState } from "@/server/whatsapp/chat-state";
 import type { OutgoingMessage } from "@/server/whatsapp/client";
-import { processInbound, type InboundMessage } from "@/server/whatsapp/inbound";
+import { processInbound } from "@/server/whatsapp/inbound";
 import { recordOutboundOnly, sendAndRecord } from "@/server/whatsapp/messaging";
 import { buildAvailabilityCheckMessage } from "@/server/whatsapp/notify";
 
@@ -50,45 +50,16 @@ export async function setConversationMode(formData: FormData): Promise<void> {
 
 // ───────────────────────────── Simulator ─────────────────────────────
 
-export type SimOption = { id?: string; title: string; description?: string };
-
-export type SimInteractive = {
-  kind: "buttons" | "list";
-  /** Body text without the option lines. */
-  body: string;
-  buttonLabel?: string;
-  options: SimOption[];
-};
-
-export type SimMessage = {
-  id: string;
-  direction: "INBOUND" | "OUTBOUND";
-  type: string;
-  body: string | null;
-  mediaUrl: string | null;
-  sentBy: string | null;
-  createdAt: string;
-  /** Known only for bot messages produced in this session (ids aren't stored in the DB). */
-  interactive?: SimInteractive;
-};
-
-export type SimState = {
-  phone: string;
-  profileName: string | null;
-  conversationId: string | null;
-  step: string;
-  stepLabel: string;
-  seller: { id: string; code: string; name: string } | null;
-  /** The seller's plots, for the availability dev controls. */
-  plots: { live: number; awaiting: number; unavailable: number; pending: number };
-  /** Live cities, for suggestions and "drop a pin". */
-  cities: { name: string; latitude: number; longitude: number }[];
-  messages: SimMessage[];
-  error?: string;
-};
+// The chat state is shared with the seller-facing web chat (src/server/whatsapp/chat-state.ts).
+export type {
+  ChatInteractive as SimInteractive,
+  ChatMessage as SimMessage,
+  ChatOption as SimOption,
+  ChatState as SimState,
+} from "@/server/whatsapp/chat-state";
 
 /** Loads the simulated chat for a number. */
-export async function simulatorLoad(phoneInput: string): Promise<SimState> {
+export async function simulatorLoad(phoneInput: string): Promise<ChatState> {
   await requireAdmin();
   const phone = normalizePhoneNumber(phoneInput);
   if (!phone.valid) return emptyState(phoneInput, "Enter a valid 10-digit Indian mobile number.");
@@ -100,53 +71,21 @@ export async function simulatorLoad(phoneInput: string): Promise<SimState> {
  * kind (text | interactive | image | location), text, replyId, replyTitle,
  * latitude, longitude, image (File).
  */
-export async function simulatorSend(formData: FormData): Promise<SimState> {
+export async function simulatorSend(formData: FormData): Promise<ChatState> {
   await requireAdmin();
   const phone = normalizePhoneNumber(String(formData.get("phone") ?? ""));
   if (!phone.valid) return emptyState(String(formData.get("phone") ?? ""), "Enter a valid 10-digit Indian mobile number.");
 
-  const kind = String(formData.get("kind") ?? "text");
   const profileName = String(formData.get("profileName") ?? "").trim().slice(0, 80) || undefined;
-  const base = { from: phone.normalized, profileName };
-  let msg: InboundMessage;
+  const parsed = await inboundFromForm(phone.normalized, formData, profileName);
+  if (!parsed.ok) return { ...(await loadState(phone.normalized)), ...(parsed.error ? { error: parsed.error } : {}) };
 
-  switch (kind) {
-    case "interactive": {
-      const replyId = String(formData.get("replyId") ?? "") || undefined;
-      const replyTitle = String(formData.get("replyTitle") ?? "") || undefined;
-      if (!replyId && !replyTitle) return { ...(await loadState(phone.normalized)), error: "Nothing to send." };
-      msg = { ...base, kind: "interactive", replyId, replyTitle };
-      break;
-    }
-    case "image": {
-      const file = formData.get("image");
-      if (!(file instanceof File) || file.size === 0) return { ...(await loadState(phone.normalized)), error: "Choose a photo first." };
-      if (file.size > MAX_UPLOAD_BYTES) return { ...(await loadState(phone.normalized)), error: "That photo is too large." };
-      if (file.type && !file.type.startsWith("image/")) return { ...(await loadState(phone.normalized)), error: "Only photos can be attached." };
-      const caption = String(formData.get("text") ?? "").trim() || undefined;
-      msg = { ...base, kind: "image", imageBytes: Buffer.from(await file.arrayBuffer()), caption };
-      break;
-    }
-    case "location": {
-      const latitude = Number(formData.get("latitude"));
-      const longitude = Number(formData.get("longitude"));
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return { ...(await loadState(phone.normalized)), error: "Invalid location." };
-      msg = { ...base, kind: "location", latitude, longitude };
-      break;
-    }
-    default: {
-      const text = String(formData.get("text") ?? "").trim().slice(0, 4000);
-      if (!text) return loadState(phone.normalized);
-      msg = { ...base, kind: "text", text };
-    }
-  }
-
-  const result = await processInbound(msg, { simulate: true });
+  const result = await processInbound(parsed.msg, { simulate: true });
   return loadState(phone.normalized, result.replies);
 }
 
 /** Deletes a simulated chat so a demo can start fresh. Refuses threads with real WhatsApp traffic. */
-export async function simulatorReset(phoneInput: string): Promise<SimState> {
+export async function simulatorReset(phoneInput: string): Promise<ChatState> {
   await requireAdmin();
   const phone = normalizePhoneNumber(phoneInput);
   if (!phone.valid) return emptyState(phoneInput, "Enter a valid 10-digit Indian mobile number.");
@@ -168,7 +107,7 @@ export async function simulatorReset(phoneInput: string): Promise<SimState> {
  * this seller's live plots (stamps the attempt and the 24h timer) and records
  * the same message in the chat. Never sends anything to WhatsApp.
  */
-export async function simulatorAvailabilityCheck(phoneInput: string): Promise<SimState> {
+export async function simulatorAvailabilityCheck(phoneInput: string): Promise<ChatState> {
   await requireAdmin();
   const phone = normalizePhoneNumber(phoneInput);
   if (!phone.valid) return emptyState(phoneInput, "Enter a valid 10-digit Indian mobile number.");
@@ -200,7 +139,7 @@ export async function simulatorAvailabilityCheck(phoneInput: string): Promise<Si
  * a reply (HIDDEN · AVAILABILITY_UNCONFIRMED), like the weekly job does, and
  * records the "We didn't hear back…" message for each. Never sends.
  */
-export async function simulatorNoReply(phoneInput: string): Promise<SimState> {
+export async function simulatorNoReply(phoneInput: string): Promise<ChatState> {
   await requireAdmin();
   const phone = normalizePhoneNumber(phoneInput);
   if (!phone.valid) return emptyState(phoneInput, "Enter a valid 10-digit Indian mobile number.");
@@ -226,90 +165,5 @@ export async function simulatorNoReply(phoneInput: string): Promise<SimState> {
   return loadState(phone.normalized);
 }
 
-function emptyState(phone: string, error?: string): SimState {
-  return {
-    phone,
-    profileName: null,
-    conversationId: null,
-    step: "IDLE",
-    stepLabel: describeStep("IDLE"),
-    seller: null,
-    plots: { live: 0, awaiting: 0, unavailable: 0, pending: 0 },
-    cities: [],
-    messages: [],
-    error,
-  };
-}
-
-function liveCities() {
-  return db.city.findMany({
-    where: { isLive: true },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    take: 5,
-    select: { name: true, latitude: true, longitude: true },
-  });
-}
-
-async function plotCounts(sellerId: string | undefined): Promise<SimState["plots"]> {
-  if (!sellerId) return { live: 0, awaiting: 0, unavailable: 0, pending: 0 };
-  const [live, awaiting, unavailable, pending] = await Promise.all([
-    db.property.count({ where: { sellerId, status: "ACTIVE" } }),
-    db.property.count({ where: { sellerId, status: "ACTIVE", availabilityCheckSentAt: { not: null } } }),
-    db.property.count({ where: { sellerId, status: "HIDDEN", hiddenReason: "AVAILABILITY_UNCONFIRMED" } }),
-    db.property.count({ where: { sellerId, status: "PENDING" } }),
-  ]);
-  return { live, awaiting, unavailable, pending };
-}
-
-async function loadState(phone: string, replies: BotReply[] = []): Promise<SimState> {
-  const conversation = await db.whatsAppConversation.findUnique({
-    where: { phone },
-    include: { seller: { select: { id: true, code: true, name: true } } },
-  });
-  const seller = conversation?.seller ?? (await db.seller.findUnique({ where: { phone }, select: { id: true, code: true, name: true } }));
-  const [plots, cities] = await Promise.all([plotCounts(seller?.id), liveCities()]);
-  if (!conversation) return { ...emptyState(phone), seller, plots, cities };
-
-  const rows = await db.whatsAppMessage.findMany({
-    where: { conversationId: conversation.id },
-    orderBy: { createdAt: "desc" },
-    take: 150,
-  });
-  const fresh = new Map(replies.filter((r) => r.messageId).map((r) => [r.messageId!, r.message]));
-
-  const messages: SimMessage[] = rows.reverse().map((m) => {
-    const out: SimMessage = {
-      id: m.id,
-      direction: m.direction,
-      type: m.type,
-      body: m.body,
-      mediaUrl: m.mediaUrl,
-      sentBy: m.sentBy,
-      createdAt: m.createdAt.toISOString(),
-    };
-    const sent = fresh.get(m.id);
-    if (sent?.type === "buttons") {
-      out.interactive = { kind: "buttons", body: sent.body, options: sent.buttons.map((b) => ({ id: b.id, title: b.title })) };
-    } else if (sent?.type === "list") {
-      out.interactive = {
-        kind: "list",
-        body: sent.body,
-        buttonLabel: sent.buttonLabel,
-        options: sent.rows.map((r) => ({ id: r.id, title: r.title, description: r.description })),
-      };
-    }
-    return out;
-  });
-
-  return {
-    phone,
-    profileName: conversation.profileName,
-    conversationId: conversation.id,
-    step: conversation.step,
-    stepLabel: describeStep(conversation.step),
-    seller,
-    plots,
-    cities,
-    messages,
-  };
-}
+const emptyState = emptyChatState;
+const loadState = (phone: string, replies?: BotReply[]) => loadChatState(phone, replies);

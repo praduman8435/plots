@@ -50,7 +50,7 @@ export default async function SellStartPage(props: PageProps<"/sell/start">) {
                     A one-time check with your Aadhaar through {kyc.label}. Buyers then see <strong className="text-ink">✓ Identity verified</strong> on your listings.
                   </p>
                   <ul className="mt-5 space-y-2.5 text-sm text-ink-soft">
-                    <li className="flex gap-2.5"><Lock className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden /> We never see or store your Aadhaar number.</li>
+                    <li className="flex gap-2.5"><Lock className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden /> We never store your Aadhaar number.</li>
                     <li className="flex gap-2.5"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden /> Buyers never see your Aadhaar details.</li>
                     <li className="flex gap-2.5"><BadgeCheck className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden /> Takes about 2 minutes. Only once.</li>
                   </ul>

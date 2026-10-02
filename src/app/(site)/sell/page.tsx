@@ -7,7 +7,7 @@ import { ButtonA, ButtonLink } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { getSellerSession } from "@/lib/seller/session";
 import { site } from "@/lib/site";
-import { sellOnWhatsAppLink } from "@/lib/whatsapp-links";
+import { sellOnWhatsAppProps } from "@/lib/whatsapp-links";
 
 export const metadata: Metadata = {
   title: "Sell your land — list free in a few minutes",
@@ -45,7 +45,7 @@ export default async function SellPage() {
                 Start selling <ArrowRight />
               </ButtonLink>
             )}
-            <ButtonA href={sellOnWhatsAppLink()} target="_blank" rel="noopener" size="xl" className="w-full bg-white/10 shadow-none ring-1 ring-white/25 hover:bg-white/15">
+            <ButtonA {...sellOnWhatsAppProps()} size="xl" className="w-full bg-white/10 shadow-none ring-1 ring-white/25 hover:bg-white/15">
               <WhatsAppIcon /> List on WhatsApp instead
             </ButtonA>
           </div>

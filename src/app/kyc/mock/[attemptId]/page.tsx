@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { isDemoMode } from "@/lib/demo";
 import { getSellerSession } from "@/lib/seller/session";
 
-export const metadata: Metadata = { title: "Identity verification (simulated)", robots: { index: false } };
+export const metadata: Metadata = { title: "Aadhaar verification", robots: { index: false } };
 
 /** Stand-in for the provider's hosted page (DigiLocker etc.). 404 outside local dev. */
 export default async function MockKycPage(props: PageProps<"/kyc/mock/[attemptId]">) {

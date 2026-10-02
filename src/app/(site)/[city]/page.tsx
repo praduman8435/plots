@@ -11,7 +11,7 @@ import { WhatsAppIcon } from "@/components/ui/icons";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/format";
 import { RESERVED_SLUGS, site } from "@/lib/site";
-import { sellOnWhatsAppLink, supportWhatsAppLink } from "@/lib/whatsapp-links";
+import { sellOnWhatsAppProps, supportWhatsAppLink } from "@/lib/whatsapp-links";
 import { getLatestListings, getLiveCities, getMarketStats } from "@/server/listings/queries";
 
 export const revalidate = 60;
@@ -66,7 +66,7 @@ export default async function CityPage(props: PageProps<"/[city]">) {
           We&apos;re launching city by city. Own or sell land in {city.name}? List it now and be among the first sellers when we go live.
         </p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <ButtonA href={sellOnWhatsAppLink()} target="_blank" rel="noopener" size="lg">
+          <ButtonA {...sellOnWhatsAppProps()} size="lg">
             <WhatsAppIcon /> List land on WhatsApp
           </ButtonA>
           <ButtonA href={supportWhatsAppLink(`Hi, please tell me when Plots launches in ${city.name}.`)} target="_blank" rel="noopener" size="lg" variant="secondary">

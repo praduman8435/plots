@@ -15,7 +15,8 @@ import { placeName } from "@/lib/land";
 import { formatPhone } from "@/lib/phone";
 import { requireSeller } from "@/lib/seller/require";
 import { formatArea } from "@/lib/units";
-import { sellOnWhatsAppLink, waLink } from "@/lib/whatsapp-links";
+import { site } from "@/lib/site";
+import { isWhatsAppConnected, sellOnWhatsAppProps, waLink } from "@/lib/whatsapp-links";
 import { sellerSignOut } from "@/server/actions/seller/auth";
 import { isKycAvailable } from "@/server/kyc/provider";
 
@@ -86,7 +87,16 @@ export default async function SellerDashboard() {
               <p className="text-xs font-semibold tracking-widest text-white/60 uppercase">Seller ID</p>
               <p className="mt-0.5 font-mono text-3xl font-bold tracking-wider">{seller.code}</p>
             </div>
-            <CopySellerId code={seller.code} />
+            <div className="flex flex-wrap gap-2">
+              <CopySellerId code={seller.code} />
+              <Link
+                href={isWhatsAppConnected() ? waLink(site.whatsappNumber, "STATUS") : "/sell/chat"}
+                {...(isWhatsAppConnected() ? { target: "_blank", rel: "noopener" } : {})}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-brand-800 transition hover:bg-brand-50"
+              >
+                <WhatsAppIcon className="size-3.5" /> Messages
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -111,7 +121,7 @@ export default async function SellerDashboard() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-extrabold">My properties</h2>
             <div className="flex gap-2">
-              <ButtonA href={sellOnWhatsAppLink()} target="_blank" rel="noopener" variant="secondary" size="sm" className="hidden sm:inline-flex">
+              <ButtonA {...sellOnWhatsAppProps()} variant="secondary" size="sm" className="hidden sm:inline-flex">
                 <WhatsAppIcon className="text-brand-600" /> Add via WhatsApp
               </ButtonA>
               <ButtonLink href="/seller/plots/new" size="sm">

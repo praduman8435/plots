@@ -11,9 +11,22 @@ export function buyerToSellerLink(sellerPhone: string, p: { title: string; code:
   return waLink(sellerPhone, `${intro} I'm interested in this property on ${site.name}: ${p.title} (${p.code})\n${site.url}/property/${p.slug}`);
 }
 
-/** Seller → our WhatsApp listing assistant. "SELL" starts the guided flow. */
+/** True once the business number is connected to the WhatsApp Cloud API (set NEXT_PUBLIC_WHATSAPP_CONNECTED=true). */
+export function isWhatsAppConnected(): boolean {
+  return process.env.NEXT_PUBLIC_WHATSAPP_CONNECTED === "true";
+}
+
+/**
+ * Seller → our listing assistant. "SELL" starts the guided flow.
+ * Until Meta is connected, the same assistant runs in the in-site chat (/sell/chat).
+ */
 export function sellOnWhatsAppLink(): string {
-  return waLink(site.whatsappNumber, "SELL — Hi, I want to list my land on Plots.");
+  return isWhatsAppConnected() ? waLink(site.whatsappNumber, "SELL — Hi, I want to list my land on Plots.") : "/sell/chat?start=1";
+}
+
+/** Props for an <a>/ButtonA: new tab only for real WhatsApp. */
+export function sellOnWhatsAppProps(): { href: string; target?: string; rel?: string } {
+  return isWhatsAppConnected() ? { href: sellOnWhatsAppLink(), target: "_blank", rel: "noopener" } : { href: sellOnWhatsAppLink() };
 }
 
 export function supportWhatsAppLink(text = "Hi, I need help with Plots."): string {

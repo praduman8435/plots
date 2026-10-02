@@ -4,7 +4,7 @@ import { WhatsAppIcon } from "@/components/ui/icons";
 import { Logo } from "@/components/ui/logo";
 import { LAND_TYPES } from "@/lib/land";
 import { site } from "@/lib/site";
-import { sellOnWhatsAppLink, supportWhatsAppLink } from "@/lib/whatsapp-links";
+import { isWhatsAppConnected, sellOnWhatsAppLink, supportWhatsAppLink } from "@/lib/whatsapp-links";
 
 export function SiteFooter() {
   const columns = [
@@ -23,7 +23,7 @@ export function SiteFooter() {
       title: "Sell land",
       links: [
         { href: "/sell", label: "How selling works" },
-        { href: sellOnWhatsAppLink(), label: "List on WhatsApp", external: true },
+        { href: sellOnWhatsAppLink(), label: "List on WhatsApp", external: isWhatsAppConnected() },
         { href: "/seller", label: "Seller login" },
       ],
     },
@@ -44,7 +44,7 @@ export function SiteFooter() {
             <ul className="mt-4 space-y-2.5 text-sm">
               {col.links.map((l) => (
                 <li key={l.label}>
-                  {"external" in l ? (
+                  {"external" in l && l.external ? (
                     <a href={l.href} target="_blank" rel="noopener" className="transition hover:text-white">
                       {l.label}
                     </a>

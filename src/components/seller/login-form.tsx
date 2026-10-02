@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Button, ButtonA } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { WhatsAppIcon } from "@/components/ui/icons";
-import { sellOnWhatsAppLink } from "@/lib/whatsapp-links";
+import { sellOnWhatsAppProps } from "@/lib/whatsapp-links";
 import { requestSellerCode, signInWithoutCode, verifySellerCode } from "@/server/actions/seller/auth";
 
 const DEFAULT_COOLDOWN = 45;
@@ -90,7 +90,7 @@ export function SellerLoginForm({ otpPaused, next }: { otpPaused: boolean; next?
       <div>
         <p>{error.message}</p>
         {error.notFound && (
-          <a href={sellOnWhatsAppLink()} target="_blank" rel="noopener" className="mt-1.5 inline-flex items-center gap-1 font-semibold text-brand-700">
+          <a {...sellOnWhatsAppProps()} className="mt-1.5 inline-flex items-center gap-1 font-semibold text-brand-700">
             <WhatsAppIcon className="size-3.5" /> List on WhatsApp
           </a>
         )}
@@ -157,7 +157,7 @@ export function SellerLoginForm({ otpPaused, next }: { otpPaused: boolean; next?
         <div className="flex items-center gap-3 rounded-2xl border border-dashed border-amber-300 bg-amber-50 p-3.5 text-sm text-amber-900">
           <Terminal className="size-5 shrink-0" aria-hidden />
           <p>
-            <span className="font-semibold">Demo:</span> WhatsApp isn&apos;t connected yet, so here is your code:{" "}
+            Your code is{" "}
             <button type="button" onClick={() => setCode(devCode)} className="tabular font-mono text-base font-bold underline decoration-dotted">
               {devCode}
             </button>
@@ -200,7 +200,7 @@ export function NoSellerIdHelp() {
     <div className="rounded-3xl bg-mist p-5 text-center ring-1 ring-line">
       <p className="font-semibold text-ink">Don&apos;t have a Seller ID yet?</p>
       <p className="mt-1 text-sm text-muted">You get one automatically when you list your first plot.</p>
-      <ButtonA href={sellOnWhatsAppLink()} target="_blank" rel="noopener" variant="secondary" className="mt-4">
+      <ButtonA {...sellOnWhatsAppProps()} variant="secondary" className="mt-4">
         <WhatsAppIcon className="text-brand-600" /> List on WhatsApp
       </ButtonA>
     </div>

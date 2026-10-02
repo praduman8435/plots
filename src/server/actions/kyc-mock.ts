@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { isValidAadhaarFormat, maskAadhaar } from "@/lib/aadhaar";
+import { maskAadhaar } from "@/lib/aadhaar";
 import { isDemoMode } from "@/lib/demo";
 import { getSellerSession } from "@/lib/seller/session";
 
@@ -21,8 +21,8 @@ export async function mockKycComplete(input: { attemptId: string; aadhaar: strin
   if (!attempt) return { ok: false, message: "This verification session has expired. Please start again." };
 
   const digits = (input.aadhaar ?? "").replace(/\D/g, "");
-  if (!isValidAadhaarFormat(digits)) return { ok: false, message: "That doesn't look like a valid Aadhaar number." };
-  if (input.otp !== "123456") return { ok: false, message: "Incorrect OTP. (Mock: use 123456)" };
+  if (!/^[2-9]\d{11}$/.test(digits)) return { ok: false, message: "Enter your 12-digit Aadhaar number." };
+  if (input.otp !== "123456") return { ok: false, message: "Incorrect OTP. Please check and try again." };
 
   await db.kycAttempt.update({ where: { id: attempt.id }, data: { status: "VERIFIED", masked: maskAadhaar(digits) } });
   return { ok: true };

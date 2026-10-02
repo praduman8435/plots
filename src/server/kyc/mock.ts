@@ -9,7 +9,7 @@ import type { KycProvider, KycResult } from "./provider";
  */
 export class MockKycProvider implements KycProvider {
   readonly id = "mock";
-  readonly label = "DigiLocker (simulated)";
+  readonly label = "a secure Aadhaar OTP";
 
   async start(input: { attemptId: string; returnUrl: string }) {
     const params = new URLSearchParams({ return: input.returnUrl });

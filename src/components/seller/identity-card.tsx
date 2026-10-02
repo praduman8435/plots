@@ -19,7 +19,7 @@ export function IdentityCard({ next, providerLabel, failed, title = "Verify your
         </p>
       )}
       <ul className="mt-5 space-y-2.5 text-sm text-ink-soft">
-        <li className="flex gap-2.5"><Lock className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden /> We never see or store your Aadhaar number.</li>
+        <li className="flex gap-2.5"><Lock className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden /> We never store your Aadhaar number.</li>
         <li className="flex gap-2.5"><BadgeCheck className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden /> Takes about 2 minutes.</li>
       </ul>
       <form action={beginIdentityCheck} className="mt-7">

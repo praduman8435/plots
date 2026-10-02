@@ -1,4 +1,5 @@
 import "server-only";
+import { isDemoMode } from "@/lib/demo";
 import { maskPhoneForLogging } from "@/lib/phone";
 import { getWhatsAppTransportConfig, isWhatsAppConfigured } from "./config";
 
@@ -87,7 +88,8 @@ export function toMetaPayload(to: string, message: OutgoingMessage): Record<stri
 /** Sends one message. Returns Meta's message id (or a dev-outbox id). Throws a plain Error on failure. */
 export async function sendWhatsAppMessage(to: string, message: OutgoingMessage, logLabel: string): Promise<string> {
   if (!isWhatsAppConfigured()) {
-    if (process.env.NODE_ENV === "production") throw new Error("WhatsApp is not configured");
+    // Before Meta is connected (DEMO_MODE), messages live in the in-site chat (/sell/chat) instead.
+    if (process.env.NODE_ENV === "production" && !isDemoMode()) throw new Error("WhatsApp is not configured");
     console.log(`[DEV WHATSAPP OUTBOX] to=${maskPhoneForLogging(to)} label=${logLabel}\n${describe(message)}`);
     return `dev-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }

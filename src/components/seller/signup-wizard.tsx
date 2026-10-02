@@ -157,10 +157,11 @@ export function SignupWizard() {
         <p className="mb-4 flex items-center gap-2.5 rounded-2xl border border-dashed border-amber-300 bg-amber-50 p-3.5 text-sm text-amber-900">
           <Terminal className="size-5 shrink-0" aria-hidden />
           <span>
-            <strong>Demo:</strong> WhatsApp isn&apos;t connected yet. Your code is{" "}
+            Your code is{" "}
             <button type="button" className="font-mono text-base font-bold underline decoration-dotted" onClick={() => setCode(devCode)}>
               {devCode}
-            </button>
+            </button>{" "}
+            <span className="text-amber-800/80">(tap to fill)</span>
           </span>
         </p>
       )}
