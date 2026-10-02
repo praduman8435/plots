@@ -30,7 +30,7 @@ export function ContactButtons({
         size={size === "sm" ? "icon-sm" : "icon"}
         aria-label={`WhatsApp ${formatPhone(phone)}`}
         title="WhatsApp"
-        className="size-11 sm:size-9"
+        className="size-9"
       >
         <WhatsAppIcon />
       </ButtonA>
@@ -40,7 +40,7 @@ export function ContactButtons({
         size={size === "sm" ? "icon-sm" : "icon"}
         aria-label={`Call ${formatPhone(phone)}`}
         title="Call"
-        className="size-11 sm:size-9"
+        className="size-9"
       >
         <Phone />
       </ButtonA>

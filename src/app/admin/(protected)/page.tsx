@@ -1,6 +1,6 @@
 import {
-  ArrowRight,
   CheckCircle2,
+  ChevronRight,
   ClipboardCheck,
   EyeOff,
   Hourglass,
@@ -36,7 +36,7 @@ function waitingFor(since: Date, at: Date) {
  * right now?" — only actions with something to do are shown, most urgent first.
  */
 export default async function AdminTodayPage() {
-  const admin = await requireAdmin();
+  await requireAdmin();
   const at = now();
   const weekAgo = daysAgo(7);
 
@@ -61,8 +61,8 @@ export default async function AdminTodayPage() {
     pending > 0 && {
       key: "review",
       icon: ClipboardCheck,
-      title: `Approve ${pending} new plot${pending === 1 ? "" : "s"}`,
-      detail: oldestPending ? `Oldest has been waiting ${waitingFor(oldestPending.createdAt, at)}. Sellers are told on WhatsApp.` : undefined,
+      title: `Approve ${pending} plot${pending === 1 ? "" : "s"}`,
+      detail: oldestPending ? `Oldest waiting ${waitingFor(oldestPending.createdAt, at)}` : undefined,
       href: "/admin/listings?status=PENDING",
       cta: "Review",
       urgent: Boolean(oldestPending && at.getTime() - oldestPending.createdAt.getTime() > 12 * 3_600_000),
@@ -70,24 +70,24 @@ export default async function AdminTodayPage() {
     chats > 0 && {
       key: "chats",
       icon: MessageCircle,
-      title: `Reply to ${chats} seller chat${chats === 1 ? "" : "s"}`,
-      detail: "Unread messages, or sellers who asked to talk to a person.",
+      title: `Reply to ${chats} chat${chats === 1 ? "" : "s"}`,
+      detail: "Unread, or asked for a person",
       href: "/admin/whatsapp",
       cta: "Open chats",
     },
     availability.unreachable > 0 && {
       key: "unreachable",
       icon: PhoneOff,
-      title: `Call ${availability.unreachable} seller${availability.unreachable === 1 ? "" : "s"} we couldn't reach`,
-      detail: "The weekly “still available?” message didn't go through. Confirm by phone.",
+      title: `Call ${availability.unreachable} seller${availability.unreachable === 1 ? "" : "s"}`,
+      detail: "Weekly check didn't reach them",
       href: "/admin/availability",
       cta: "Follow up",
     },
     availability.unavailable > 0 && {
       key: "unavailable",
       icon: EyeOff,
-      title: `${availability.unavailable} plot${availability.unavailable === 1 ? "" : "s"} hidden after no reply`,
-      detail: "Ask the seller if it's still available — one tap brings it back.",
+      title: `${availability.unavailable} plot${availability.unavailable === 1 ? "" : "s"} hidden — no reply`,
+      detail: "Ask if still available",
       href: "/admin/availability",
       cta: "Check",
     },
@@ -98,46 +98,33 @@ export default async function AdminTodayPage() {
   return (
     <div className="mx-auto max-w-3xl">
       {/* Headline: how much needs me? */}
-      <header className="mb-6">
-        <p className="text-sm font-medium text-muted">
-          {hello}, {admin.name.split(/\s+/)[0]}
-        </p>
-        <h1 className="mt-1 text-[1.75rem] leading-tight font-extrabold tracking-tight text-ink sm:text-3xl">
-          {actions.length === 0 ? "You're all caught up" : `${actions.length} thing${actions.length === 1 ? "" : "s"} need${actions.length === 1 ? "s" : ""} you`}
+      <header className="mb-5">
+        <p className="text-xs font-medium text-muted">{hello}</p>
+        <h1 className="mt-0.5 text-2xl leading-tight font-bold tracking-tight text-ink">
+          {actions.length === 0 ? "All caught up" : `${actions.length} to do`}
         </h1>
       </header>
 
       {/* To-do */}
       {actions.length === 0 ? (
-        <div className="flex items-center gap-4 rounded-3xl bg-brand-50 p-5 ring-1 ring-brand-100">
-          <CheckCircle2 className="size-8 shrink-0 text-brand-600" aria-hidden />
-          <div>
-            <p className="font-semibold text-brand-900">Nothing to approve, no chats waiting.</p>
-            <p className="text-sm text-brand-800/80">New plots and seller messages will show up here.</p>
-          </div>
+        <div className="flex items-center gap-3 rounded-2xl bg-brand-50 px-4 py-4 ring-1 ring-brand-100">
+          <CheckCircle2 className="size-6 shrink-0 text-brand-600" aria-hidden />
+          <p className="text-sm font-medium text-brand-900">Nothing to approve and no chats waiting. New items will show up here.</p>
         </div>
       ) : (
-        <ul className="space-y-2.5" aria-label="To do">
+        <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-white ring-1 ring-line" aria-label="To do">
           {actions.map((a) => (
             <li key={a.key}>
-              <Link
-                href={a.href}
-                className={cn(
-                  "group flex items-center gap-4 rounded-2xl bg-white p-4 shadow-soft ring-1 transition hover:shadow-card sm:p-5",
-                  a.urgent ? "ring-amber-300" : "ring-line hover:ring-brand-200",
-                )}
-              >
-                <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl", a.urgent ? "bg-amber-50 text-amber-700" : "bg-brand-50 text-brand-700")}>
-                  <a.icon className="size-5" aria-hidden />
+              <Link href={a.href} className="group flex items-center gap-3 px-4 py-3.5 transition active:bg-mist hover:bg-mist/60">
+                <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-full", a.urgent ? "bg-amber-50 text-amber-700" : "bg-brand-50 text-brand-700")}>
+                  <a.icon className="size-[18px]" aria-hidden />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-bold text-ink">{a.title}</span>
-                  {a.detail && <span className="mt-0.5 block text-sm leading-snug text-muted">{a.detail}</span>}
+                  <span className="block text-[15px] font-semibold text-ink">{a.title}</span>
+                  {a.detail && <span className="block truncate text-[13px] text-muted">{a.detail}</span>}
                 </span>
-                <span className="hidden shrink-0 items-center gap-1 rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-brand transition group-hover:bg-brand-700 sm:inline-flex">
-                  {a.cta} <ArrowRight className="size-4" aria-hidden />
-                </span>
-                <ArrowRight className="size-5 shrink-0 text-brand-600 sm:hidden" aria-hidden />
+                {a.urgent && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Waiting</span>}
+                <ChevronRight className="size-4 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-brand-600" aria-hidden />
               </Link>
             </li>
           ))}
@@ -146,9 +133,9 @@ export default async function AdminTodayPage() {
 
       {/* The very next plot to approve — decide it right here */}
       {next[0] && (
-        <section className="mt-8" aria-labelledby="next-heading">
+        <section className="mt-6" aria-labelledby="next-heading">
           <div className="mb-3 flex items-end justify-between gap-3">
-            <h2 id="next-heading" className="text-lg font-bold text-ink">
+            <h2 id="next-heading" className="text-base font-bold text-ink">
               Next to approve
             </h2>
             {pending > 1 && (
@@ -169,7 +156,7 @@ export default async function AdminTodayPage() {
         </p>
       )}
 
-      <section className="mt-10" aria-labelledby="week-heading">
+      <section className="mt-8" aria-labelledby="week-heading">
         <h2 id="week-heading" className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">
           This week
         </h2>
@@ -179,13 +166,13 @@ export default async function AdminTodayPage() {
           <Stat href="/admin/enquiries?range=7" label="Buyer enquiries" value={enquiries7} />
           <Stat href="/admin/sellers" label="New sellers" value={newSellers} />
         </dl>
-        <Link href="/admin/insights" className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:text-brand-800">
-          See full insights →
+        <Link href="/admin/insights" className="mt-2 inline-block text-[13px] font-semibold text-brand-700 hover:text-brand-800">
+          Full insights →
         </Link>
       </section>
 
       {recentEnquiries.length > 0 && (
-        <section className="mt-10" aria-labelledby="enq-heading">
+        <section className="mt-8" aria-labelledby="enq-heading">
           <div className="mb-3 flex items-end justify-between gap-3">
             <h2 id="enq-heading" className="text-sm font-semibold tracking-wide text-muted uppercase">
               Latest buyer enquiries
@@ -205,9 +192,9 @@ type Action = { key: string; icon: LucideIcon; title: string; detail?: string; h
 
 function Stat({ href, label, value }: { href: string; label: string; value: number }) {
   return (
-    <Link href={href} className="border-line p-4 transition hover:bg-mist [&:not(:last-child)]:border-r max-sm:[&:nth-child(2)]:border-r-0 max-sm:[&:nth-child(-n+2)]:border-b">
+    <Link href={href} className="border-line px-4 py-3 transition hover:bg-mist [&:not(:last-child)]:border-r max-sm:[&:nth-child(2)]:border-r-0 max-sm:[&:nth-child(-n+2)]:border-b">
       <dt className="text-xs font-medium text-muted">{label}</dt>
-      <dd className="tabular mt-1 text-xl font-extrabold text-ink">{formatNumber(value)}</dd>
+      <dd className="tabular mt-0.5 text-lg font-bold text-ink">{formatNumber(value)}</dd>
     </Link>
   );
 }

@@ -103,7 +103,7 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
   );
 
   return (
-    <div className="flex min-h-dvh flex-1 [--sticky-bottom:calc(4.25rem+env(safe-area-inset-bottom))] lg:[--sticky-bottom:0px]">
+    <div className="flex min-h-dvh flex-1 [--sticky-bottom:calc(3.75rem+env(safe-area-inset-bottom))] lg:[--sticky-bottom:0px]">
       {/* ── Desktop sidebar ── */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-white lg:flex">
         <div className="flex h-16 items-center gap-2 px-5">
@@ -168,15 +168,15 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ── Mobile top bar ── */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-line bg-white/90 px-4 backdrop-blur-md lg:hidden">
+        <header className="sticky top-0 z-30 flex h-12 items-center justify-between gap-3 border-b border-line bg-white/90 px-4 backdrop-blur-md lg:hidden">
           <Link href="/admin" className="flex items-center gap-2" aria-label="Admin overview">
-            <LogoMark className="size-7" />
-            <span className="text-[17px] font-extrabold tracking-tight text-brand-950">Plots</span>
+            <LogoMark className="size-6" />
+            <span className="text-base font-extrabold tracking-tight text-brand-950">Plots</span>
             <span className="rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-brand-700 uppercase ring-1 ring-brand-100">
               Admin
             </span>
           </Link>
-          <ButtonLink href="/admin/listings/new" size="sm" variant="soft" aria-label="Add plot for a seller">
+          <ButtonLink href="/admin/listings/new" size="sm" variant="soft" className="h-8 px-3 text-[13px]" aria-label="Add plot for a seller">
             <Plus /> Add plot
           </ButtonLink>
         </header>
@@ -200,7 +200,7 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "relative flex h-14 flex-col items-center justify-center gap-1 text-[11px] font-semibold transition",
+                    "relative flex h-[3.25rem] flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition",
                     isActive ? "text-brand-700" : "text-muted",
                   )}
                 >
@@ -224,7 +224,7 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
               onClick={openMore}
               aria-haspopup="dialog"
               className={cn(
-                "relative flex h-14 w-full flex-col items-center justify-center gap-1 text-[11px] font-semibold transition",
+                "relative flex h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition",
                 moreActive ? "text-brand-700" : "text-muted",
               )}
             >

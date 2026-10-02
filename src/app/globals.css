@@ -150,3 +150,15 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.07' stroke-width='1.2'%3E%3Cpath d='M-50 120c80-40 160 30 250 0s170-70 260-20 160 40 200 10'/%3E%3Cpath d='M-50 170c90-40 170 30 260 0s160-60 250-15 160 45 200 10'/%3E%3Cpath d='M-50 220c100-35 180 35 270 5s150-55 240-12 160 48 200 12'/%3E%3Cpath d='M-50 300c80-30 170 40 260 10s170-70 260-25 150 40 190 8'/%3E%3Cpath d='M-50 350c90-30 170 40 260 12s160-62 250-20 150 42 190 10'/%3E%3Cpath d='M-50 430c80-40 160 30 250 0s170-70 260-20 160 40 200 10'/%3E%3Cpath d='M-50 480c90-40 170 30 260 0s160-60 250-15 160 45 200 10'/%3E%3Cpath d='M-50 540c100-35 180 35 270 5s150-55 240-12 160 48 200 12'/%3E%3C/g%3E%3C/svg%3E");
   background-size: 600px 600px;
 }
+
+/*
+ * Admin is a work tool used on phones: a slightly smaller scale (everything is rem-based),
+ * calmer buttons (no glow), and no tap highlight noise.
+ */
+html:has(.admin-root) {
+  font-size: 14px;
+}
+.admin-root {
+  --shadow-brand: 0 1px 2px rgb(10 100 62 / 0.25);
+  --shadow-card: 0 1px 2px rgb(14 26 20 / 0.04), 0 4px 12px -6px rgb(14 26 20 / 0.1);
+}

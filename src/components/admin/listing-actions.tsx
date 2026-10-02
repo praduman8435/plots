@@ -127,23 +127,32 @@ export function ReviewActions({ propertyId, className }: { propertyId: string; c
   const { pending, running, run } = useRunner();
   const rejectRef = useRef<HTMLDialogElement>(null);
   return (
-    <div className={cn("flex gap-2", className)}>
+    <div className={cn("flex items-center gap-2", className)}>
       <Button
         type="button"
-        className="flex-1 px-3"
+        size="md"
+        className="h-10 flex-1 px-4"
         onClick={() => run("APPROVE", () => changeListingStatusAction(propertyId, { type: "APPROVE" }))}
         disabled={pending}
       >
         {running === "APPROVE" ? <Loader2 className="animate-spin" /> : <Check />}
         Approve
       </Button>
-      <Button type="button" variant="danger" className="flex-1 px-3" onClick={() => rejectRef.current?.showModal()} disabled={pending}>
-        <X /> Reject
+      <Button
+        type="button"
+        size="md"
+        variant="ghost"
+        className="h-10 px-4 text-danger hover:bg-red-50 hover:text-danger"
+        onClick={() => rejectRef.current?.showModal()}
+        disabled={pending}
+      >
+        Reject
       </Button>
       <ButtonLink
         href={`/admin/listings/${propertyId}#edit`}
-        variant="secondary"
-        className="w-11 px-0 sm:w-auto sm:px-4"
+        variant="ghost"
+        size="md"
+        className="size-10 px-0 sm:w-auto sm:px-4"
         aria-label="Edit listing"
         title="Edit"
       >
