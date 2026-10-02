@@ -19,13 +19,15 @@ async function load(params: Promise<{ city: string; type: string }>) {
   const type = landTypeFromSlug(typeSlug);
   if (!type || type === "OTHER" || RESERVED_SLUGS.has(citySlug) || !/^[a-z0-9-]+$/.test(citySlug)) return null;
   const city = await db.city.findUnique({ where: { slug: citySlug } });
-  if (!city?.isLive) return null;
+  if (!city) return null;
   return { city, type };
 }
 
 export async function generateStaticParams() {
-  const cities = await db.city.findMany({ where: { isLive: true }, select: { slug: true } });
-  return cities.flatMap((c) => ["AGRICULTURAL", "RESIDENTIAL_PLOT", "COMMERCIAL", "INDUSTRIAL"].map((t) => ({ city: c.slug, type: LAND_TYPE_SLUGS[t as keyof typeof LAND_TYPE_SLUGS] })));
+  const combos = await db.property.groupBy({ by: ["cityId", "landType"], where: { status: "ACTIVE" } });
+  const cities = await db.city.findMany({ where: { id: { in: [...new Set(combos.map((c) => c.cityId))] } }, select: { id: true, slug: true } });
+  const slugOf = new Map(cities.map((c) => [c.id, c.slug]));
+  return combos.flatMap((c) => (slugOf.has(c.cityId) && c.landType !== "OTHER" ? [{ city: slugOf.get(c.cityId)!, type: LAND_TYPE_SLUGS[c.landType] }] : []));
 }
 
 export async function generateMetadata(props: PageProps<"/[city]/[type]">): Promise<Metadata> {

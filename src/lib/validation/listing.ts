@@ -14,7 +14,11 @@ const optionalCoord = (min: number, max: number) =>
 
 /** Shared by the seller "Add plot" form, the admin form and the WhatsApp assistant. */
 export const listingInputSchema = z.object({
-  cityId: z.string().min(1, "Choose a city"),
+  /** An existing city… */
+  cityId: z.string().max(40).optional(),
+  /** …or any city/town typed by the seller (created on first use). */
+  cityName: z.string().trim().max(60).optional(),
+  state: z.string().trim().max(60).optional(),
   landType: z.enum(Object.values(LandType) as [LandType, ...LandType[]], { message: "Choose the land type" }),
   area: z.coerce.number({ message: "Enter the land size" }).positive("Enter the land size").max(10_000_000),
   areaUnit: z.enum(Object.values(AreaUnit) as [AreaUnit, ...AreaUnit[]]),
@@ -30,7 +34,15 @@ export const listingInputSchema = z.object({
   longitude: optionalCoord(-180, 180),
   description: z.string().trim().min(15, "Add a short description (at least 15 characters)").max(2000),
   features: z.array(z.enum(FEATURE_OPTIONS)).default([]),
-});
+})
+  // Where: an existing city, or a typed city + its state. State comes first in every form.
+  .superRefine((v, ctx) => {
+    if (v.cityId) return;
+    if (!v.state) ctx.addIssue({ code: "custom", path: ["state"], message: "Choose the state" });
+    if (!v.cityName || !/^[\p{L}\p{M}][\p{L}\p{M} .'()-]{1,58}$/u.test(v.cityName)) {
+      ctx.addIssue({ code: "custom", path: ["cityName"], message: "Enter the city or district" });
+    }
+  });
 
 export type ListingInput = z.infer<typeof listingInputSchema>;
 

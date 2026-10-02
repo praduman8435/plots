@@ -4,8 +4,7 @@ import { Logo } from "@/components/ui/logo";
 
 const nav = [
   { href: "/search", label: "Search land" },
-  { href: "/chandigarh", label: "Chandigarh" },
-  { href: "/azamgarh", label: "Azamgarh" },
+  { href: "/cities", label: "All cities" },
   { href: "/seller", label: "Seller login" },
 ];
 

@@ -24,6 +24,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import type { AreaUnit, LandType } from "@/generated/prisma/enums";
 import { cn } from "@/lib/cn";
 import { formatNumber, formatPrice } from "@/lib/format";
+import { INDIAN_STATES } from "@/lib/india";
 import { FEATURE_OPTIONS, LAND_TYPES, buildTitle, placeName } from "@/lib/land";
 import { AREA_UNITS, formatArea, toSqft } from "@/lib/units";
 import { listingInputSchema } from "@/lib/validation/listing";
@@ -95,18 +96,19 @@ function parseAmount(v: string): number {
   return Number.isFinite(n) ? n : NaN;
 }
 
-const FIELD_ORDER = ["landType", "cityId", "locality", "village", "area", "areaUnit", "price", "features", "description", "images", "title"];
+const FIELD_ORDER = ["landType", "state", "cityName", "locality", "village", "area", "areaUnit", "price", "features", "description", "images", "title"];
 
 /** Wizard pages and the fields each one validates before "Next". */
 const PAGES = [
-  { title: "Property details", fields: ["landType", "cityId", "locality", "village", "area", "areaUnit", "price", "priceNegotiable", "latitude", "longitude"] },
+  { title: "Property details", fields: ["landType", "state", "cityName", "locality", "village", "area", "areaUnit", "price", "priceNegotiable", "latitude", "longitude"] },
   { title: "Photos & description", fields: ["description", "features", "images"] },
   { title: "Check and submit", fields: [] as string[] },
 ];
 
 type Draft = {
   landType: LandType | "";
-  cityId: string;
+  stateName: string;
+  cityName: string;
   locality: string;
   village: string;
   coords: { lat: number; lng: number } | null;
@@ -139,7 +141,9 @@ export function ListingForm({
   const [pending, startTransition] = useTransition();
 
   const [landType, setLandType] = useState<LandType | "">(initial?.landType ?? "");
-  const [cityId, setCityId] = useState(initial?.cityId ?? (cities.length === 1 ? cities[0].id : ""));
+  const initialCity = cities.find((c) => c.id === initial?.cityId);
+  const [stateName, setStateName] = useState(initial?.state ?? initialCity?.state ?? "");
+  const [cityName, setCityName] = useState(initial?.cityName ?? initialCity?.name ?? "");
   const [locality, setLocality] = useState(initial?.locality ?? "");
   const [village, setVillage] = useState(initial?.village ?? "");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
@@ -173,7 +177,8 @@ export function ListingForm({
       const d = JSON.parse(localStorage.getItem(wizard.draftKey) ?? "null") as Draft | null;
       if (!d || Date.now() - d.savedAt > 14 * 86_400_000) return;
       setLandType(d.landType);
-      if (cities.some((c) => c.id === d.cityId)) setCityId(d.cityId);
+      setStateName(d.stateName ?? "");
+      setCityName(d.cityName ?? "");
       setLocality(d.locality);
       setVillage(d.village);
       setCoords(d.coords);
@@ -195,7 +200,7 @@ export function ListingForm({
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const draft: Omit<Draft, "savedAt"> = { landType, cityId, locality, village, coords, area, areaUnit, priceAmount, priceUnit, negotiable, features, description, images, page };
+  const draft: Omit<Draft, "savedAt"> = { landType, stateName, cityName, locality, village, coords, area, areaUnit, priceAmount, priceUnit, negotiable, features, description, images, page };
   const draftJson = JSON.stringify(draft);
   useEffect(() => {
     if (!wizard) return;
@@ -222,7 +227,9 @@ export function ListingForm({
     window.location.reload();
   }
 
-  const city = cities.find((c) => c.id === cityId);
+  // An already-used city (suggested as you type), or a brand-new one — both work.
+  const city = cities.find((c) => c.state === stateName && c.name.toLowerCase() === cityName.trim().toLowerCase());
+  const stateCities = cities.filter((c) => !stateName || c.state === stateName);
   const areaNum = parseAmount(area);
   const multiplier = PRICE_UNITS.find((u) => u.value === priceUnit)!.multiplier;
   const amountNum = parseAmount(priceAmount);
@@ -271,7 +278,9 @@ export function ListingForm({
 
   function rawInput() {
     return {
-      cityId,
+      cityId: city?.id,
+      cityName: cityName.trim() || undefined,
+      state: stateName || undefined,
       landType: landType || undefined,
       area: area.trim() === "" ? undefined : areaNum,
       areaUnit,
@@ -447,26 +456,47 @@ export function ListingForm({
       {/* ── Location ── */}
       <Section title="Where is it?" step={wizard ? undefined : 2}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="City / district" htmlFor={fid("cityId")} error={errors.cityId}>
+          <Field label="State" htmlFor={fid("state")} error={errors.state}>
             <Select
-              id={fid("cityId")}
-              value={cityId}
+              id={fid("state")}
+              value={stateName}
               onChange={(e) => {
-                setCityId(e.target.value);
-                clearError("cityId");
+                setStateName(e.target.value);
+                clearError("state");
               }}
-              aria-invalid={Boolean(errors.cityId) || undefined}
+              aria-invalid={Boolean(errors.state) || undefined}
             >
-              {cities.length !== 1 && <option value="">Choose…</option>}
-              {cities.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}, {c.state}
+              <option value="">Choose state…</option>
+              {INDIAN_STATES.map((st) => (
+                <option key={st} value={st}>
+                  {st}
                 </option>
               ))}
             </Select>
           </Field>
+          <Field label="City / district" htmlFor={fid("cityName")} error={errors.cityName} hint={stateName ? "Pick a suggestion or type yours" : "Choose the state first"}>
+            <Input
+              id={fid("cityName")}
+              list={fid("cities")}
+              value={cityName}
+              onChange={(e) => {
+                setCityName(e.target.value);
+                clearError("cityName");
+              }}
+              placeholder="e.g. Mohali, Nashik, Azamgarh"
+              autoComplete="off"
+              maxLength={60}
+              disabled={!stateName}
+              aria-invalid={Boolean(errors.cityName) || undefined}
+            />
+            <datalist id={fid("cities")}>
+              {stateCities.map((c) => (
+                <option key={c.id} value={c.name} />
+              ))}
+            </datalist>
+          </Field>
           <Field
-            label="Area / locality"
+            label="Address — area / locality"
             htmlFor={fid("locality")}
             error={errors.locality}
             hint="Mohalla, road or a landmark buyers know"
@@ -502,8 +532,8 @@ export function ListingForm({
           <LocationPicker
             value={coords}
             onChange={setCoords}
-            center={city?.latitude != null && city?.longitude != null ? { lat: city.latitude, lng: city.longitude } : { lat: 26.0686, lng: 83.184 }}
-            areaHint={city ? `${city.name}, ${city.state}` : undefined}
+            center={city?.latitude != null && city?.longitude != null ? { lat: city.latitude, lng: city.longitude } : { lat: 22.9734, lng: 78.6569 }}
+            areaHint={cityName.trim() && stateName ? `${cityName.trim()}, ${stateName}` : stateName || undefined}
           />
         </div>
       </Section>
@@ -683,7 +713,7 @@ export function ListingForm({
           areaUnit={areaUnit}
           rupees={rupees}
           negotiable={negotiable}
-          place={[placeName({ locality, village }), city?.name].filter(Boolean).join(", ")}
+          place={[placeName({ locality, village }), cityName.trim()].filter(Boolean).join(", ")}
           pinned={Boolean(coords)}
           photos={images}
           description={description}

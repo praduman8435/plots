@@ -6,18 +6,16 @@ import { notFound } from "next/navigation";
 import { PropertyCard } from "@/components/listing/property-card";
 import { HeroSearch } from "@/components/site/hero-search";
 import { LandTypeTiles, SectionHeading, SellOnWhatsAppBand } from "@/components/site/sections";
-import { ButtonA, ButtonLink } from "@/components/ui/button";
-import { WhatsAppIcon } from "@/components/ui/icons";
+import { ButtonLink } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/format";
 import { RESERVED_SLUGS, site } from "@/lib/site";
-import { sellOnWhatsAppProps, supportWhatsAppLink } from "@/lib/whatsapp-links";
-import { getLatestListings, getLiveCities, getMarketStats } from "@/server/listings/queries";
+import { getCitiesWithCounts, getLatestListings, getMarketStats } from "@/server/listings/queries";
 
 export const revalidate = 60;
 
 export async function generateStaticParams() {
-  const cities = await getLiveCities();
+  const cities = await getCitiesWithCounts(200);
   return cities.map((c) => ({ city: c.slug }));
 }
 
@@ -36,7 +34,8 @@ export async function generateMetadata(props: PageProps<"/[city]">): Promise<Met
       city.intro ??
       `Agricultural land, residential plots and commercial land for sale in ${city.name}, ${city.state}. Contact owners and brokers directly on WhatsApp.`,
     alternates: { canonical: `/${city.slug}` },
-    robots: { index: city.isLive },
+    // Pages for cities with no live land yet stay out of Google until they have something to show.
+    robots: { index: (await db.property.count({ where: { cityId: city.id, status: "ACTIVE" } })) > 0 },
   };
 }
 
@@ -54,31 +53,6 @@ async function agriPricePerAcre(cityId: string) {
 export default async function CityPage(props: PageProps<"/[city]">) {
   const city = await getCity((await props.params).city);
   if (!city) notFound();
-
-  if (!city.isLive) {
-    return (
-      <section className="container-page flex min-h-[70vh] flex-col items-center justify-center py-16 text-center">
-        <span className="flex size-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-700 ring-1 ring-brand-100">
-          <MapPin className="size-6" aria-hidden />
-        </span>
-        <h1 className="mt-6 text-3xl font-extrabold sm:text-4xl">Coming soon to {city.name}</h1>
-        <p className="mx-auto mt-3 max-w-md text-muted">
-          We&apos;re launching city by city. Own or sell land in {city.name}? List it now and be among the first sellers when we go live.
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <ButtonA {...sellOnWhatsAppProps()} size="lg">
-            <WhatsAppIcon /> List land on WhatsApp
-          </ButtonA>
-          <ButtonA href={supportWhatsAppLink(`Hi, please tell me when Plots launches in ${city.name}.`)} target="_blank" rel="noopener" size="lg" variant="secondary">
-            Notify me at launch
-          </ButtonA>
-        </div>
-        <Link href="/" className="mt-8 text-sm font-semibold text-brand-700">
-          ← Browse live cities
-        </Link>
-      </section>
-    );
-  }
 
   const [stats, latest, pricing] = await Promise.all([
     getMarketStats(city.id),
@@ -124,7 +98,7 @@ export default async function CityPage(props: PageProps<"/[city]">) {
           <h1 className="mt-4 max-w-3xl text-[2.2rem] leading-[1.05] font-extrabold text-white sm:text-6xl">
             Land for sale in <span className="text-brand-300">{city.name}</span>
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/80 sm:text-lg">{city.intro}</p>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/80 sm:text-lg">{city.intro ?? `Residential plots, farmland and commercial land for sale in ${city.name}, ${city.state}. See real photos and prices, and talk to sellers directly on WhatsApp.`}</p>
           <dl className="mt-7 flex flex-wrap gap-x-8 gap-y-3 text-white">
             <div>
               <dt className="text-xs text-white/60">Plots available</dt>
@@ -162,16 +136,28 @@ export default async function CityPage(props: PageProps<"/[city]">) {
               </Link>
             }
           />
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-            {latest.map((p, i) => (
-              <PropertyCard key={p.id} p={p} priority={i < 2} />
-            ))}
-          </div>
-          <div className="mt-8 flex justify-center">
-            <ButtonLink href={`/search?city=${city.slug}`} variant="secondary" size="lg">
-              See all {stats.live} plots in {city.name} <ArrowRight />
-            </ButtonLink>
-          </div>
+          {latest.length === 0 ? (
+            <div className="rounded-3xl bg-white p-8 text-center ring-1 ring-line">
+              <p className="font-semibold">No land listed in {city.name} yet</p>
+              <p className="mt-1 text-sm text-muted">Own or sell land here? Be the first to list it.</p>
+              <ButtonLink href="/sell" className="mt-4">
+                Sell your land
+              </ButtonLink>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
+                {latest.map((p, i) => (
+                  <PropertyCard key={p.id} p={p} priority={i < 2} />
+                ))}
+              </div>
+              <div className="mt-8 flex justify-center">
+                <ButtonLink href={`/search?city=${city.slug}`} variant="secondary" size="lg">
+                  See all {stats.live} plots in {city.name} <ArrowRight />
+                </ButtonLink>
+              </div>
+            </>
+          )}
         </div>
       </section>
 

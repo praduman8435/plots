@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { ListingFormPayload, ListingFormResult } from "@/components/listing/types";
 import { requireAdmin } from "@/lib/admin/require";
 import { db } from "@/lib/db";
+import { resolveCity } from "@/server/cities";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { listingInputSchema, sellerInputSchema } from "@/lib/validation/listing";
 import { changeListingStatus, createListing, findOrCreateSeller, runAvailabilityChecks, updateListing } from "@/server/listings/service";
@@ -219,8 +220,8 @@ export async function updateListingAction(propertyId: string, payload: ListingFo
 
   const existing = await db.property.findUnique({ where: { id: id.data }, select: { id: true } });
   if (!existing) return { ok: false, message: "This listing no longer exists." };
-  const city = await db.city.findUnique({ where: { id: parsed.listing.cityId }, select: { id: true } });
-  if (!city) return { ok: false, fieldErrors: { cityId: "Choose a city" } };
+  const city = await resolveCity({ ...parsed.listing });
+  if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
 
   await updateListing(existing.id, { ...parsed.listing, title: parsed.title });
   // Photos: the form sends the full, ordered list (first = cover).
@@ -284,8 +285,8 @@ export async function createListingForSellerAction(input: AdminCreateListingInpu
       fieldErrors: { ...(parsed.ok ? {} : parsed.result.fieldErrors), ...sellerErrors },
     };
   }
-  const city = await db.city.findUnique({ where: { id: parsed.listing.cityId }, select: { id: true } });
-  if (!city) return { ok: false, fieldErrors: { cityId: "Choose a city" } };
+  const city = await resolveCity({ ...parsed.listing });
+  if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
 
   const seller =
     existing ??

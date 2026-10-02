@@ -3,17 +3,19 @@ import Link from "next/link";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { Logo } from "@/components/ui/logo";
 import { LAND_TYPES } from "@/lib/land";
+import { getCitiesWithCounts } from "@/server/listings/queries";
 import { site } from "@/lib/site";
 import { isWhatsAppConnected, sellOnWhatsAppLink, supportWhatsAppLink } from "@/lib/whatsapp-links";
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const topCities = await getCitiesWithCounts(5);
   const columns = [
     {
       title: "Buy land",
       links: [
         { href: "/search", label: "All plots" },
-        { href: "/chandigarh", label: "Land in Chandigarh Tricity" },
-        { href: "/azamgarh", label: "Land in Azamgarh" },
+        ...topCities.map((c) => ({ href: `/${c.slug}`, label: `Land in ${c.name}` })),
+        { href: "/cities", label: "All cities" },
         ...Object.entries(LAND_TYPES)
           .filter(([key]) => key !== "OTHER")
           .map(([key, t]) => ({ href: `/search?type=${key}`, label: t.label })),

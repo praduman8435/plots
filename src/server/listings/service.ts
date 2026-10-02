@@ -5,6 +5,7 @@ import { createWithUniqueCode, generatePropertyCode, generateSellerCode } from "
 import { db } from "@/lib/db";
 import { buildTitle } from "@/lib/land";
 import { slugify } from "@/lib/slug";
+import { resolveCity } from "@/server/cities";
 import { toSqft } from "@/lib/units";
 import type { ListingInput } from "@/lib/validation/listing";
 import { trackEvent } from "@/server/analytics";
@@ -59,7 +60,8 @@ export async function createListing(params: {
   notify?: boolean;
 }) {
   const { input } = params;
-  const city = await db.city.findUniqueOrThrow({ where: { id: input.cityId } });
+  const city = await resolveCity({ ...input });
+  if (!city) throw new Error("Could not determine the city for this listing");
   const title = buildTitle(input);
   const now = new Date();
 
@@ -103,7 +105,8 @@ export async function createListing(params: {
 
 /** Admin edit. Recomputes normalised area; keeps the title unless one is given. */
 export async function updateListing(propertyId: string, input: ListingInput & { title?: string }) {
-  const city = await db.city.findUniqueOrThrow({ where: { id: input.cityId } });
+  const city = await resolveCity({ ...input });
+  if (!city) throw new Error("Could not determine the city for this listing");
   return db.property.update({
     where: { id: propertyId },
     data: {

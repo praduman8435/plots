@@ -6,6 +6,7 @@ import { requireSeller } from "@/lib/seller/require";
 import type { ListingFormPayload, ListingFormResult } from "@/components/listing/types";
 import { listingInputSchema } from "@/lib/validation/listing";
 import { isKycAvailable } from "@/server/kyc/provider";
+import { resolveCity } from "@/server/cities";
 import { isOurImageUrl } from "@/server/storage";
 import { changeListingStatus, createListing, updateListing, type StatusAction } from "@/server/listings/service";
 
@@ -52,8 +53,8 @@ export async function createSellerListing(payload: ListingFormPayload): Promise<
     for (const issue of parsed.error.issues) fieldErrors[String(issue.path[0])] ??= issue.message;
     return { ok: false, message: "Please fix the highlighted fields.", fieldErrors };
   }
-  const city = await db.city.findFirst({ where: { id: parsed.data.cityId, isLive: true }, select: { id: true } });
-  if (!city) return { ok: false, fieldErrors: { cityId: "Choose a city" } };
+  const city = await resolveCity({ ...parsed.data });
+  if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
 
   // Only accept images our own upload endpoint produced.
   const images = (payload.images ?? []).filter((i) => isOurImageUrl(i.url)).slice(0, 10);
@@ -84,8 +85,8 @@ export async function updateSellerListing(propertyId: string, payload: ListingFo
     for (const issue of parsed.error.issues) fieldErrors[String(issue.path[0])] ??= issue.message;
     return { ok: false, message: "Please fix the highlighted fields.", fieldErrors };
   }
-  const city = await db.city.findFirst({ where: { id: parsed.data.cityId, isLive: true }, select: { id: true } });
-  if (!city) return { ok: false, fieldErrors: { cityId: "Choose a city" } };
+  const city = await resolveCity({ ...parsed.data });
+  if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
   const images = (payload.images ?? []).filter((i) => isOurImageUrl(i.url)).slice(0, 10);
 
   await updateListing(p.id, parsed.data);

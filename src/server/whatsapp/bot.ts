@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma, type Seller, type WhatsAppConversation } from "@/generated/prisma/client";
 import { AreaUnit, LandType, type ListingStatus, type HiddenReason, type SellerType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { matchState, splitCityAndState } from "@/lib/india";
 import { formatPrice } from "@/lib/format";
 import { LAND_TYPES, buildTitle, placeName } from "@/lib/land";
 import { maskPhoneForLogging } from "@/lib/phone";
@@ -10,6 +11,7 @@ import { site } from "@/lib/site";
 import { formatArea, formatSqftHint, toSqft } from "@/lib/units";
 import { listingInputSchema, type ListingInput } from "@/lib/validation/listing";
 import { trackEvent } from "@/server/analytics";
+import { CITY_NAME_PATTERN, resolveCity } from "@/server/cities";
 import { isKycAvailable } from "@/server/kyc/provider";
 import { changeListingStatus, createListing, findOrCreateSeller, plotsAwaitingAvailability } from "@/server/listings/service";
 import type { StoredImage } from "@/server/storage";
@@ -74,6 +76,7 @@ export const BOT_STEPS = [
   "ASK_NAME",
   "ASK_SELLER_TYPE",
   "ASK_LAND_TYPE",
+  "ASK_STATE",
   "ASK_CITY",
   "ASK_LOCALITY",
   "ASK_AREA",
@@ -95,7 +98,8 @@ const STEP_LABELS: Record<BotStep, string> = {
   ASK_NAME: "Asking name",
   ASK_SELLER_TYPE: "Owner or broker?",
   ASK_LAND_TYPE: "Asking land type",
-  ASK_CITY: "Asking city",
+  ASK_STATE: "Asking state",
+  ASK_CITY: "Asking city / district",
   ASK_LOCALITY: "Asking village / area",
   ASK_AREA: "Asking land size",
   ASK_AREA_UNIT: "Asking size unit",
@@ -123,6 +127,7 @@ const FLOW_ORDER: BotStep[] = [
   "ASK_NAME",
   "ASK_SELLER_TYPE",
   "ASK_LAND_TYPE",
+  "ASK_STATE",
   "ASK_CITY",
   "ASK_LOCALITY",
   "ASK_AREA",
@@ -148,6 +153,7 @@ const draftSchema = z
     landType: z.enum(Object.values(LandType) as [LandType, ...LandType[]]),
     cityId: z.string(),
     cityName: z.string(),
+    cityState: z.string(),
     locality: z.string(),
     village: z.string(),
     area: z.number(),
@@ -493,7 +499,7 @@ async function sendMenu(t: Turn, lead?: string) {
   const seller = t.seller ?? (await t.loadSeller());
   const intro = seller
     ? `Namaste ${firstName(seller.name)} 🙏\nYour Seller ID: *${seller.code}*`
-    : `Namaste 🙏 Welcome to *${site.name}* — sell your land directly to buyers in ${await liveCityNames()}. Listing takes about 2 minutes, right here on WhatsApp.`;
+    : `Namaste 🙏 Welcome to *${site.name}* — sell your land directly to buyers, anywhere in India. Listing takes about 2 minutes, right here on WhatsApp.`;
   await t.reply({
     type: "buttons",
     body: `${lead ? `${lead}\n\n` : ""}${intro}\n\nWhat would you like to do?`,
@@ -503,12 +509,6 @@ async function sendMenu(t: Turn, lead?: string) {
       { id: "menu:human", title: "Talk to us" },
     ],
   });
-}
-
-async function liveCityNames(): Promise<string> {
-  const cities = await db.city.findMany({ where: { isLive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], take: 3 });
-  if (cities.length === 0) return "your area";
-  return cities.map((c) => c.name).join(", ");
 }
 
 async function cancel(t: Turn) {
@@ -891,29 +891,11 @@ async function advance(t: Turn, from: BotStep, draft: BotDraft, lead?: string) {
 
 /** Saves the step and asks its question (skipping steps that answer themselves). */
 async function goTo(t: Turn, step: BotStep, draft: BotDraft, lead?: string): Promise<void> {
-  if (step === "ASK_CITY") {
-    const cities = await liveCities();
-    if (cities.length === 0) {
-      await t.save("HUMAN", draft);
-      await t.text(
-        `${lead ? `${lead}\n\n` : ""}We're not taking listings online in your area just yet 🙏 Someone from our team will message you here soon to help.`,
-      );
-      return;
-    }
-    if (cities.length === 1) {
-      const city = cities[0];
-      return advance(t, "ASK_CITY", { ...draft, cityId: city.id, cityName: city.name }, joinLead(lead, `📍 City: *${city.name}*`));
-    }
-  }
   if (step === "ASK_SELLER_TYPE" && draft.sellerType) return advance(t, step, draft, lead);
   if (step === "ASK_NAME" && draft.name) return advance(t, step, draft, lead);
 
   await t.save(step, draft);
   await t.reply(await promptFor(t, step, lead));
-}
-
-function joinLead(...parts: (string | undefined)[]) {
-  return parts.filter(Boolean).join("\n\n") || undefined;
 }
 
 /** Repeats the current question (after help, a stray message, or a stale button tap). */
@@ -923,8 +905,17 @@ async function reprompt(t: Turn, lead?: string) {
   await t.reply(await promptFor(t, t.step, lead));
 }
 
-function liveCities() {
-  return db.city.findMany({ where: { isLive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }], take: 10 });
+/** States that already have listings, most active first (shown as quick picks; any state can be typed). */
+async function popularStates(): Promise<string[]> {
+  const rows = await db.city.findMany({ where: { isLive: true }, select: { state: true, _count: { select: { properties: true } } } });
+  const totals = new Map<string, number>();
+  for (const r of rows) totals.set(r.state, (totals.get(r.state) ?? 0) + r._count.properties);
+  return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([state]) => state).slice(0, 9);
+}
+
+/** Cities already used in this state, most active first (quick picks; any city can be typed). */
+function citiesInState(state: string) {
+  return db.city.findMany({ where: { isLive: true, state }, orderBy: [{ properties: { _count: "desc" } }, { name: "asc" }], take: 9 });
 }
 
 const LAND_TYPE_HINTS: Record<LandType, string> = {
@@ -978,13 +969,26 @@ async function promptFor(t: Turn, step: BotStep, lead?: string): Promise<Outgoin
         buttonLabel: "Choose land type",
         rows: LAND_TYPE_ORDER.map((lt) => ({ id: `type:${lt}`, title: landTypeLabel(lt), description: LAND_TYPE_HINTS[lt] })),
       };
-    case "ASK_CITY": {
-      const cities = await liveCities();
+    case "ASK_STATE": {
+      const states = await popularStates();
       return {
         type: "list",
-        body: `${pre}Which city / district is the land in?`,
+        body: `${pre}Which *state* is the land in?\n\nPick from the list, or just type it — e.g. _Punjab_, _Uttar Pradesh_, _Gujarat_.`,
+        buttonLabel: "Choose state",
+        rows: states.map((st) => ({ id: `state:${st}`, title: st })),
+      };
+    }
+    case "ASK_CITY": {
+      const cities = d.cityState ? await citiesInState(d.cityState) : [];
+      const where = d.cityState ? ` in ${d.cityState}` : "";
+      if (cities.length === 0) {
+        return { type: "text", text: `${pre}🏙️ Which *city or district*${where} is the land in? Just type it — e.g. _Mohali_, _Azamgarh_, _Nashik_.` };
+      }
+      return {
+        type: "list",
+        body: `${pre}Which *city or district*${where} is the land in?\n\nPick from the list, or type it if yours isn't there.`,
         buttonLabel: "Choose city",
-        rows: cities.map((c) => ({ id: `city:${c.id}`, title: c.name, description: `${c.district}, ${c.state}` })),
+        rows: cities.map((c) => ({ id: `city:${c.id}`, title: c.name, description: c.state })),
       };
     }
     case "ASK_LOCALITY":
@@ -1081,7 +1085,8 @@ function summary(t: Turn): string {
 /** "(≈ 2.47 acres)" for fixed units. Bigha/Biswa and Marla/Kanal vary by region (City row), so no hint for them here. */
 function sqftHintFor(area: number, unit: AreaUnit): string {
   if (unit === "SQFT" || unit === "BIGHA" || unit === "BISWA" || unit === "MARLA" || unit === "KANAL") return "";
-  return ` (${formatSqftHint(toSqft(area, unit, 0))})`;
+  const hint = formatSqftHint(toSqft(area, unit, 0), unit);
+  return hint ? ` (${hint})` : "";
 }
 
 /** Answers to the current question. */
@@ -1120,15 +1125,26 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
       return advance(t, "ASK_LAND_TYPE", { ...d, landType }, `${landTypeLabel(landType)} ✓`);
     }
 
+    case "ASK_STATE": {
+      const fromId = replyId?.startsWith("state:") ? replyId.slice(6) : null;
+      const state = matchState(fromId ?? text ?? "");
+      if (!state) return reprompt(t, "I didn't recognise that state. Please pick one from the list, or type its name (e.g. *Punjab*).");
+      return advance(t, "ASK_STATE", { ...d, cityState: state, cityId: undefined, cityName: undefined }, `🗺️ State: *${state}*`);
+    }
+
     case "ASK_CITY": {
-      const cities = await liveCities();
       const fromId = replyId?.startsWith("city:") ? replyId.slice(5) : null;
-      const key = text ? normalizeInput(text) : "";
-      const city =
-        cities.find((c) => c.id === fromId) ??
-        (key ? cities.find((c) => c.name.toLowerCase() === key || c.slug === key || key.includes(c.name.toLowerCase())) : undefined);
-      if (!city) return reprompt(t, "Please choose a city from the list 👇");
-      return advance(t, "ASK_CITY", { ...d, cityId: city.id, cityName: city.name }, `📍 City: *${city.name}*`);
+      if (fromId) {
+        const city = await db.city.findUnique({ where: { id: fromId } });
+        if (city) return advance(t, "ASK_CITY", { ...d, cityId: city.id, cityName: city.name, cityState: city.state }, `🏙️ *${city.name}* ✓`);
+      }
+      const typed = cleanFreeText(text ?? "", 60);
+      // "Mohali, Punjab" typed in full is fine too; the state we already have wins.
+      const { name } = splitCityAndState(typed);
+      if (!CITY_NAME_PATTERN.test(name)) return reprompt(t, "Please type the city or district name (letters only).");
+      const city = await resolveCity({ cityName: name, state: d.cityState });
+      if (!city) return reprompt(t, "Please type the city or district name (letters only).");
+      return advance(t, "ASK_CITY", { ...d, cityId: city.id, cityName: city.name, cityState: city.state }, `🏙️ *${city.name}* ✓`);
     }
 
     case "ASK_LOCALITY": {
@@ -1332,6 +1348,8 @@ async function reloadDraft(conversationId: string) {
 
 const FIELD_TO_STEP: Partial<Record<keyof ListingInput, BotStep>> = {
   cityId: "ASK_CITY",
+  cityName: "ASK_CITY",
+  state: "ASK_STATE",
   landType: "ASK_LAND_TYPE",
   area: "ASK_AREA",
   areaUnit: "ASK_AREA",
@@ -1359,6 +1377,8 @@ async function submit(t: Turn) {
 
   const parsed = listingInputSchema.safeParse({
     cityId: d.cityId,
+    cityName: d.cityName,
+    state: d.cityState,
     landType: d.landType,
     area: d.area,
     areaUnit: d.areaUnit,
@@ -1382,14 +1402,6 @@ async function submit(t: Turn) {
     }
     return goTo(t, step, fixed, `⚠️ One thing needs fixing: ${issue?.message ?? "please check this answer"}.`);
   }
-  const city = await db.city.findUnique({ where: { id: parsed.data.cityId }, select: { id: true, isLive: true } });
-  if (!city?.isLive) {
-    const { cityId, cityName, ...rest } = d;
-    void cityId;
-    void cityName;
-    return goTo(t, "ASK_CITY", { ...rest, returnToConfirm: true }, "⚠️ Please choose the city again.");
-  }
-
   // Guard against a double tap on Submit: only one turn may move CONFIRM → SUBMITTING.
   const claimed = await db.whatsAppConversation.updateMany({
     where: { id: t.conv.id, step: "CONFIRM" },

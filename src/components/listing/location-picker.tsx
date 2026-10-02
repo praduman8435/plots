@@ -44,7 +44,7 @@ export function LocationPicker({
     import("leaflet").then((L) => {
       if (cancelled || !el.current || mapRef.current) return;
       const start = value ?? center;
-      const map = L.map(el.current, { center: [start.lat, start.lng], zoom: value ? 15 : 12, scrollWheelZoom: false, attributionControl: true });
+      const map = L.map(el.current, { center: [start.lat, start.lng], zoom: value ? 15 : 5, scrollWheelZoom: false, attributionControl: true });
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -60,6 +60,21 @@ export function LocationPicker({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- map is created once; value/center sync below
   }, []);
+
+  // When the city/state changes (and no pin yet), move the map there so the seller starts in the right place.
+  useEffect(() => {
+    if (!areaHint || value) return;
+    const t = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ format: "jsonv2", countrycodes: "in", limit: "1", q: areaHint });
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { headers: { "Accept-Language": "en" } });
+        const [hit] = (await res.json()) as { lat: string; lon: string }[];
+        if (hit && !value) mapRef.current?.setView([Number(hit.lat), Number(hit.lon)], areaHint.includes(",") ? 12 : 7);
+      } catch {}
+    }, 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the typed place should retrigger
+  }, [areaHint]);
 
   // Keep the pin in sync with `value`.
   useEffect(() => {

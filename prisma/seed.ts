@@ -71,9 +71,6 @@ const cities = [
     isLive: true,
     sortOrder: 1,
   },
-  { slug: "lucknow", name: "Lucknow", district: "Lucknow", state: "Uttar Pradesh", latitude: 26.8467, longitude: 80.9462, bighaInSqft: 27_225, marlaInSqft: 272.25, isLive: false, sortOrder: 2 },
-  { slug: "varanasi", name: "Varanasi", district: "Varanasi", state: "Uttar Pradesh", latitude: 25.3176, longitude: 82.9739, bighaInSqft: 27_225, marlaInSqft: 272.25, isLive: false, sortOrder: 3 },
-  { slug: "jaipur", name: "Jaipur", district: "Jaipur", state: "Rajasthan", latitude: 26.9124, longitude: 75.7873, bighaInSqft: 27_225, marlaInSqft: 272.25, isLive: false, sortOrder: 4 },
 ];
 
 // Fixed Seller IDs so they're easy to try on /seller. Clearly fake numbers (+91 90000 000xx).

@@ -106,6 +106,7 @@ export async function searchListings(f: SearchFilters) {
       ? {
           OR: [
             { locality: { contains: f.q, mode: "insensitive" } },
+            { city: { name: { contains: f.q, mode: "insensitive" } } },
             { village: { contains: f.q, mode: "insensitive" } },
             { title: { contains: f.q, mode: "insensitive" } },
             { code: { equals: f.q.toUpperCase() } },
@@ -127,8 +128,9 @@ export async function searchListings(f: SearchFilters) {
   return { total, items, city, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
+/** Every city/town that exists (for suggestions and filters), busiest first. */
 export async function getLiveCities() {
-  return db.city.findMany({ where: { isLive: true }, orderBy: { sortOrder: "asc" } });
+  return db.city.findMany({ where: { isLive: true }, orderBy: [{ properties: { _count: "desc" } }, { name: "asc" }], take: 400 });
 }
 
 export async function getLatestListings(take = 8, cityId?: string, landType?: LandType) {
@@ -140,12 +142,16 @@ export async function getLatestListings(take = 8, cityId?: string, landType?: La
   });
 }
 
-/** Live + upcoming cities for "Popular locations", with live plot counts. */
-export async function getCitiesWithCounts() {
-  const cities = await db.city.findMany({ orderBy: [{ isLive: "desc" }, { sortOrder: "asc" }] });
-  const counts = await db.property.groupBy({ by: ["cityId"], where: { status: "ACTIVE" }, _count: { _all: true } });
-  const byCity = new Map(counts.map((c) => [c.cityId, c._count._all]));
-  return cities.map((c) => ({ ...c, live: byCity.get(c.id) ?? 0 }));
+/** Cities that have live land right now, busiest first — for "Popular locations", filters and the cities page. */
+export async function getCitiesWithCounts(limit = 60) {
+  const counts = await db.property.groupBy({ by: ["cityId"], where: { status: "ACTIVE" }, _count: { _all: true }, orderBy: { _count: { cityId: "desc" } }, take: limit });
+  if (counts.length === 0) return [];
+  const cities = await db.city.findMany({ where: { id: { in: counts.map((c) => c.cityId) } } });
+  const byId = new Map(cities.map((c) => [c.id, c]));
+  return counts.flatMap((c) => {
+    const city = byId.get(c.cityId);
+    return city ? [{ ...city, live: c._count._all }] : [];
+  });
 }
 
 /** Counts per land type and a few headline numbers for landing pages. */

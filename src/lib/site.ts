@@ -14,6 +14,6 @@ export const site = {
 
 /** Top-level paths a City.slug must never take, since /[city] sits at the root. */
 export const RESERVED_SLUGS = new Set([
-  "admin", "api", "media", "demo", "login", "logout", "sell", "seller", "search", "property",
+  "admin", "api", "media", "demo", "cities", "login", "logout", "sell", "seller", "search", "property",
   "about", "contact", "privacy", "terms", "help", "sitemap.xml", "robots.txt",
 ]);
