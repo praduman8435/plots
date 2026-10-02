@@ -14,7 +14,9 @@ export function SiteFooter() {
         { href: "/search", label: "All plots" },
         { href: "/chandigarh", label: "Land in Chandigarh Tricity" },
         { href: "/azamgarh", label: "Land in Azamgarh" },
-        ...Object.entries(LAND_TYPES).map(([key, t]) => ({ href: `/search?type=${key}`, label: t.label })),
+        ...Object.entries(LAND_TYPES)
+          .filter(([key]) => key !== "OTHER")
+          .map(([key, t]) => ({ href: `/search?type=${key}`, label: t.label })),
       ],
     },
     {

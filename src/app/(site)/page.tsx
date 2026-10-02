@@ -107,10 +107,10 @@ export default async function HomePage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2.5">
-            <ButtonLink href="/search" variant="white" size="md">
+            <ButtonLink href="/search" variant="white" size="sm" className="h-10 px-4">
               Start searching <ArrowRight />
             </ButtonLink>
-            <ButtonLink href="/sell" size="md" className="bg-white/10 shadow-none ring-1 ring-white/25 hover:bg-white/15">
+            <ButtonLink href="/sell" size="sm" className="h-10 bg-white/10 px-4 shadow-none ring-1 ring-white/25 hover:bg-white/15">
               Sell your land
             </ButtonLink>
           </div>
