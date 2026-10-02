@@ -37,20 +37,6 @@ export default async function HomePage() {
           <div className="mt-7 max-w-4xl sm:mt-9">
             <HeroSearch citySlug={liveCity?.slug} />
           </div>
-          {stats.areaNames.length > 0 && (
-            <div className="mt-5 flex max-w-4xl flex-wrap items-center gap-2">
-              <span className="mr-1 text-sm text-white/70">Popular:</span>
-              {stats.areaNames.slice(0, 5).map((name) => (
-                <Link
-                  key={name}
-                  href={`/search?${new URLSearchParams({ ...(liveCity ? { city: liveCity.slug } : {}), q: name })}`}
-                  className="rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-medium text-white transition hover:bg-white/25"
-                >
-                  {name}
-                </Link>
-              ))}
-            </div>
-          )}
         </div>
       </section>
 
