@@ -1,7 +1,7 @@
 /**
  * DEMO_MODE=true: a public demo before WhatsApp/KYC providers are connected.
  * Login codes are shown on screen and identity checks are simulated — the
- * site shows a banner saying so. Never enable it for a real launch.
+ * login screens say so. Never enable it for a real launch.
  */
 export function isDemoMode(): boolean {
   return process.env.DEMO_MODE?.trim().toLowerCase() === "true";
