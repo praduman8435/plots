@@ -62,7 +62,7 @@ export function ShareProfile({ url, name, variant = "dashboard", total }: { url:
 
   async function onNativeShare() {
     try {
-      await navigator.share({ title: `${name} — properties on Plots`, text, url });
+      await navigator.share({ title: `${name} — properties on InstaPlots`, text, url });
     } catch (err) {
       // User closed the sheet → nothing to do. Anything else → fall back to copying.
       if ((err as DOMException)?.name !== "AbortError") await onCopy();

@@ -29,7 +29,7 @@ export function MockKycScreen({ attemptId, returnUrl, sellerName }: { attemptId:
         <div className="rounded-3xl bg-white p-6 shadow-card ring-1 ring-line">
           <h1 className="text-xl font-bold text-ink">Verify your identity</h1>
           <p className="mt-1 text-sm text-muted">
-            Verifying <strong>{sellerName}</strong>. Plots only receives “verified” and the last 4 digits — never your full Aadhaar number.
+            Verifying <strong>{sellerName}</strong>. InstaPlots only receives “verified” and the last 4 digits — never your full Aadhaar number.
           </p>
 
           {error && (

@@ -22,7 +22,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, type ReactNode } from "react";
 import { ButtonLink } from "@/components/ui/button";
-import { Logo, LogoMark } from "@/components/ui/logo";
+import { Logo, LogoMark, Wordmark } from "@/components/ui/logo";
 import { cn } from "@/lib/cn";
 import { adminLogout } from "@/server/actions/admin/auth";
 import { Toaster } from "./toast";
@@ -183,7 +183,7 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
         <header className="sticky top-0 z-30 flex h-12 items-center justify-between gap-3 border-b border-line bg-white/90 px-4 backdrop-blur-md lg:hidden">
           <Link href="/admin" className="flex items-center gap-2" aria-label="Admin overview">
             <LogoMark className="size-6" />
-            <span className="text-base font-extrabold tracking-tight text-brand-950">Plots</span>
+            <Wordmark className="text-base" />
             <span className="rounded-md bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-brand-700 uppercase ring-1 ring-brand-100">
               Admin
             </span>

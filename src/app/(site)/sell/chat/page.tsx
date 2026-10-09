@@ -6,8 +6,8 @@ import { resolveChatPhone } from "@/server/seller/chat-phone";
 import { loadChatState } from "@/server/whatsapp/chat-state";
 
 export const metadata: Metadata = {
-  title: "Chat with Plots",
-  description: "List your land by chatting with the Plots listing assistant.",
+  title: "Chat with InstaPlots",
+  description: "List your land by chatting with the InstaPlots listing assistant.",
   robots: { index: false, follow: false },
 };
 

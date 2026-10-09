@@ -310,7 +310,7 @@ for (const [command, phrases] of Object.entries(PHRASES) as [BotCommand, string[
  * Detects a global command. Deliberately strict — the whole message must be
  * the command — so a description like "New colony near station" is never
  * mistaken for one. The one exception is a message that STARTS with "sell"
- * (our wa.me link pre-fills "SELL — Hi, I want to list my land on Plots.").
+ * (our wa.me link pre-fills "SELL — Hi, I want to list my land on InstaPlots.").
  */
 export function detectCommand(text: string | null | undefined): BotCommand | null {
   if (!text) return null;

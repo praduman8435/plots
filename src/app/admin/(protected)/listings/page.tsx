@@ -97,7 +97,7 @@ export default async function AdminListingsPage({ searchParams }: PageProps<"/ad
     <>
       <PageHeader
         title={reviewing ? "Review queue" : "Listings"}
-        description={reviewing ? "Oldest first. Check photos, price and seller, then approve or reject." : "Every plot on Plots, newest first."}
+        description={reviewing ? "Oldest first. Check photos, price and seller, then approve or reject." : "Every plot on InstaPlots, newest first."}
         actions={
           <ButtonLink href="/admin/listings/new" className="hidden lg:inline-flex">
             <Plus /> Add plot

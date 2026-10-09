@@ -188,7 +188,7 @@ function Group({
                   <span className="block truncate font-medium text-ink">{p.seller.name}</span>
                   <span className="tabular block text-xs text-muted">{p.seller.code}</span>
                 </Link>
-                <ContactButtons phone={p.seller.phone} text={`Hi ${p.seller.name}, this is Plots. Is your property ${p.title} (${p.code}) still available?`} />
+                <ContactButtons phone={p.seller.phone} text={`Hi ${p.seller.name}, this is InstaPlots. Is your property ${p.title} (${p.code}) still available?`} />
               </div>
               <div className="lg:shrink-0">{actions}</div>
             </li>

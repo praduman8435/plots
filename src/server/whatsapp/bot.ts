@@ -325,7 +325,7 @@ async function handle(t: Turn, input: BotInput) {
     if (command === "MENU" || command === "START" || replyId === "menu:list" || replyId === "menu:bot") {
       await t.save("IDLE", null);
       if (command === "START" || replyId === "menu:list") return startListing(t);
-      return sendMenu(t, "👋 You're back with the Plots assistant.");
+      return sendMenu(t, "👋 You're back with the InstaPlots assistant.");
     }
     return;
   }
@@ -529,7 +529,7 @@ async function cancel(t: Turn) {
 async function handOverToHuman(t: Turn) {
   await t.save("HUMAN", t.draft);
   await t.text(
-    "🙋 Sure! Someone from the Plots team will reply here soon.\n\nYou can type your question now. To go back to the assistant anytime, send *MENU*.",
+    "🙋 Sure! Someone from the InstaPlots team will reply here soon.\n\nYou can type your question now. To go back to the assistant anytime, send *MENU*.",
   );
 }
 

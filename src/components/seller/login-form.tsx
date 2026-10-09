@@ -113,7 +113,7 @@ export function SellerLoginForm({ otpPaused, next }: { otpPaused: boolean; next?
               autoComplete="username"
               autoCapitalize="characters"
               spellCheck={false}
-              className="h-14 pl-12 font-semibold tracking-wide"
+              className="h-14 pl-12 font-semibold tracking-wide md:h-12"
               aria-invalid={Boolean(error)}
             />
           </div>

@@ -18,7 +18,7 @@ export default async function AdminLoginPage() {
       <div className="relative w-full max-w-[400px] animate-fade-up">
         <div className="mb-7 flex flex-col items-center text-center text-white">
           <LogoMark className="size-12 shadow-brand ring-4 ring-white/10" />
-          <p className="mt-4 text-2xl font-extrabold tracking-tight">Plots Admin</p>
+          <p className="mt-4 text-2xl font-extrabold tracking-tight">InstaPlots Admin</p>
           <p className="mt-1 text-sm text-brand-100/80">Review plots, help sellers, keep listings honest.</p>
         </div>
 

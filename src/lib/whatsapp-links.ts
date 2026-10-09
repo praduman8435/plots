@@ -21,7 +21,7 @@ export function isWhatsAppConnected(): boolean {
  * Until Meta is connected, the same assistant runs in the in-site chat (/sell/chat).
  */
 export function sellOnWhatsAppLink(): string {
-  return isWhatsAppConnected() ? waLink(site.whatsappNumber, "SELL — Hi, I want to list my land on Plots.") : "/sell/chat?start=1";
+  return isWhatsAppConnected() ? waLink(site.whatsappNumber, "SELL — Hi, I want to list my land on InstaPlots.") : "/sell/chat?start=1";
 }
 
 /** Props for an <a>/ButtonA: new tab only for real WhatsApp. */
@@ -29,6 +29,6 @@ export function sellOnWhatsAppProps(): { href: string; target?: string; rel?: st
   return isWhatsAppConnected() ? { href: sellOnWhatsAppLink(), target: "_blank", rel: "noopener" } : { href: sellOnWhatsAppLink() };
 }
 
-export function supportWhatsAppLink(text = "Hi, I need help with Plots."): string {
+export function supportWhatsAppLink(text = "Hi, I need help with InstaPlots."): string {
   return waLink(site.whatsappNumber, text);
 }

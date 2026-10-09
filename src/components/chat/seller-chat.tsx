@@ -91,7 +91,7 @@ function ChatThread({
       variant="seller"
       backHref="/sell"
       suggestions={sellerSuggestions(chat.state)}
-      notice="This is the official Plots chat. Our listing assistant replies instantly — send TALK anytime to reach a person from our team."
+      notice="This is the official InstaPlots chat. Our listing assistant replies instantly — send TALK anytime to reach a person from our team."
       emptyState={
         <div className="mx-auto mt-6 flex max-w-xs flex-col items-center gap-3 rounded-2xl bg-white px-6 py-6 text-center shadow-sm">
           <span className="grid size-14 place-items-center rounded-2xl bg-brand-50">
@@ -191,7 +191,7 @@ function VerifyNumber({ onVerified }: { onVerified: (state: ChatState) => void }
           <WaRichText
             text={
               step === "phone"
-                ? "Namaste 🙏 Welcome to *Plots*.\n\nList your land in about 2 minutes, right here in this chat. First, let's confirm your mobile number."
+                ? "Namaste 🙏 Welcome to *InstaPlots*.\n\nList your land in about 2 minutes, right here in this chat. First, let's confirm your mobile number."
                 : `We've sent a 6-digit code to ${maskedPhone}. Enter it below to start chatting.`
             }
           />

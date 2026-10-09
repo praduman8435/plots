@@ -1,4 +1,4 @@
-# Plots
+# InstaPlots
 
 A land-only marketplace for India, launching in Azamgarh.
 

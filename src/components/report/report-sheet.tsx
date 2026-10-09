@@ -20,7 +20,7 @@ type Props = {
 
 const SUCCESS = "Thank you for helping us keep property listings accurate. Our team will review your report.";
 
-/** "Report this listing / profile": a quiet trigger and a bottom sheet with one reason + optional details. */
+/** "Report this listing / profile": a red text trigger and a bottom sheet with one reason + optional details. */
 export function ReportSheet({ target, targetRef, notice, hideReasons = [], className }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const formId = useId();
@@ -74,7 +74,7 @@ export function ReportSheet({ target, targetRef, notice, hideReasons = [], class
       <button
         type="button"
         onClick={open}
-        className={cn("inline-flex items-center gap-1.5 rounded-full text-sm font-medium text-muted transition hover:text-danger", className)}
+        className={cn("inline-flex items-center gap-1.5 rounded-full text-sm font-semibold text-red-600 transition hover:text-red-700 hover:underline underline-offset-4", className)}
       >
         <Flag className="size-4" aria-hidden /> Report this {noun}
       </button>

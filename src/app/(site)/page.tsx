@@ -93,7 +93,7 @@ export default async function HomePage() {
 
       {/* ───── Why ───── */}
       <section className="container-page py-12 sm:py-20">
-        <SectionHeading title="Why people use Plots" />
+        <SectionHeading title="Why people use InstaPlots" />
         <WhyUs />
       </section>
 

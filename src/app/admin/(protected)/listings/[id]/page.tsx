@@ -265,7 +265,7 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
             </div>
             <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2">
               <span className="tabular text-[15px] font-semibold text-ink">{formatPhone(p.seller.phone)}</span>
-              <ContactButtons phone={p.seller.phone} text={`Hi ${p.seller.name}, this is Plots about your plot ${p.title} (${p.code}).`} />
+              <ContactButtons phone={p.seller.phone} text={`Hi ${p.seller.name}, this is InstaPlots about your plot ${p.title} (${p.code}).`} />
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {p.seller.conversation ? (

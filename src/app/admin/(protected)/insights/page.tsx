@@ -24,7 +24,7 @@ export default async function AdminInsightsPage({ searchParams }: PageProps<"/ad
 
   return (
     <>
-      <PageHeader title="Insights" description="Is Plots working? Buyers who find and contact sellers, sellers who list, and listings that stay honest." />
+      <PageHeader title="Insights" description="Is InstaPlots working? Buyers who find and contact sellers, sellers who list, and listings that stay honest." />
 
       <Segmented
         label="Time range"

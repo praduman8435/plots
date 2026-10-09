@@ -352,7 +352,7 @@ export function ChatFrame({
               </span>
               <div className="min-w-0 flex-1 leading-tight">
                 <p className="flex items-center gap-1 truncate text-[16px] font-semibold">
-                  Plots <BadgeCheck className="size-4 shrink-0 fill-white text-brand-600" aria-label="Verified business" />
+                  InstaPlots <BadgeCheck className="size-4 shrink-0 fill-white text-brand-600" aria-label="Verified business" />
                 </p>
                 <p className="truncate text-[12.5px] text-white/80" aria-live="polite">
                   {subtitle}
@@ -556,7 +556,7 @@ export function ChatWindow({
             );
           })}
           {isPending && (
-            <li className="mt-1.5 flex items-start" aria-label="Plots is typing">
+            <li className="mt-1.5 flex items-start" aria-label="InstaPlots is typing">
               <span className="flex items-center gap-1 rounded-2xl rounded-tl-sm bg-white px-3.5 py-3 shadow-sm">
                 {[0, 150, 300].map((d) => (
                   <span key={d} className="size-1.5 animate-bounce rounded-full bg-faint" style={{ animationDelay: `${d}ms` }} />
@@ -865,7 +865,7 @@ function Bubble({
       )}
     >
       {showSystemLabel && !mine && m.sentBy === "system" && (
-        <span className="mb-0.5 block px-1 text-[11px] font-semibold text-brand-700">Plots · notification</span>
+        <span className="mb-0.5 block px-1 text-[11px] font-semibold text-brand-700">InstaPlots · notification</span>
       )}
       {image && (
         // eslint-disable-next-line @next/next/no-img-element -- user photos of unknown size from /media

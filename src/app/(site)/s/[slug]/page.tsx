@@ -80,7 +80,7 @@ export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
                 </span>
                 <span aria-hidden>·</span>
                 <span className="inline-flex items-center gap-1">
-                  <CalendarDays className="size-3.5" aria-hidden /> On Plots since{" "}
+                  <CalendarDays className="size-3.5" aria-hidden /> On InstaPlots since{" "}
                   {profile.memberSince.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
                 </span>
               </p>

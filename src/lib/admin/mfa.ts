@@ -97,7 +97,7 @@ export function verifyTotp(secretBase32: string, code: string, lastStep: number 
   return null;
 }
 
-export function otpauthUri(secretBase32: string, account: string, issuer = "Plots Admin"): string {
+export function otpauthUri(secretBase32: string, account: string, issuer = "InstaPlots Admin"): string {
   const label = encodeURIComponent(`${issuer}:${account}`);
   const params = new URLSearchParams({ secret: secretBase32, issuer, algorithm: "SHA1", digits: String(DIGITS), period: String(STEP_SECONDS) });
   return `otpauth://totp/${label}?${params}`;

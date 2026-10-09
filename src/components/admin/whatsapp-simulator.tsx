@@ -305,7 +305,7 @@ export function WhatsAppSimulator({ initial, defaultProfileName }: { initial: Si
               <p className="text-[13px] text-muted">
                 Sellers tap “Sell on WhatsApp” on the website, which opens this chat with <b>SELL</b> already typed.
               </p>
-              <Button size="sm" onClick={() => sendText("SELL — Hi, I want to list my land on Plots.")}>
+              <Button size="sm" onClick={() => sendText("SELL — Hi, I want to list my land on InstaPlots.")}>
                 Send “SELL”
               </Button>
             </div>

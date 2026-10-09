@@ -1,5 +1,5 @@
 export const site = {
-  name: "Plots",
+  name: "InstaPlots",
   tagline: "Land, listed honestly.",
   description:
     "Find residential plots, farmland and commercial land in Chandigarh Tricity and Azamgarh. Real photos and prices — talk to sellers directly on WhatsApp. No login needed.",
@@ -9,7 +9,7 @@ export const site = {
   supportPhone: process.env.NEXT_PUBLIC_SUPPORT_PHONE ?? "+919999999999",
   /** Shown on every detail page. We verify the seller's phone — never ownership. */
   disclaimer:
-    "Plots verifies the seller's phone number only. We have not checked ownership or land documents — always verify papers (khatauni, registry) before paying anything.",
+    "InstaPlots verifies the seller's phone number only. We have not checked ownership or land documents — always verify papers (khatauni, registry) before paying anything.",
 } as const;
 
 /** Top-level paths a City.slug must never take, since /[city] sits at the root. */

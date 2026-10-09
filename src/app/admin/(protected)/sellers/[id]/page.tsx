@@ -103,7 +103,7 @@ export default async function AdminSellerPage({ params }: PageProps<"/admin/sell
             <h2 className="mb-3 text-sm font-bold tracking-wide text-muted uppercase">Contact</h2>
             <div className="flex items-center justify-between gap-3">
               <span className="tabular text-lg font-bold text-ink">{formatPhone(seller.phone)}</span>
-              <ContactButtons phone={seller.phone} text={`Hi ${seller.name}, this is Plots.`} />
+              <ContactButtons phone={seller.phone} text={`Hi ${seller.name}, this is InstaPlots.`} />
             </div>
             <div className="mt-4">
               {seller.conversation ? (
@@ -114,7 +114,7 @@ export default async function AdminSellerPage({ params }: PageProps<"/admin/sell
                   )}
                 </ButtonLink>
               ) : (
-                <ButtonA href={waLink(seller.phone, `Hi ${seller.name}, this is Plots.`)} target="_blank" rel="noreferrer" variant="secondary" className="w-full">
+                <ButtonA href={waLink(seller.phone, `Hi ${seller.name}, this is InstaPlots.`)} target="_blank" rel="noreferrer" variant="secondary" className="w-full">
                   <WhatsAppIcon /> Message on WhatsApp
                 </ButtonA>
               )}

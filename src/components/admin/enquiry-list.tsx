@@ -75,7 +75,7 @@ export function EnquiryList({
               )}
             </p>
           </div>
-          <ContactButtons phone={e.buyerPhone} text={`Hi ${e.buyerName}, this is Plots. You enquired about ${e.property.title} (${e.property.code}).`} />
+          <ContactButtons phone={e.buyerPhone} text={`Hi ${e.buyerName}, this is InstaPlots. You enquired about ${e.property.title} (${e.property.code}).`} />
         </li>
       ))}
     </ul>

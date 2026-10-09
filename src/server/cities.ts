@@ -15,7 +15,7 @@ export async function geocodePlace(query: string): Promise<{ lat: number; lng: n
   try {
     const params = new URLSearchParams({ format: "jsonv2", countrycodes: "in", limit: "1", q: query });
     const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-      headers: { "User-Agent": "Plots land marketplace (contact via site)", "Accept-Language": "en" },
+      headers: { "User-Agent": "InstaPlots land marketplace (contact via site)", "Accept-Language": "en" },
       signal: AbortSignal.timeout(4000),
       cache: "no-store",
     });

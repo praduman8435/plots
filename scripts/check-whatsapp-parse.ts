@@ -157,6 +157,7 @@ check("looksLikePerUnitPrice(18 lakh)", looksLikePerUnitPrice("18 lakh"), false)
 // ── detectCommand ──
 const commandCases: [string, string | null][] = [
   ["SELL — Hi, I want to list my land on Plots.", "START"],
+  ["SELL — Hi, I want to list my land on InstaPlots.", "START"],
   ["SELL", "START"],
   ["sell", "START"],
   ["Sell my land", "START"],

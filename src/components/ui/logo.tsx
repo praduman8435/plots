@@ -13,13 +13,20 @@ export function LogoMark({ className }: { className?: string }) {
   );
 }
 
+/** "InstaPlots" — "Insta" in brand green, "Plots" in ink (or green-tint/white on dark). */
+export function Wordmark({ className, inverted = false }: { className?: string; inverted?: boolean }) {
+  return (
+    <span className={cn("font-extrabold tracking-tight", inverted ? "text-white" : "text-brand-950", className)}>
+      <span className={inverted ? "text-brand-300" : "text-brand-600"}>Insta</span>Plots
+    </span>
+  );
+}
+
 export function Logo({ className, inverted = false }: { className?: string; inverted?: boolean }) {
   return (
     <Link href="/" className={cn("inline-flex items-center gap-2.5", className)} aria-label={`${site.name} home`}>
       <LogoMark />
-      <span className={cn("text-[1.35rem] font-extrabold tracking-tight", inverted ? "text-white" : "text-brand-950")}>
-        {site.name}
-      </span>
+      <Wordmark inverted={inverted} className="text-[1.35rem]" />
     </Link>
   );
 }
