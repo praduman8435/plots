@@ -22,8 +22,8 @@ export function SectionHeading({
     <div className="mb-6 flex items-end justify-between gap-4 sm:mb-8">
       <div>
         {eyebrow && <p className="mb-2 text-xs font-bold tracking-[0.14em] text-brand-600 uppercase">{eyebrow}</p>}
-        <h2 className="text-[1.6rem] leading-tight font-extrabold text-ink sm:text-[1.75rem]">{title}</h2>
-        {description && <p className="mt-2 max-w-2xl text-[15px] text-muted sm:text-base">{description}</p>}
+        <h2 className="text-[1.375rem] leading-snug font-extrabold tracking-tight text-ink sm:text-[1.75rem]">{title}</h2>
+        {description && <p className="mt-1.5 max-w-2xl text-[15px] leading-relaxed text-muted sm:text-base">{description}</p>}
       </div>
       {action}
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy, Share2, Store, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
@@ -38,8 +38,9 @@ async function copyText(text: string): Promise<boolean> {
  * `variant="dashboard"` is the prominent card on the seller dashboard;
  * `variant="button"` is a small share button (public profile page).
  */
-export function ShareProfile({ url, name, variant = "dashboard", total }: { url: string; name: string; variant?: "dashboard" | "button"; total?: number }) {
+export function ShareProfile({ url, name, variant = "dashboard", total }: { url: string; name: string; variant?: "dashboard" | "button" | "icon"; total?: number }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   const [copy, setCopy] = useState<CopyState>("idle");
   const [canNativeShare, setCanNativeShare] = useState(false);
   const text = profileShareText(name, url);
@@ -86,15 +87,24 @@ export function ShareProfile({ url, name, variant = "dashboard", total }: { url:
             <Share2 /> Share My Properties
           </Button>
         </div>
+      ) : variant === "icon" ? (
+        <button
+          type="button"
+          onClick={open}
+          aria-label={`Share ${name}'s properties`}
+          className="flex size-10 items-center justify-center rounded-full bg-white/90 text-ink shadow-soft backdrop-blur transition hover:bg-white"
+        >
+          <Share2 className="size-[18px]" />
+        </button>
       ) : (
-        <Button type="button" size="sm" variant="secondary" onClick={open}>
-          <Share2 /> Share
+        <Button type="button" size="lg" onClick={open} className="w-full sm:w-auto">
+          <WhatsAppIcon /> Share this page
         </Button>
       )}
 
       <dialog
         ref={dialogRef}
-        aria-labelledby="share-profile-title"
+        aria-labelledby={titleId}
         className="m-0 mt-auto w-full max-w-none rounded-t-[1.75rem] bg-white p-0 shadow-lift open:animate-sheet-up sm:m-auto sm:max-w-md sm:rounded-3xl"
         onClick={(e) => {
           if (e.target === e.currentTarget) e.currentTarget.close();
@@ -104,7 +114,7 @@ export function ShareProfile({ url, name, variant = "dashboard", total }: { url:
           <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" aria-hidden />
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 id="share-profile-title" className="text-lg font-bold text-ink">
+              <h2 id={titleId} className="text-lg font-bold text-ink">
                 {variant === "dashboard" ? "Share your properties" : `Share ${name}'s properties`}
               </h2>
               <p className="mt-0.5 text-sm text-muted">

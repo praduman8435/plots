@@ -33,7 +33,7 @@ export function sellerProfileUrl(slug: string): string {
 
 /** The message sellers share. Uses their public name only. */
 export function profileShareText(name: string, url: string): string {
-  return `Looking for land? Explore ${name.trim() ? `${name.trim()}'s` : "my"} available properties on ${site.name}: ${url}`;
+  return `Looking for land? 🏡 See ${name.trim() ? `${name.trim()}'s` : "my"} land for sale on ${site.name} — real photos and prices, and you can call or WhatsApp directly: ${url}`;
 }
 
 /** WhatsApp "share to anyone" link (no recipient — the seller picks the chat or group). */

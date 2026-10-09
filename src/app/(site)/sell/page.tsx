@@ -1,4 +1,4 @@
-import { ArrowRight, BadgeCheck, Camera, Check, ClipboardList, Fingerprint, IdCard, Laptop, MessageCircle, Smartphone } from "lucide-react";
+import { ArrowRight, BadgeCheck, Camera, Check, ClipboardList, Fingerprint, IdCard, Languages, Laptop, MessageCircle, PhoneCall, Smartphone } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,28 +43,32 @@ export default async function SellPage() {
           <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
             <BadgeCheck className="size-3.5 text-brand-200" aria-hidden /> For sellers · Free while we launch
           </p>
-          <h1 className="mt-4 max-w-3xl text-[2.25rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">Your land. Your price. The right buyer.</h1>
-          <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
+          <h1 className="mt-4 max-w-3xl text-[2rem] leading-[1.1] font-extrabold tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">Your land. Your price. The right buyer.</h1>
+          <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/80 sm:mt-4 sm:text-lg">
             List in a few simple steps — on WhatsApp in Hindi or English, or right here. We check every listing, then buyers looking for land in your area call you directly.
           </p>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <ButtonLink href={web.href} variant="white" size="xl" className="w-full sm:w-auto">
+          <div className="mt-7 grid gap-2.5 sm:flex sm:flex-wrap sm:gap-3">
+            <ButtonLink href={web.href} variant="white" size="lg" className="w-full sm:w-auto">
               {web.label} <ArrowRight />
             </ButtonLink>
-            <ButtonA {...sellOnWhatsAppProps()} size="xl" className="w-full bg-white/10 shadow-none ring-1 ring-white/25 hover:bg-white/15 sm:w-auto">
+            <ButtonA {...sellOnWhatsAppProps()} size="lg" className="w-full bg-white/10 shadow-none ring-1 ring-white/25 hover:bg-white/15 sm:w-auto">
               <WhatsAppIcon /> List on WhatsApp
             </ButtonA>
           </div>
-          <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/80">
-            {["Free to list", "Hindi or English", "Buyers call you directly"].map((t) => (
-              <li key={t} className="flex items-center gap-1.5">
-                <Check className="size-4 text-brand-300" aria-hidden /> {t}
+          <ul className="mt-6 grid max-w-md grid-cols-3 divide-x divide-white/15 rounded-2xl bg-white/[0.06] py-3 text-center ring-1 ring-white/10">
+            {[
+              { icon: BadgeCheck, label: "Free listing" },
+              { icon: Languages, label: "Hindi / English" },
+              { icon: PhoneCall, label: "Direct calls" },
+            ].map((t) => (
+              <li key={t.label} className="flex flex-col items-center gap-1 px-1 text-xs font-medium text-white/85">
+                <t.icon className="size-4 text-brand-300" aria-hidden /> {t.label}
               </li>
             ))}
           </ul>
           {!seller && (
-            <p className="mt-6 text-sm text-white/70">
+            <p className="mt-5 text-sm text-white/70">
               Already a seller?{" "}
               <Link href="/seller?next=/seller/plots/new" className="font-semibold text-white underline underline-offset-4">
                 Sign in with your Seller ID
@@ -80,25 +84,25 @@ export default async function SellPage() {
         <div className="grid gap-4 md:grid-cols-2 md:gap-5">
           <WayCard
             highlight
-            icon={<WhatsAppIcon className="size-6" />}
+            icon={<WhatsAppIcon className="size-[22px]" />}
             tag="Easiest on a phone"
             title="On WhatsApp"
             text="Chat with our assistant in Hindi or English, and send photos straight from your phone."
             points={["No app, no password", "One simple question at a time", "Updates come right in the chat"]}
             action={
-              <ButtonA {...sellOnWhatsAppProps()} size="lg" className="w-full sm:w-auto">
+              <ButtonA {...sellOnWhatsAppProps()} size="md" className="w-full sm:w-auto">
                 <WhatsAppIcon /> Start on WhatsApp
               </ButtonA>
             }
           />
           <WayCard
-            icon={<Laptop className="size-6" />}
+            icon={<Laptop className="size-[22px]" />}
             tag="Everything on one page"
             title="On the website"
             text="Fill one short form, drop a pin on the map and upload your photos."
             points={["See all your details at once", "Pin the spot — buyers only see the area", "Manage all your land from one dashboard"]}
             action={
-              <ButtonLink href={web.href} variant="secondary" size="lg" className="w-full sm:w-auto">
+              <ButtonLink href={web.href} variant="secondary" size="md" className="w-full sm:w-auto">
                 {web.label} <ArrowRight />
               </ButtonLink>
             }
@@ -243,14 +247,14 @@ function WayCard({
   highlight?: boolean;
 }) {
   return (
-    <div className={cn("flex flex-col rounded-3xl bg-white p-6 sm:p-7", highlight ? "shadow-card ring-2 ring-brand-500" : "ring-1 ring-line")}>
+    <div className={cn("flex flex-col rounded-3xl bg-white p-5 sm:p-7", highlight ? "shadow-card ring-2 ring-brand-500" : "ring-1 ring-line")}>
       <div className="flex items-center justify-between gap-3">
-        <span className={cn("flex size-12 items-center justify-center rounded-2xl", highlight ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-700")}>{icon}</span>
+        <span className={cn("flex size-11 items-center justify-center rounded-2xl", highlight ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-700")}>{icon}</span>
         <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", highlight ? "bg-brand-50 text-brand-800" : "bg-mist text-ink-soft")}>{tag}</span>
       </div>
-      <h3 className="mt-5 text-xl font-bold text-ink">{title}</h3>
-      <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{text}</p>
-      <ul className="mt-4 mb-6 space-y-2 text-[15px] text-ink-soft">
+      <h3 className="mt-4 text-lg font-bold text-ink">{title}</h3>
+      <p className="mt-1 text-sm leading-relaxed text-muted">{text}</p>
+      <ul className="mt-4 mb-5 space-y-2 text-sm text-ink-soft">
         {points.map((p) => (
           <li key={p} className="flex gap-2">
             <Check className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden /> {p}

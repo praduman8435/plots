@@ -1,4 +1,4 @@
-import { BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, Fingerprint, MapPin, Store } from "lucide-react";
+import { ArrowRight, BadgeCheck, ChevronLeft, ChevronRight, Fingerprint, MapPin, ShieldCheck, Store } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,8 +7,8 @@ import { PropertyCard } from "@/components/listing/property-card";
 import { ReportSheet } from "@/components/report/report-sheet";
 import { ShareProfile } from "@/components/seller/share-profile";
 import { ButtonLink } from "@/components/ui/button";
+import { IntentLink } from "@/components/ui/intent-link";
 import { cn } from "@/lib/cn";
-import { formatPrice } from "@/lib/format";
 import { sellerLabel } from "@/lib/seller-label";
 import { sellerProfilePath, sellerProfileUrl } from "@/lib/seller-profile";
 import { getPublicSellerProfile } from "@/server/seller/profile";
@@ -58,84 +58,69 @@ export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
   if (!profile) notFound();
   if (profile.slug !== slug) notFound(); // only the canonical lower-case slug
 
-  const prices = profile.listings.map((l) => Number(l.price));
-  const minPrice = prices.length ? Math.min(...prices) : 0;
   const url = sellerProfileUrl(profile.slug);
   const pageHref = (n: number) => (n <= 1 ? sellerProfilePath(profile.slug) : `${sellerProfilePath(profile.slug)}?page=${n}`);
+  const firstName = profile.name.trim().split(/\s+/)[0] || profile.name;
+  const places = profile.cities.map((c) => c.name);
+  const since = profile.memberSince.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 
   return (
     <div className="pb-24 md:pb-16">
-      {/* Seller header */}
-      <section className="border-b border-line bg-mist">
-        <div className="container-page py-7 sm:py-10">
-          <div className="flex items-start gap-4">
-            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-brand-600 text-2xl font-bold text-white sm:size-16">
-              {profile.name.trim().charAt(0).toUpperCase() || "S"}
-            </span>
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-2xl font-extrabold text-ink sm:text-3xl">{profile.name}</h1>
-              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
-                <span className="inline-flex items-center gap-1">
-                  <Store className="size-3.5" aria-hidden /> {sellerLabel(profile.sellerType)}
-                </span>
-                <span aria-hidden>·</span>
-                <span className="inline-flex items-center gap-1">
-                  <CalendarDays className="size-3.5" aria-hidden /> On InstaPlots since{" "}
-                  {profile.memberSince.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
-                </span>
-              </p>
-              {(profile.phoneVerified || profile.identityVerified) && (
-                <ul className="mt-2 flex flex-wrap gap-1.5">
-                  {profile.phoneVerified && (
-                    <li className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-brand-800 ring-1 ring-brand-100">
-                      <BadgeCheck className="size-3.5" aria-hidden /> Phone verified
-                    </li>
-                  )}
-                  {profile.identityVerified && (
-                    <li className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-brand-800 ring-1 ring-brand-100">
-                      <Fingerprint className="size-3.5" aria-hidden /> Aadhaar verified
-                    </li>
-                  )}
-                </ul>
-              )}
-            </div>
-            <div className="hidden shrink-0 sm:block">
-              <ShareProfile url={url} name={profile.name} variant="button" total={profile.total} />
+      {/* ── Seller card */}
+      <section className="container-page pt-4 sm:pt-8">
+        <div className="overflow-hidden rounded-3xl bg-white shadow-card ring-1 ring-line">
+          <div className="relative isolate h-24 bg-linear-to-br from-brand-800 via-brand-700 to-brand-500 sm:h-32">
+            <div className="bg-contours absolute inset-0 -z-10" aria-hidden />
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
+              <ShareProfile url={url} name={profile.name} variant="icon" total={profile.total} />
             </div>
           </div>
-
-          <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-            <p>
-              <span className="tabular text-lg font-bold text-ink">{profile.total}</span>{" "}
-              <span className="text-muted">available {profile.total === 1 ? "property" : "properties"}</span>
-            </p>
-            {profile.total > 0 && minPrice > 0 && (
-              <p className="text-muted">
-                from <span className="font-semibold text-ink">{formatPrice(minPrice)}</span>
-              </p>
-            )}
-            {profile.cities.length > 0 && (
-              <p className="flex flex-wrap items-center gap-1.5 text-muted">
-                <MapPin className="size-3.5" aria-hidden />
-                {profile.cities.map((c, i) => (
-                  <span key={c.slug}>
-                    <Link href={`/${c.slug}`} className="font-medium text-ink-soft hover:text-brand-700">
-                      {c.name}
-                    </Link>
-                    {i < profile.cities.length - 1 && ","}
+          <div className="px-5 pb-5 sm:px-8 sm:pb-7">
+            <span className="relative z-10 -mt-10 flex size-20 items-center justify-center rounded-2xl bg-brand-600 text-3xl font-bold text-white shadow-card ring-4 ring-white sm:-mt-12 sm:size-24">
+              {profile.name.trim().charAt(0).toUpperCase() || "S"}
+            </span>
+            <div className="mt-3">
+              <div className="min-w-0">
+                <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink sm:text-[1.75rem]">{profile.name}</h1>
+                <p className="mt-1 flex items-start gap-1.5 text-[15px] text-muted">
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
+                  <span>
+                    {sellerLabel(profile.sellerType)}
+                    {places.length > 0 && <> · Land in {places.join(", ")}</>}
                   </span>
-                ))}
-              </p>
-            )}
-            <div className="sm:hidden">
+                </p>
+                {(profile.phoneVerified || profile.identityVerified) && (
+                  <ul className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                    {profile.phoneVerified && (
+                      <li className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-brand-800 ring-1 ring-brand-100">
+                        <BadgeCheck className="size-3.5" aria-hidden /> Phone verified
+                      </li>
+                    )}
+                    {profile.identityVerified && (
+                      <li className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-brand-800 ring-1 ring-brand-100">
+                        <Fingerprint className="size-3.5" aria-hidden /> Aadhaar verified
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <dl className="mt-5 grid grid-cols-3 divide-x divide-line rounded-2xl bg-mist ring-1 ring-line">
+              <Stat label={profile.total === 1 ? "Property" : "Properties"} value={String(profile.total)} />
+              <Stat label={profile.cities.length === 1 ? "City" : "Cities"} value={String(profile.cities.length)} />
+              <Stat label="Seller since" value={since} />
+            </dl>
+
+            <div className="mt-4">
               <ShareProfile url={url} name={profile.name} variant="button" total={profile.total} />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Listings */}
-      <div className="container-page mt-6 sm:mt-8">
+      {/* ── Listings */}
+      <section className="container-page mt-8 sm:mt-10">
         {profile.total === 0 ? (
           <div className="mx-auto max-w-md rounded-3xl bg-mist px-6 py-12 text-center ring-1 ring-line">
             <p className="text-lg font-bold">No properties available right now</p>
@@ -146,17 +131,30 @@ export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
           </div>
         ) : (
           <>
-            <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-ink sm:text-xl">Land for sale by {firstName}</h2>
+                <p className="mt-0.5 text-sm text-muted">Tap a property for photos and details, or contact {firstName} directly.</p>
+              </div>
+            </div>
+            <ul className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
               {profile.listings.map((p, i) => (
-                <li key={p.id} className="flex flex-col gap-2.5">
-                  <PropertyCard p={p} priority={i === 0 && profile.page === 1} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" />
-                  <ContactActions
-                    variant="bar"
-                    source="card"
-                    plot={{ id: p.id, code: p.code, slug: p.slug, title: p.title }}
-                    sellerPhone={p.seller.phone}
-                    sellerName={p.seller.name}
+                <li key={p.id} className="flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-line transition hover:shadow-card hover:ring-line-strong">
+                  <PropertyCard
+                    p={p}
+                    priority={i === 0 && profile.page === 1}
+                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    className="flex-1 rounded-none ring-0 hover:translate-y-0 hover:shadow-none hover:ring-0"
                   />
+                  <div className="px-4 pb-4">
+                    <ContactActions
+                      variant="row"
+                      source="card"
+                      plot={{ id: p.id, code: p.code, slug: p.slug, title: p.title }}
+                      sellerPhone={p.seller.phone}
+                      sellerName={p.seller.name}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -186,15 +184,48 @@ export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
             )}
           </>
         )}
+      </section>
 
-        <p className="mx-auto mt-10 max-w-xl text-center text-xs leading-relaxed text-muted">
-          Verification means we checked the seller&apos;s phone{profile.identityVerified ? " and identity (Aadhaar)" : ""} — not the land&apos;s legal papers. Visit the
-          land and verify ownership and documents before paying anything.
-        </p>
-        <div className="mt-4 flex justify-center">
-          <ReportSheet target="PROFILE" targetRef={profile.slug} />
+      {/* ── Trust + report */}
+      <section className="container-page mt-10">
+        <div className="rounded-2xl bg-mist p-5 ring-1 ring-line sm:p-6">
+          <p className="flex items-center gap-2 font-semibold text-ink">
+            <ShieldCheck className="size-[18px] text-brand-600" aria-hidden /> Buy safely
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-ink-soft">
+            {profile.identityVerified && profile.phoneVerified
+              ? `We've confirmed who ${firstName} is: their phone number and their identity with Aadhaar.`
+              : profile.phoneVerified
+                ? `We've confirmed ${firstName}'s phone number.`
+                : `${firstName} hasn't been verified yet.`}{" "}
+            We don&apos;t check land papers — visit the land and check the ownership documents (khatauni, registry) before paying anything.
+          </p>
+          <div className="mt-3">
+            <ReportSheet target="PROFILE" targetRef={profile.slug} />
+          </div>
         </div>
-      </div>
+
+        {/* Every shared profile is also an invitation to sell. */}
+        <IntentLink href="/sell" className="group mt-4 flex items-center gap-4 rounded-2xl bg-white p-4 ring-1 ring-line transition hover:ring-brand-300 sm:p-5">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+            <Store className="size-5" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold text-ink">Selling land too?</span>
+            <span className="block text-sm text-muted">Get your own page like this — list free on WhatsApp or here.</span>
+          </span>
+          <ArrowRight className="size-5 shrink-0 text-brand-700 transition group-hover:translate-x-0.5" aria-hidden />
+        </IntentLink>
+      </section>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 px-3 py-3 text-center">
+      <dd className="tabular truncate text-[17px] font-bold text-ink">{value}</dd>
+      <dt className="mt-0.5 truncate text-xs text-muted">{label}</dt>
     </div>
   );
 }
