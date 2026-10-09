@@ -5,7 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PropertyCard } from "@/components/listing/property-card";
 import { HeroSearch } from "@/components/site/hero-search";
-import { LandTypeTiles, SectionHeading, SellOnWhatsAppBand } from "@/components/site/sections";
+import { LandTypeTiles, SectionHeading, SellerNudge } from "@/components/site/sections";
 import { ButtonLink } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/format";
@@ -180,7 +180,7 @@ export default async function CityPage(props: PageProps<"/[city]">) {
       )}
 
       <section className="container-page pb-12 sm:pb-16">
-        <SellOnWhatsAppBand />
+        <SellerNudge place={city.name} />
       </section>
 
       <section className="bg-mist py-12 sm:py-16">

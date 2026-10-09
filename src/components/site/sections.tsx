@@ -1,10 +1,7 @@
 import { ArrowRight, BadgeCheck, CircleDollarSign, FileSearch, LocateFixed, MessageCircle, Search, ShieldCheck } from "lucide-react";
 import { IntentLink } from "@/components/ui/intent-link";
-import { ButtonA, ButtonLink } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { LAND_TYPES, LAND_TYPE_SLUGS } from "@/lib/land";
-import { site } from "@/lib/site";
-import { sellOnWhatsAppProps } from "@/lib/whatsapp-links";
 import type { PropertyCardData } from "@/server/listings/queries";
 import { PropertyCard } from "@/components/listing/property-card";
 import { LandTypeIcon } from "./land-type-icon";
@@ -100,94 +97,22 @@ export function HowItWorks() {
   );
 }
 
-/** Green band with a live-looking WhatsApp chat — the seller pitch. */
-export function SellOnWhatsAppBand() {
+/** A quiet one-line pointer for sellers on buyer pages — the full story lives on /sell. */
+export function SellerNudge({ place }: { place?: string }) {
   return (
-    <div className="relative isolate overflow-hidden rounded-[2rem] bg-linear-to-br from-brand-800 via-brand-700 to-brand-600 px-5 py-10 text-white shadow-lift sm:px-10 sm:py-14 lg:px-14">
-      <div className="bg-contours absolute inset-0 -z-10" aria-hidden />
-      <div className="absolute -top-24 -right-24 -z-10 size-72 rounded-full bg-brand-400/30 blur-3xl" aria-hidden />
-      <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <div>
-          <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
-            <WhatsAppIcon className="size-3.5" /> For sellers
-          </p>
-          <h2 className="mt-4 text-[1.9rem] leading-[1.1] font-extrabold sm:text-[2.25rem]">
-            Your land deserves the right buyer.
-          </h2>
-          <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-white/80 sm:text-base">
-            Just send us a message on WhatsApp — in Hindi or English. Answer a few simple questions and share some photos. Our team
-            checks your listing and puts it live, and buyers call you directly. You also get a permanent{" "}
-            <strong className="text-white">Seller ID</strong> to manage everything in one place.
-          </p>
-          <ul className="mt-6 grid gap-2.5 text-[15px] text-white/90">
-            {["Chat in Hindi or English", "Buyers contact you directly", "Free to list while we launch"].map((t) => (
-              <li key={t} className="flex items-center gap-2.5">
-                <BadgeCheck className="size-5 text-brand-200" aria-hidden /> {t}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <ButtonA {...sellOnWhatsAppProps()} variant="white" size="xl">
-              <WhatsAppIcon className="text-brand-600" /> List on WhatsApp
-            </ButtonA>
-            <ButtonLink href="/sell" size="xl" className="bg-white/10 shadow-none ring-1 ring-white/25 hover:bg-white/15">
-              How it works <ArrowRight />
-            </ButtonLink>
-          </div>
-        </div>
-        <ChatMockup />
-      </div>
-    </div>
-  );
-}
-
-function ChatMockup() {
-  const bubbles: { from: "me" | "bot"; text: string; buttons?: string[] }[] = [
-    { from: "me", text: "SELL — I want to list my land" },
-    { from: "bot", text: "Namaste ji 🙏 What kind of land is it?", buttons: ["Agricultural land", "Residential plot"] },
-    { from: "me", text: "Khet, 2 bigha in Sathiyaon" },
-    { from: "bot", text: "Thank you 🙏 And your asking price?" },
-    { from: "me", text: "18 lakh" },
-    { from: "bot", text: "✅ Thank you! Our team will check it and message you as soon as it's live.\nSeller ID: SLR-7A41K2" },
-  ];
-  return (
-    <div className="mx-auto w-full max-w-[22rem]" aria-hidden>
-      <div className="rounded-[2.4rem] bg-brand-950 p-2.5 shadow-lift ring-1 ring-white/10">
-        <div className="overflow-hidden rounded-[1.9rem] bg-[#efeae2]">
-          <div className="flex items-center gap-3 bg-brand-800 px-4 py-3 text-white">
-            <span className="flex size-9 items-center justify-center rounded-full bg-white/15 text-sm font-bold">P</span>
-            <div className="leading-tight">
-              <p className="text-sm font-semibold">{site.name} Assistant</p>
-              <p className="text-[11px] text-white/70">Listing assistant</p>
-            </div>
-          </div>
-          <div className="space-y-2 px-3 py-4 text-[13px] leading-snug">
-            {bubbles.map((b, i) => (
-              <div key={i} className={b.from === "me" ? "flex justify-end" : "flex justify-start"}>
-                <div
-                  className={
-                    b.from === "me"
-                      ? "max-w-[80%] rounded-2xl rounded-tr-md bg-[#d9fdd3] px-3 py-2 text-ink shadow-sm"
-                      : "max-w-[85%] rounded-2xl rounded-tl-md bg-white px-3 py-2 text-ink shadow-sm"
-                  }
-                >
-                  <p className="whitespace-pre-line">{b.text}</p>
-                  {b.buttons && (
-                    <div className="mt-2 grid gap-1 border-t border-line pt-1.5">
-                      {b.buttons.map((t) => (
-                        <span key={t} className="text-center text-[12.5px] font-semibold text-sky-600">
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+    <IntentLink
+      href="/sell"
+      className="group flex items-center gap-4 rounded-2xl bg-white p-4 ring-1 ring-line transition hover:ring-brand-300 sm:p-5"
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+        <WhatsAppIcon className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-ink">Have land{place ? ` in ${place}` : ""} to sell?</span>
+        <span className="block text-sm text-muted">List it free on WhatsApp or here — buyers call you directly.</span>
+      </span>
+      <ArrowRight className="size-5 shrink-0 text-brand-700 transition group-hover:translate-x-0.5" aria-hidden />
+    </IntentLink>
   );
 }
 
