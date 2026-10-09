@@ -1,0 +1,3 @@
+# False positive: a dummy CRON_SECRET assigned inside the test script in this commit
+# (the test now generates random values at run time). Not a real secret.
+cd5f59ef2e0a946e5cf40699e3568102999ffe43:scripts/check-security.ts:generic-api-key:23

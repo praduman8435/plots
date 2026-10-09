@@ -8,7 +8,7 @@
     "vercel-build": "if [ \"$VERCEL_ENV\" = production ]; then prisma migrate deploy; fi && next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "db:up": "docker compose up -d",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
@@ -23,15 +23,15 @@
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
-    "@vercel/blob": "^2.8.0",
+    "@vercel/blob": "^2.8.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
-    "lucide-react": "^1.49.0",
+    "lucide-react": "^1.54.0",
     "next": "16.3.8",
     "pg": "^8.23.1",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "server-only": "^0.0.1",
     "sharp": "^0.35.5",
     "tailwind-merge": "^3.7.0",
@@ -40,7 +40,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.22",
-    "@types/node": "^20",
+    "@types/node": "^24.19.1",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -50,7 +50,7 @@
     "prisma": "7.10.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^6.0.3"
   },
   "packageManager": "pnpm@9.15.0",
   "pnpm": {

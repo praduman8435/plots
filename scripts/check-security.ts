@@ -14,13 +14,14 @@
  * Creates its own temporary sellers / plots / admin and deletes them afterwards.
  */
 import "dotenv/config";
-import { createHmac } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import sharp from "sharp";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 
-process.env.WHATSAPP_APP_SECRET = "test-app-secret-for-check-security";
-process.env.CRON_SECRET = "test-cron-secret-0123456789abcdef";
+// Random per run: test-only values, never a real secret (and nothing for secret scanners to flag).
+process.env.WHATSAPP_APP_SECRET = randomBytes(24).toString("hex");
+process.env.CRON_SECRET = randomBytes(24).toString("hex");
 
 let passed = 0;
 let failed = 0;
