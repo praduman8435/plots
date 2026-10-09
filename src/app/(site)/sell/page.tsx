@@ -116,7 +116,7 @@ export default async function SellPage() {
         <div className="grid gap-4 sm:grid-cols-3">
           {[
             { icon: MessageCircle, title: "Buyers contact you directly", text: "On WhatsApp or by call. You decide who to talk to, and when." },
-            { icon: BadgeCheck, title: "Weekly “still available?”", text: "One tap YES keeps your listing live. NO marks it sold. That's it." },
+            { icon: BadgeCheck, title: "Always up to date", text: "We check in with you on WhatsApp. One tap keeps your land live, or marks it sold. That's it." },
             { icon: Fingerprint, title: "Your data stays private", text: "Buyers see your name and number only. Never your Aadhaar." },
           ].map((it) => (
             <div key={it.title} className="rounded-3xl bg-mist p-6 ring-1 ring-line">

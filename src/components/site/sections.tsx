@@ -258,7 +258,7 @@ export function WhyUs() {
   const items = [
     { icon: Search, title: "Land near you", text: "Search by village, town or road — in bigha, acre, gaj or sq ft." },
     { icon: MessageCircle, title: "Straight to the seller", text: "Call or WhatsApp. No login, no fee for buyers, nobody in between." },
-    { icon: BadgeCheck, title: "Fresh, not forgotten", text: "Every week sellers confirm their land is still available." },
+    { icon: BadgeCheck, title: "Only land that's really available", text: "Sellers keep their listings up to date, and sold land comes off. What you see is what's for sale." },
     { icon: ShieldCheck, title: "Checked before it's live", text: "Our team reviews every listing. Every seller's phone is verified." },
   ];
   return (
