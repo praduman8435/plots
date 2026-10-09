@@ -25,6 +25,9 @@ export function checkProductionEnv(env: Record<string, string | undefined> = pro
   if (env.DEMO_MODE?.trim().toLowerCase() === "true") {
     warnings.push("DEMO_MODE=true — login codes are shown on screen and identity checks are simulated. Anyone can sign in as any seller. Turn it off before a real launch.");
   }
+  if (env.AI_ENABLED?.trim().toLowerCase() === "true" && !((env.AI_API_KEY?.trim().length ?? 0) >= 20 && !/^(replace|change|your|add|todo|none|xxx|placeholder)/i.test(env.AI_API_KEY!.trim()))) {
+    warnings.push("AI_ENABLED=true but AI_API_KEY is missing or a placeholder — the WhatsApp assistant uses its fixed replies.");
+  }
   if (env.ADMIN_REQUIRE_MFA?.trim().toLowerCase() !== "true") warnings.push("ADMIN_REQUIRE_MFA is not true — admins can sign in with a password only.");
   return { errors, warnings };
 }

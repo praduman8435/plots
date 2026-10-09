@@ -1,7 +1,7 @@
 import { BadgeCheck, CircleAlert, Clock, Globe, PencilLine, Phone, PhoneOff, ShieldBan, ShieldQuestionMark, ShieldX, UserCog, UserRoundPen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { WhatsAppIcon } from "@/components/ui/icons";
-import type { HiddenReason, IdentityStatus, ListingSource, ListingStatus, SellerType } from "@/generated/prisma/enums";
+import type { HiddenReason, IdentityStatus, ListingSource, ListingStatus } from "@/generated/prisma/enums";
 
 /** Admin UI labels. HIDDEN splits in two — see statusLabel(). */
 export const STATUS_LABELS: Record<ListingStatus, string> = {
@@ -77,17 +77,6 @@ export function SourceBadge({ source, size = "sm" }: { source: ListingSource; si
   return (
     <Badge tone="blue" size={size}>
       <Globe /> Web
-    </Badge>
-  );
-}
-
-/** Admin only: "Owner (self-declared)". The public site never says "Owner". */
-export const SELLER_TYPE_LABELS: Record<SellerType, string> = { OWNER: "Owner (self-declared)", BROKER: "Broker" };
-
-export function SellerTypeBadge({ type, size = "sm" }: { type: SellerType; size?: "sm" | "md" }) {
-  return (
-    <Badge tone={type === "OWNER" ? "neutral" : "amber"} size={size}>
-      {SELLER_TYPE_LABELS[type]}
     </Badge>
   );
 }

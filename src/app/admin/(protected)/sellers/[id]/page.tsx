@@ -2,7 +2,7 @@ import { ArrowLeft, Flag, Inbox, MapPinned, MessageCircle, Plus } from "lucide-r
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BlockedBadge, EditedBadge, IdentityBadge, OnboardingBadge, PhoneVerifiedBadge, SellerTypeBadge, StatusBadge } from "@/components/admin/badges";
+import { BlockedBadge, EditedBadge, IdentityBadge, OnboardingBadge, PhoneVerifiedBadge, StatusBadge } from "@/components/admin/badges";
 import { BlockSellerButton } from "@/components/admin/block-seller-button";
 import { ContactButtons } from "@/components/admin/contact-buttons";
 import { EmptyState } from "@/components/admin/empty-state";
@@ -78,7 +78,6 @@ export default async function AdminSellerPage({ params }: PageProps<"/admin/sell
             <span className="tabular font-semibold text-ink-soft">{seller.code}</span>
             <PhoneVerifiedBadge verified={Boolean(seller.phoneVerifiedAt)} />
             <IdentityBadge status={seller.identityStatus} />
-            <SellerTypeBadge type={seller.sellerType} />
             {!seller.onboardedAt && <OnboardingBadge />}
             {seller.isBlocked && <BlockedBadge />}
           </span>

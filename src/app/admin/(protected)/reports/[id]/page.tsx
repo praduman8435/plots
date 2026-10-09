@@ -2,7 +2,7 @@ import { ArrowLeft, ExternalLink, Flag, History, ShieldAlert, UserRound } from "
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BlockedBadge, IdentityBadge, PhoneVerifiedBadge, SellerTypeBadge, StatusBadge } from "@/components/admin/badges";
+import { BlockedBadge, IdentityBadge, PhoneVerifiedBadge, StatusBadge } from "@/components/admin/badges";
 import { formatDate, formatDateTime } from "@/components/admin/format";
 import { ListingThumb } from "@/components/admin/listing-thumb";
 import { PageHeader } from "@/components/admin/page-header";
@@ -195,7 +195,6 @@ export default async function AdminReportPage({ params }: PageProps<"/admin/repo
             <div className="flex flex-wrap items-center gap-1.5">
               <p className="font-semibold text-ink">{r.seller.name}</p>
               <span className="tabular text-xs text-muted">{r.seller.code}</span>
-              <SellerTypeBadge type={r.seller.sellerType} />
               <PhoneVerifiedBadge verified={Boolean(r.seller.phoneVerifiedAt)} />
               <IdentityBadge status={r.seller.identityStatus} />
               {r.seller.isBlocked && <BlockedBadge />}

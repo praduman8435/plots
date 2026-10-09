@@ -7,7 +7,7 @@ import { isOtpPaused } from "@/server/seller/otp";
 
 export const metadata: Metadata = {
   title: "Seller login",
-  description: "Owners and brokers: sign in with your Seller ID to see your plots and buyer enquiries.",
+  description: "Sellers: sign in with your Seller ID to see your land, buyer enquiries and share link.",
   robots: { index: false },
 };
 

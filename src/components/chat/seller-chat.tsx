@@ -91,7 +91,7 @@ function ChatThread({
       variant="seller"
       backHref="/sell"
       suggestions={sellerSuggestions(chat.state)}
-      notice="This is the official InstaPlots chat. Our listing assistant replies instantly — send TALK anytime to reach a person from our team."
+      notice="This is the official InstaPlots chat. Our listing assistant replies instantly, in Hindi or English — send TALK anytime to reach a person from our team."
       emptyState={
         <div className="mx-auto mt-6 flex max-w-xs flex-col items-center gap-3 rounded-2xl bg-white px-6 py-6 text-center shadow-sm">
           <span className="grid size-14 place-items-center rounded-2xl bg-brand-50">
@@ -99,7 +99,7 @@ function ChatThread({
           </span>
           <p className="text-[16px] font-bold text-ink">List your land in 2 minutes</p>
           <p className="text-[14px] leading-snug text-muted">
-            Answer a few quick questions, add photos, and buyers contact you directly. Free, no documents needed.
+            Answer a few simple questions — in Hindi or English — add photos, and buyers contact you directly. Free, no documents needed.
           </p>
           <button
             type="button"
@@ -191,8 +191,8 @@ function VerifyNumber({ onVerified }: { onVerified: (state: ChatState) => void }
           <WaRichText
             text={
               step === "phone"
-                ? "Namaste 🙏 Welcome to *InstaPlots*.\n\nList your land in about 2 minutes, right here in this chat. First, let's confirm your mobile number."
-                : `We've sent a 6-digit code to ${maskedPhone}. Enter it below to start chatting.`
+                ? "Namaste 🙏 Welcome to *InstaPlots*.\nList your land in about 2 minutes, right here — in Hindi or English. First, let's confirm your mobile number.\n\nनमस्ते 🙏 *InstaPlots* में आपका स्वागत है।\nहिंदी या English, जैसे आप चाहें। पहले अपना मोबाइल नंबर पक्का कर लें।"
+                : `We've sent a 6-digit code to ${maskedPhone}. Enter it below to start chatting.\n\n${maskedPhone} पर 6 अंकों का कोड भेजा है। बात शुरू करने के लिए नीचे डालें।`
             }
           />
         </div>

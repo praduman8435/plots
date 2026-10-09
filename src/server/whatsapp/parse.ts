@@ -245,7 +245,9 @@ export type BotCommand =
   | "HUMAN"
   | "MENU"
   /** "hi", "hello", "namaste" — shows the welcome menu when idle, resumes when mid-listing, never leaves HUMAN. */
-  | "GREETING";
+  | "GREETING"
+  /** "language", "भाषा", "hindi", "english" — switch the chat language. */
+  | "LANGUAGE";
 
 /** Lowercase, Devanagari digits normalised, punctuation and emoji stripped. */
 function commandKey(text: string): string {
@@ -261,11 +263,17 @@ const PHRASES: Record<Exclude<BotCommand, "START">, string[]> = {
     "namastey", "ram ram", "jai shri ram", "salaam", "salam", "assalamualaikum", "good morning", "good afternoon",
     "good evening", "hi there", "hello plots", "hi plots", "नमस्ते", "नमस्कार", "राम राम", "हेलो", "हाय",
   ],
-  MENU: ["menu", "main menu", "options", "bot", "assistant", "back to menu", "go back", "मेनू"],
+  MENU: ["menu", "main menu", "options", "bot", "assistant", "back to menu", "go back", "मेनू", "मेन्यू"],
+  LANGUAGE: [
+    "language", "change language", "lang", "bhasha", "bhasa", "bhasha badlo", "hindi", "english", "angrezi", "angreji",
+    "hindi please", "english please", "hindi me", "hindi mein", "english me", "english mein", "hindi me baat karo",
+    "भाषा", "भाषा बदलें", "भाषा बदलो", "हिंदी", "हिन्दी", "हिंदी में", "अंग्रेज़ी", "अंग्रेजी", "इंग्लिश",
+  ],
   HELP: ["help", "madad", "sahayata", "how", "how does it work", "what can you do", "मदद", "सहायता", "help please"],
   STATUS: [
     "status", "my plots", "my plot", "my listings", "my listing", "my land", "my lands", "plots", "listings",
     "check status", "listing status", "mere plot", "mera plot", "my properties", "my property", "स्टेटस",
+    "मेरी लिस्टिंग", "मेरी ज़मीन", "मेरी जमीन", "लिस्टिंग", "meri listing", "meri zameen",
   ],
   ID: ["id", "my id", "seller id", "sellerid", "my seller id", "seller code", "my code", "mera id", "meri id", "आईडी"],
   YES: [
@@ -275,6 +283,8 @@ const PHRASES: Record<Exclude<BotCommand, "START">, string[]> = {
     // Button titles of the weekly check (template quick replies arrive as their text).
     "yes all available", "yes all", "all available", "all are available", "yes all are available", "sab available",
     "sab available hai", "haan sab available", "yes available hai", "still available yes",
+    // Hindi button titles (template quick replies arrive as their text).
+    "हाँ उपलब्ध है", "हाँ सब उपलब्ध", "हां उपलब्ध है", "हां सब उपलब्ध", "उपलब्ध है", "अभी उपलब्ध है",
   ],
   NO: [
     "no", "n", "nope", "nah", "na", "naa", "nahi", "nahin", "nai", "nhi", "nahi hai", "no sir", "नहीं", "नही", "ना",
@@ -283,6 +293,7 @@ const PHRASES: Record<Exclude<BotCommand, "START">, string[]> = {
     "no sold", "no it s sold", "no its sold", "no it is sold", "no it s sold out", "one is sold", "another is sold",
     "bik gaya", "bik gayi", "bik gya", "bik gai", "bik chuka", "bik chuka hai", "bik gaya hai", "bech diya",
     "bech diye", "बिक गया", "बिक गई", "बिक गयी", "बेच दिया", "बिक चुका",
+    "नहीं बिक गई", "नहीं बिक गया", "एक बिक गई", "दूसरी भी बिकी", "नहीं यह भी बिकी",
   ],
   SOLD: ["sold", "mark sold", "mark as sold", "mark plot sold", "sold plot"],
   CANCEL: ["cancel", "stop", "exit", "quit", "end", "band karo", "ruko", "cancel listing", "रद्द", "बंद करो", "रुको"],
@@ -298,7 +309,8 @@ const START_PHRASES = new Set([
   "sell", "list", "new", "start", "register", "sell land", "sell my land", "sell plot", "sell my plot",
   "list my land", "list land", "list plot", "list my plot", "new listing", "new plot", "add plot", "add land",
   "add my plot", "post plot", "post land", "zameen bechni hai", "plot bechna hai", "bechna hai", "बेचना है",
-  "जमीन बेचनी है", "ज़मीन बेचनी है",
+  "जमीन बेचनी है", "ज़मीन बेचनी है", "बेचना", "बेचनी है", "ज़मीन लिस्ट करें", "जमीन लिस्ट करें", "लिस्ट करें",
+  "ज़मीन बेचना", "जमीन बेचना", "zameen bechna", "zameen list karni hai",
 ]);
 
 const PHRASE_LOOKUP = new Map<string, BotCommand>();
@@ -473,4 +485,15 @@ export function parseName(text: string): string | null {
 function round(n: number, digits: number): number {
   const f = 10 ** digits;
   return Math.round(n * f) / f;
+}
+
+// ───────────────────────────── Language ─────────────────────────────
+
+/** "English" / "हिंदी" / "hindi" / "1" / "2" (the picker's order) → "en" | "hi". */
+export function parseLanguage(text: string | null | undefined): "en" | "hi" | null {
+  if (!text) return null;
+  const k = commandKey(text);
+  if (/^(?:1|english|eng|angrezi|angreji|अंग्रेज़ी|अंग्रेजी|इंग्लिश)(?:\s+(?:please|me|mein|में))?$/.test(k)) return "en";
+  if (/^(?:2|hindi|हिंदी|हिन्दी)(?:\s+(?:please|me|mein|में|me baat karo))?$/.test(k)) return "hi";
+  return null;
 }

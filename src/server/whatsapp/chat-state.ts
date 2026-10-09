@@ -44,6 +44,8 @@ export type ChatState = {
   plots: { live: number; awaiting: number; unavailable: number; pending: number };
   /** Live cities, for suggestions and "drop a pin". */
   cities: { name: string; latitude: number; longitude: number }[];
+  /** The chat's language ("en" | "hi"); null until the seller picks one. */
+  language: string | null;
   messages: ChatMessage[];
   error?: string;
 };
@@ -58,6 +60,7 @@ export function emptyChatState(phone: string, error?: string): ChatState {
     seller: null,
     plots: { live: 0, awaiting: 0, unavailable: 0, pending: 0 },
     cities: [],
+    language: null,
     messages: [],
     error,
   };
@@ -140,6 +143,7 @@ export async function loadChatState(phone: string, replies: BotReply[] = [], opt
     seller,
     plots,
     cities,
+    language: conversation.language,
     messages,
   };
 }

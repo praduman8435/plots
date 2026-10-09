@@ -7,6 +7,7 @@
  */
 import {
   detectCommand,
+  parseLanguage,
   detectFeatures,
   parseArea,
   parseCoordinates,
@@ -304,6 +305,23 @@ check("parseName(Ramesh Yadav)", parseName("Ramesh Yadav"), "Ramesh Yadav");
 check("parseName(मेरा नाम सुरेश है)", parseName("मेरा नाम सुरेश है"), "सुरेश");
 check("parseName(9876543210)", parseName("9876543210"), null);
 check("parseName(x)", parseName("x"), null);
+
+// ── Language + Hindi phrases ──
+const languageCases: [string, "en" | "hi" | null][] = [
+  ["English", "en"], ["english please", "en"], ["अंग्रेज़ी", "en"], ["1", "en"],
+  ["हिंदी", "hi"], ["Hindi", "hi"], ["hindi me", "hi"], ["हिन्दी", "hi"], ["2", "hi"],
+  ["hello", null], ["2 bigha", null],
+];
+for (const [input, expected] of languageCases) check(`parseLanguage(${JSON.stringify(input)})`, parseLanguage(input), expected);
+const hindiCommands: [string, string | null][] = [
+  ["भाषा", "LANGUAGE"], ["language", "LANGUAGE"], ["hindi", "LANGUAGE"], ["बेचना", "START"], ["ज़मीन लिस्ट करें", "START"],
+  ["स्टेटस", "STATUS"], ["मेरी लिस्टिंग", "STATUS"], ["हाँ, उपलब्ध है", "YES"], ["हाँ, सब उपलब्ध", "YES"],
+  ["नहीं, बिक गई", "NO"], ["एक बिक गई", "NO"], ["नहीं 2", "NO"], ["बात करनी है", "HUMAN"], ["मेनू", "MENU"],
+];
+for (const [input, expected] of hindiCommands) check(`detectCommand(${JSON.stringify(input)})`, detectCommand(input), expected);
+check("parseAvailabilityReply(नहीं 2)", parseAvailabilityReply("नहीं 2"), { answer: "NO", number: 2, plain: false });
+check("parseArea(२ बीघा ५ बिस्वा)", parseArea("२ बीघा ५ बिस्वा"), { area: 2.25, unit: "BIGHA" });
+check("parsePrice(१८ लाख)", parsePrice("१८ लाख"), 1_800_000);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -44,6 +44,9 @@ export const LIMITS = {
   reportPerReporter: { limit: 10, windowSeconds: 86_400 },
   // Caps a pile-on against one plot or seller; admins still see every report that got through.
   reportPerTarget: { limit: 50, windowSeconds: 3600 },
+  // Optional AI in the WhatsApp assistant (limits overridable by AI_MAX_CALLS_*): per chat, and all chats.
+  aiPerChat: { limit: 25, windowSeconds: 86_400 },
+  aiGlobal: { limit: 500, windowSeconds: 86_400 },
   // Admin second step (authenticator code), per admin account.
   adminMfaPerAdmin: { limit: 6, windowSeconds: 900 },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;
@@ -52,8 +55,9 @@ export type LimitName = keyof typeof LIMITS;
 export type RateLimitResult = { ok: true } | { ok: false; retryAfterSeconds: number };
 
 /** Counts one hit against `name` for `subject`. Over the limit → ok:false with seconds until the window resets. */
-export async function hitRateLimit(name: LimitName, subject: string, now = Date.now()): Promise<RateLimitResult> {
-  const { limit, windowSeconds } = LIMITS[name];
+export async function hitRateLimit(name: LimitName, subject: string, now = Date.now(), override?: { limit: number }): Promise<RateLimitResult> {
+  const { windowSeconds } = LIMITS[name];
+  const limit = override?.limit ?? LIMITS[name].limit;
   const windowMs = windowSeconds * 1000;
   const windowStart = new Date(Math.floor(now / windowMs) * windowMs);
   const key = `${name}:${subject}`.slice(0, 200);

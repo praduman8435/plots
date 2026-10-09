@@ -27,6 +27,33 @@ export async function geocodePlace(query: string): Promise<{ lat: number; lng: n
   }
 }
 
+/** True for text in Devanagari (Hindi) script. */
+export function isDevanagari(text: string): boolean {
+  return /[\u0900-\u097F]/.test(text);
+}
+
+/**
+ * "आज़मगढ़" (+ state) → "Azamgarh": the place's English name from OpenStreetMap,
+ * so a city typed in Hindi matches the existing city instead of creating a
+ * second one. Never throws; null if unknown, slow, or not in Latin letters.
+ */
+export async function englishPlaceName(query: string): Promise<string | null> {
+  try {
+    const params = new URLSearchParams({ format: "jsonv2", countrycodes: "in", limit: "1", q: query });
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+      headers: { "User-Agent": "InstaPlots land marketplace (contact via site)", "Accept-Language": "en" },
+      signal: AbortSignal.timeout(4000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const [hit] = (await res.json()) as { name?: string }[];
+    const name = hit?.name?.trim();
+    return name && /^[A-Za-z][A-Za-z .'()-]{1,58}$/.test(name) ? name : null;
+  } catch {
+    return null;
+  }
+}
+
 export type CityRef = { cityId?: string | null; cityName?: string | null; state?: string | null; latitude?: number | null; longitude?: number | null };
 
 /**

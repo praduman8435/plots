@@ -50,6 +50,7 @@ jobs:
         run: |
           pnpm check:security
           pnpm check:integrity
+          pnpm check:bot
           pnpm check:profile
           pnpm exec tsx scripts/check-whatsapp-parse.ts
       - run: pnpm build

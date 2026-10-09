@@ -29,9 +29,9 @@ export default async function HomePage() {
         <Image src="/demo/land-066.webp" alt="" fill preload fetchPriority="high" quality={50} sizes="100vw" className="-z-10 object-cover object-[50%_60%] opacity-60" />
         <div className="absolute inset-0 -z-10 bg-linear-to-b from-brand-950/70 via-brand-950/40 to-brand-950/80" />
         <div className="container-page pt-12 pb-10 sm:pt-16 sm:pb-14 lg:pt-20 lg:pb-16">
-          <h1 className="max-w-2xl text-[2.4rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">Find the right land for you.</h1>
+          <h1 className="max-w-2xl text-[2.4rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">The right land, straight from the seller.</h1>
           <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
-            Farmland, house plots and commercial land — with real photos and prices. Talk directly to the seller.
+            Farmland, house plots and shop land near you — with real photos and honest prices. When you find the one, call or WhatsApp the seller directly. No login, no fee.
           </p>
           <div className="mt-7 max-w-4xl sm:mt-8 lg:max-w-[52rem]">
             <HeroSearch />
@@ -93,14 +93,14 @@ export default async function HomePage() {
 
       {/* ───── Why ───── */}
       <section className="container-page py-12 sm:py-20">
-        <SectionHeading title="Why people use InstaPlots" />
+        <SectionHeading title="Why buyers and sellers trust InstaPlots" description="Buying or selling land is a big decision. We keep it simple, honest and in your hands." />
         <WhyUs />
       </section>
 
       {/* ───── How it works ───── */}
       <section className="bg-mist py-12 sm:py-20">
         <div className="container-page">
-          <SectionHeading title="How it works" />
+          <SectionHeading title="How it works" description="One place where people looking for land meet the sellers who have it." />
           <HowItWorksBoth />
         </div>
       </section>
@@ -109,9 +109,9 @@ export default async function HomePage() {
       <section className="container-page py-12 sm:py-20">
         <div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] bg-brand-700 p-7 text-white sm:flex-row sm:items-center sm:p-12">
           <div>
-            <h2 className="text-2xl font-extrabold sm:text-3xl">Looking for land?</h2>
+            <h2 className="text-2xl font-extrabold sm:text-3xl">Buying or selling land? Start here.</h2>
             <p className="mt-1.5 flex items-center gap-1.5 text-white/80">
-              <MapPin className="size-4" aria-hidden /> {totalLive} plots available right now.
+              <MapPin className="size-4" aria-hidden /> {totalLive} plots waiting for the right buyer right now.
             </p>
           </div>
           <div className="flex flex-wrap gap-2.5">

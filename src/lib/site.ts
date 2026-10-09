@@ -1,8 +1,8 @@
 export const site = {
   name: "InstaPlots",
-  tagline: "Land, listed honestly.",
+  tagline: "Land, made simple.",
   description:
-    "Find residential plots, farmland and commercial land in Chandigarh Tricity and Azamgarh. Real photos and prices — talk to sellers directly on WhatsApp. No login needed.",
+    "Find farmland, house plots and commercial land across India — real photos, real prices, and the seller just one call away. Sellers list free on WhatsApp, in Hindi or English.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   /** Our WhatsApp Business number (digits only, with country code) — sellers chat here to list. */
   whatsappNumber: (process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER ?? "919999999999").replace(/\D/g, ""),

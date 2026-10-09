@@ -267,29 +267,39 @@ export function useWhatsAppChat({
 // ───────────────────────────── Reply suggestions ─────────────────────────────
 
 /** Replies to the weekly "still available?" check, offered while plots wait for an answer. */
-export function availabilitySuggestions(plots: ChatState["plots"]): string[] {
-  if (plots.awaiting > 1) return ["YES", ...Array.from({ length: Math.min(plots.awaiting, 3) }, (_, i) => `NO ${i + 1}`)];
-  if (plots.awaiting === 1) return ["YES", "NO"];
-  if (plots.unavailable > 0) return ["YES"];
+/** Quick replies in the chat's language (the assistant understands both). */
+const WORDS = {
+  en: { yes: "YES", no: "NO", sell: "SELL", status: "STATUS", sold: "SOLD", help: "HELP", menu: "MENU" },
+  hi: { yes: "हाँ", no: "नहीं", sell: "बेचना", status: "स्टेटस", sold: "बिक गई", help: "मदद", menu: "मेनू" },
+} as const;
+
+export function availabilitySuggestions(plots: ChatState["plots"], language?: string | null): string[] {
+  const w = WORDS[language === "hi" ? "hi" : "en"];
+  if (plots.awaiting > 1) return [w.yes, ...Array.from({ length: Math.min(plots.awaiting, 3) }, (_, i) => `${w.no} ${i + 1}`)];
+  if (plots.awaiting === 1) return [w.yes, w.no];
+  if (plots.unavailable > 0) return [w.yes];
   return [];
 }
 
 /** Quick replies a seller would type next — the chips above the composer (photo/location chips are added by the window). */
 export function sellerSuggestions(state: ChatState): string[] {
   const step = state.step;
+  // Before a language is picked, the assistant's own English / हिंदी buttons are the answer.
+  if (!state.language) return [];
+  const w = WORDS[state.language === "hi" ? "hi" : "en"];
   if (step === "IDLE") {
     return [
       ...new Set([
-        ...availabilitySuggestions(state.plots),
-        "SELL",
-        ...(state.seller ? ["STATUS"] : []),
-        ...(state.plots.live > 0 && state.plots.awaiting === 0 ? ["SOLD"] : []),
-        "HELP",
+        ...availabilitySuggestions(state.plots, state.language),
+        w.sell,
+        ...(state.seller ? [w.status] : []),
+        ...(state.plots.live > 0 && state.plots.awaiting === 0 ? [w.sold] : []),
+        w.help,
       ]),
     ];
   }
   // Inside a listing the assistant's own buttons and lists are the answers.
-  if (step === "HUMAN") return ["MENU"];
+  if (step === "HUMAN") return [w.menu];
   return [];
 }
 

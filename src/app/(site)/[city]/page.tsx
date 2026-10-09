@@ -32,7 +32,7 @@ export async function generateMetadata(props: PageProps<"/[city]">): Promise<Met
     title,
     description:
       city.intro ??
-      `Agricultural land, residential plots and commercial land for sale in ${city.name}, ${city.state}. Contact owners and brokers directly on WhatsApp.`,
+      `Agricultural land, residential plots and commercial land for sale in ${city.name}, ${city.state}. Contact sellers directly on WhatsApp.`,
     alternates: { canonical: `/${city.slug}` },
     // Pages for cities with no live land yet stay out of Google until they have something to show.
     robots: { index: (await db.property.count({ where: { cityId: city.id, status: "ACTIVE" } })) > 0 },
@@ -71,7 +71,7 @@ export default async function CityPage(props: PageProps<"/[city]">) {
     },
     {
       q: "Do I need to sign up to contact a seller?",
-      a: "No. Browse freely and tap “Contact Seller on WhatsApp” on any plot. You'll talk to the owner or broker directly.",
+      a: "No. Browse freely and tap “Contact Seller on WhatsApp” on any plot. You'll talk to the seller directly.",
     },
     {
       q: "Is the land verified?",

@@ -11,7 +11,6 @@ import {
   IdentityBadge,
   OnboardingBadge,
   PhoneVerifiedBadge,
-  SellerTypeBadge,
   SourceBadge,
   StatusBadge,
 } from "@/components/admin/badges";
@@ -257,7 +256,6 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   <PhoneVerifiedBadge verified={Boolean(p.seller.phoneVerifiedAt)} />
                   <IdentityBadge status={p.seller.identityStatus} />
-                  <SellerTypeBadge type={p.seller.sellerType} />
                   {!p.seller.onboardedAt && <OnboardingBadge />}
                   {p.seller.isBlocked && <BlockedBadge />}
                 </div>

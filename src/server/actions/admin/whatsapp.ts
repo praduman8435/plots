@@ -3,7 +3,6 @@
 import { refresh } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin/require";
-import { formatPrice } from "@/lib/format";
 import { placeName } from "@/lib/land";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { changeListingStatus, plotsAwaitingAvailability } from "@/server/listings/service";
@@ -12,6 +11,7 @@ import { emptyChatState, inboundFromForm, loadChatState, type ChatState } from "
 import type { OutgoingMessage } from "@/server/whatsapp/client";
 import { processInbound } from "@/server/whatsapp/inbound";
 import { recordOutboundOnly, sendAndRecord } from "@/server/whatsapp/messaging";
+import { copy, price, toLang } from "@/server/whatsapp/copy";
 import { buildAvailabilityCheckMessage } from "@/server/whatsapp/notify";
 
 // ───────────────────────────── Inbox ─────────────────────────────
@@ -129,7 +129,8 @@ export async function simulatorAvailabilityCheck(phoneInput: string): Promise<Ch
     include: { city: { select: { name: true } } },
     orderBy: { createdAt: "asc" },
   });
-  const { message } = buildAvailabilityCheckMessage(plots);
+  const conv = await db.whatsAppConversation.findUnique({ where: { phone: phone.normalized }, select: { language: true } });
+  const { message } = buildAvailabilityCheckMessage(plots, toLang(conv?.language));
   const messageId = await recordOutboundOnly(phone.normalized, message, "system");
   return loadState(phone.normalized, [{ messageId, message }]);
 }
@@ -153,12 +154,13 @@ export async function simulatorNoReply(phoneInput: string): Promise<ChatState> {
     include: { city: { select: { name: true } } },
     orderBy: { createdAt: "asc" },
   });
+  const lang = toLang((await db.whatsAppConversation.findUnique({ where: { phone: phone.normalized }, select: { language: true } }))?.language);
   for (const p of plots) {
     await changeListingStatus(p.id, { type: "HIDE_UNCONFIRMED" }, { notify: false, via: "cron" });
     // Mirrors notifySeller(…, "LISTING_UNAVAILABLE").
     const message: OutgoingMessage = {
       type: "text",
-      text: `We didn't hear back, so we've hidden your property from buyers for now.\n\n${p.title}\n${placeName(p)}, ${p.city.name} · ${formatPrice(p.price)}\n\nStill available? Reply *YES* and it goes live again.`,
+      text: copy(lang).nUnavailable({ plot: `${p.title}\n${placeName(p)}, ${p.city.name} · ${price(lang, p.price)}` }),
     };
     await recordOutboundOnly(phone.normalized, message, "system");
   }

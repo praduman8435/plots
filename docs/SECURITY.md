@@ -157,6 +157,17 @@ Scanners only know published advisories. "No known vulnerabilities" isn't proof 
 - The WhatsApp webhook has no timestamp-based replay window, because Meta doesn't sign one. Replays are de-duplicated by message id.
 - Uploaded photos are public-by-URL (unguessable names). That's intended, since all photos are public listing photos. Don't reuse this storage for private documents; use private Blob plus signed URLs for those.
 
+**Optional AI (WhatsApp assistant).** When `AI_ENABLED=true`, a seller's chat messages are sent to the configured AI provider. Before anything leaves the server:
+- Phone numbers and 12-digit (Aadhaar-like) numbers are masked.
+- Text is capped at 1,200 characters.
+
+What the AI returns is constrained:
+- Extracted fields are schema-validated and range-checked, then go through the same checks as typed answers.
+- Replies are plain text, with any link other than ours removed.
+- The AI can't publish, approve or change anything.
+
+Calls are rate-limited per chat and globally, time out, and fall back to fixed replies. Choose a provider whose data-retention terms you accept, and mention it in your privacy policy.
+
 ## 9. Environment variables
 
 `.env.example` documents every variable (placeholders only). New since this audit:

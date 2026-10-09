@@ -1,9 +1,10 @@
 import type { SellerType } from "@/generated/prisma/enums";
 
 /**
- * Public label for who listed a plot. We never say "Owner": ownership isn't
- * verified (brokers often list for owners). Self-declared owners show as "Seller".
+ * Everyone who lists land on InstaPlots is simply a "Seller" — buyers don't
+ * need to know more, and sellers aren't sorted into owner / broker.
  */
-export function sellerLabel(t: SellerType): string {
-  return t === "BROKER" ? "Broker" : "Seller";
+export function sellerLabel(_t?: SellerType): string {
+  void _t;
+  return "Seller";
 }

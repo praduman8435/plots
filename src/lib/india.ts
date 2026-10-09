@@ -14,6 +14,15 @@ const ALIASES: Record<string, (typeof INDIAN_STATES)[number]> = {
   pb: "Punjab", gj: "Gujarat", br: "Bihar", jk: "Jammu and Kashmir", "j&k": "Jammu and Kashmir", ka: "Karnataka",
   kl: "Kerala", od: "Odisha", orissa: "Odisha", ct: "Chhattisgarh", jh: "Jharkhand", ts: "Telangana", dl: "Delhi",
   "new delhi": "Delhi", ncr: "Delhi", pondicherry: "Puducherry", uttaranchal: "Uttarakhand",
+  // Hindi (Devanagari) names, for sellers chatting in Hindi.
+  "उत्तर प्रदेश": "Uttar Pradesh", "यूपी": "Uttar Pradesh", "बिहार": "Bihar", "मध्य प्रदेश": "Madhya Pradesh",
+  "राजस्थान": "Rajasthan", "पंजाब": "Punjab", "हरियाणा": "Haryana", "दिल्ली": "Delhi", "गुजरात": "Gujarat",
+  "महाराष्ट्र": "Maharashtra", "उत्तराखंड": "Uttarakhand", "उत्तराखण्ड": "Uttarakhand", "हिमाचल प्रदेश": "Himachal Pradesh",
+  "झारखंड": "Jharkhand", "झारखण्ड": "Jharkhand", "छत्तीसगढ़": "Chhattisgarh", "छत्तीसगढ": "Chhattisgarh",
+  "पश्चिम बंगाल": "West Bengal", "ओडिशा": "Odisha", "उड़ीसा": "Odisha", "चंडीगढ़": "Chandigarh", "चण्डीगढ़": "Chandigarh",
+  "जम्मू और कश्मीर": "Jammu and Kashmir", "जम्मू कश्मीर": "Jammu and Kashmir", "कर्नाटक": "Karnataka",
+  "तेलंगाना": "Telangana", "आंध्र प्रदेश": "Andhra Pradesh", "तमिलनाडु": "Tamil Nadu", "केरल": "Kerala",
+  "असम": "Assam", "गोवा": "Goa",
 };
 
 /** "up", "Uttar pradesh", "Punjab " → canonical state name, or null. */

@@ -378,6 +378,8 @@ model WhatsAppConversation {
   step          String    @default("IDLE")
   /// Partially collected listing (validated on submit).
   draft         Json?
+  /// "en" | "hi" — chosen by the seller at the start of the chat. Null = not chosen yet.
+  language      String?
   lastInboundAt DateTime? /// WhatsApp only allows free-form replies within 24h of this
   unreadCount   Int       @default(0)
   createdAt     DateTime  @default(now())

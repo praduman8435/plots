@@ -56,7 +56,7 @@ export function ReviewCard({ p }: { p: ReviewQueueItem }) {
         <div className="flex items-center justify-between gap-3 rounded-xl bg-mist px-3 py-2 text-sm">
           <Link href={`/admin/sellers/${p.seller.id}`} className="min-w-0 truncate font-semibold text-ink hover:text-brand-800">
             {p.seller.name}
-            <span className="ml-1.5 text-xs font-normal text-muted">{p.seller.sellerType === "BROKER" ? "Broker" : "Seller"}</span>
+            <span className="ml-1.5 text-xs font-normal text-muted">Seller</span>
           </Link>
           <p className="flex shrink-0 items-center gap-2 text-xs font-medium">
             <span className={phoneOk ? "text-brand-700" : "text-amber-700"}>{phoneOk ? "✓ Phone" : "Phone not verified"}</span>

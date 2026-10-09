@@ -1,7 +1,7 @@
 import { SearchX, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BlockedBadge, IdentityBadge, OnboardingBadge, PhoneVerifiedBadge, SellerTypeBadge } from "@/components/admin/badges";
+import { BlockedBadge, IdentityBadge, OnboardingBadge, PhoneVerifiedBadge } from "@/components/admin/badges";
 import { EmptyState } from "@/components/admin/empty-state";
 import { formatDate } from "@/components/admin/format";
 import { PageHeader } from "@/components/admin/page-header";
@@ -41,7 +41,7 @@ export default async function AdminSellersPage({ searchParams }: PageProps<"/adm
 
   return (
     <>
-      <PageHeader title="Sellers" description={`${total} seller${total === 1 ? "" : "s"}${q ? ` matching “${q}”` : " — owners and brokers"}.`} />
+      <PageHeader title="Sellers" description={`${total} seller${total === 1 ? "" : "s"}${q ? ` matching “${q}”` : ""}.`} />
       <SearchBox action="/admin/sellers" defaultValue={q} placeholder="Search name, Seller ID or phone" />
 
       <div className="mt-5">
@@ -66,7 +66,6 @@ export default async function AdminSellersPage({ searchParams }: PageProps<"/adm
                           {s.code} · {formatPhone(s.phone)}
                         </p>
                       </div>
-                      <SellerTypeBadge type={s.sellerType} />
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-1.5">
                       <PhoneVerifiedBadge verified={Boolean(s.phoneVerifiedAt)} />
@@ -109,7 +108,6 @@ export default async function AdminSellersPage({ searchParams }: PageProps<"/adm
                         <div className="flex flex-wrap gap-1">
                           <PhoneVerifiedBadge verified={Boolean(s.phoneVerifiedAt)} />
                           <IdentityBadge status={s.identityStatus} />
-                          <SellerTypeBadge type={s.sellerType} />
                           {!s.onboardedAt && <OnboardingBadge />}
                           {s.isBlocked && <BlockedBadge />}
                         </div>

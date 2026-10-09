@@ -9,7 +9,6 @@ import { cn } from "@/lib/cn";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { createListingForSellerAction, lookupSellerByPhone, type AdminSellerLookup } from "@/server/actions/admin/listings";
 
-type SellerType = "OWNER" | "BROKER";
 
 /** Admin "Add plot for a seller": seller section + the shared ListingForm + "Publish immediately". */
 export function NewListingForm({
@@ -24,7 +23,6 @@ export function NewListingForm({
   const uid = useId();
   const [phone, setPhone] = useState(initialPhone?.replace(/^\+91/, "") ?? "");
   const [name, setName] = useState("");
-  const [sellerType, setSellerType] = useState<SellerType>("OWNER");
   const [publishNow, setPublishNow] = useState(false);
   const [lookup, setLookup] = useState<{ phone: string; result: AdminSellerLookup } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -61,7 +59,8 @@ export function NewListingForm({
     }
     const result = await createListingForSellerAction({
       ...payload,
-      seller: { phone: validPhone!, name: name.trim(), sellerType },
+      // Everyone is simply a seller.
+      seller: { phone: validPhone!, name: name.trim(), sellerType: "OWNER" },
       publishNow,
     });
     if (!result.ok) {
@@ -120,7 +119,7 @@ export function NewListingForm({
               {current.name} <span className="tabular font-medium text-muted">· {current.code}</span>
             </p>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-muted">
-              <span>{current.sellerType === "OWNER" ? "Owner" : "Broker"}</span>
+              <span>Seller</span>
               {current.verified && (
                 <span className="inline-flex items-center gap-1 text-brand-700">
                   <BadgeCheck className="size-3.5" aria-hidden /> Verified
@@ -137,7 +136,7 @@ export function NewListingForm({
           <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
             <UserRoundPlus className="size-4 text-brand-600" aria-hidden /> New seller — they’ll get a Seller ID on WhatsApp
           </p>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:max-w-sm">
             <Field label="Seller name" htmlFor={`${uid}-name`} error={errors["seller.name"]}>
               <Input
                 id={`${uid}-name`}
@@ -152,26 +151,6 @@ export function NewListingForm({
                 aria-invalid={Boolean(errors["seller.name"]) || undefined}
               />
             </Field>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-semibold text-ink">They are the</span>
-              <div role="radiogroup" aria-label="Seller type" className="grid h-12 grid-cols-2 rounded-xl border border-line-strong bg-mist p-1">
-                {(["OWNER", "BROKER"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    role="radio"
-                    aria-checked={sellerType === t}
-                    onClick={() => setSellerType(t)}
-                    className={cn(
-                      "rounded-lg text-sm font-semibold transition",
-                      sellerType === t ? "bg-white text-brand-800 shadow-soft" : "text-muted",
-                    )}
-                  >
-                    {t === "OWNER" ? "Owner" : "Broker"}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       )}

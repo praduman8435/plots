@@ -11,14 +11,14 @@ import { sellOnWhatsAppProps } from "@/lib/whatsapp-links";
 
 export const metadata: Metadata = {
   title: "Sell your land — list free in a few minutes",
-  description: `Owners and brokers: list residential plots, farmland or commercial land on ${site.name} in a few minutes. Buyers contact you directly on WhatsApp or call.`,
+  description: `List farmland, house plots or commercial land on ${site.name} in a few simple steps — on WhatsApp in Hindi or English, or right here. We check every listing, then buyers call you directly.`,
 };
 
 const steps = [
   { icon: Smartphone, title: "Your details", text: "Your name and mobile number, verified with a code. Only the first time." },
   { icon: Fingerprint, title: "Quick identity check", text: "A one-time Aadhaar check. We never store your Aadhaar number." },
   { icon: ClipboardList, title: "Property details", text: "Land type, size, price and where it is — drop a pin on the map." },
-  { icon: Camera, title: "Photos & submit", text: "Add a few photos. We review it and it goes live, usually within hours." },
+  { icon: Camera, title: "Photos & submit", text: "Add a few photos. Our team checks it and it goes live, usually within hours." },
 ];
 
 export default async function SellPage() {
@@ -30,9 +30,9 @@ export default async function SellPage() {
         <Image src="/demo/land-097.webp" alt="" fill preload fetchPriority="high" quality={50} sizes="100vw" className="-z-10 object-cover opacity-45" />
         <div className="absolute inset-0 -z-10 bg-linear-to-b from-brand-950/80 to-brand-950/90" />
         <div className="container-page py-12 sm:py-16 lg:py-20">
-          <h1 className="max-w-3xl text-[2.3rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">Sell your land in a few minutes.</h1>
+          <h1 className="max-w-3xl text-[2.3rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">Your land. Your price. The right buyer.</h1>
           <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
-            Just a few basic details and your listing is ready. Buyers contact you directly — no documents needed to list.
+            List in a few simple steps — on WhatsApp in Hindi or English, or right here. We check every listing, then buyers looking for land in your area call you directly. No documents needed to list.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -61,7 +61,7 @@ export default async function SellPage() {
       </section>
 
       <section className="container-page py-12 sm:py-20">
-        <SectionHeading title="How it works" description="The first time takes about 5 minutes. After that, adding another property takes 2." />
+        <SectionHeading title="How it works" description="The first time takes about 5 minutes. After that, adding more land takes about 2." />
         <ol className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
           {steps.map((s, i) => (
             <li key={s.title} className="rounded-3xl bg-white p-5 ring-1 ring-line sm:p-6">
@@ -79,7 +79,7 @@ export default async function SellPage() {
       <section className="bg-mist py-12 sm:py-20">
         <div className="container-page grid items-center gap-10 lg:grid-cols-2">
           <div>
-            <SectionHeading title="One Seller ID for all your properties" description="Brokers: register once, then list as many properties as you like. No repeat registration, no repeat verification." />
+            <SectionHeading title="One Seller ID for all your land" description="Register once, then list as much land as you have — each with its own page. No repeat registration, no repeat verification." />
             <ul className="space-y-3 text-[15px] text-ink-soft">
               {[
                 "Sign in with your Seller ID or mobile number",
@@ -102,7 +102,7 @@ export default async function SellPage() {
             <div className="mt-8 flex items-end justify-between">
               <div>
                 <p className="text-sm font-semibold">Gurpreet Singh</p>
-                <p className="text-xs text-white/60">Broker · Mohali</p>
+                <p className="text-xs text-white/60">Seller · Mohali</p>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
                 <BadgeCheck className="size-3.5" aria-hidden /> Verified
@@ -115,7 +115,7 @@ export default async function SellPage() {
       <section className="container-page py-12 sm:py-20">
         <div className="grid gap-4 sm:grid-cols-3">
           {[
-            { icon: MessageCircle, title: "Buyers contact you directly", text: "On WhatsApp or by call. You stay in control of every conversation." },
+            { icon: MessageCircle, title: "Buyers contact you directly", text: "On WhatsApp or by call. You decide who to talk to, and when." },
             { icon: BadgeCheck, title: "Weekly “still available?”", text: "One tap YES keeps your listing live. NO marks it sold. That's it." },
             { icon: Fingerprint, title: "Your data stays private", text: "Buyers see your name and number only. Never your Aadhaar." },
           ].map((it) => (

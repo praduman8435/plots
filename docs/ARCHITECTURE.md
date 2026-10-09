@@ -167,6 +167,20 @@ Shared caches only hold pages without per-visitor content. Contact, report and v
 | Rate-limit table | Fails open (logged), so the limiter never takes the site down. |
 | KYC provider | Only a mock exists. A real provider plugs into `server/kyc/provider.ts`, and outcomes are fetched server-side, never read from redirects. |
 
+## 6a. WhatsApp assistant: language and optional AI
+
+- **Language.** A new chat starts with "English / हिंदी" (stored on `whatsapp_conversations.language`); *LANGUAGE* / *भाषा* switches anytime. Every message, including notifications, comes from `src/server/whatsapp/copy.ts` in the seller's language. Hindi replies ("हाँ", "नहीं 2", "२ बीघा", "18 लाख", state names in Devanagari) are understood. A city typed in Hindi is matched to its English name via OpenStreetMap, so it never creates a duplicate city. Older chats continue in English.
+- **Sellers only.** The assistant no longer asks owner vs broker; everyone is a seller (the stored field stays for older records).
+- **Optional AI** (`src/server/ai`). Off unless `AI_ENABLED=true` and a real `AI_API_KEY` exist. Providers: OpenAI, Anthropic Claude, xAI Grok, Gemini (OpenAI endpoint), Groq, OpenRouter, or any OpenAI-compatible URL, all through plain `fetch`. It is used only where the fixed parser didn't understand:
+  1. *Extraction.* Listing details are pulled out of free-form messages ("2 bigha khet Azamgarh 18 lakh"). The details are validated like typed answers, and questions already answered are skipped.
+  2. *Reply.* A short, respectful answer in the seller's language, followed by the same question again.
+- **AI guardrails:**
+  - It can't take actions; listings are still reviewed by our team.
+  - Phone and Aadhaar-like numbers are masked before sending, and only links to our own site are kept in replies.
+  - Calls time out after 8 s and are capped per chat and per day (Postgres limiter).
+  - Any failure falls back to the fixed reply.
+  - Prompts and replies are never logged.
+
 ## 7. Deployment and migrations
 
 - Push to `main`:

@@ -80,7 +80,7 @@ export function HowItWorks() {
   const steps = [
     { icon: Search, title: "Search near you", text: "Filter by village, land type, budget and size — in bigha, acre, gaj or sq ft." },
     { icon: FileSearch, title: "Check the details", text: "Real photos, price per unit, approximate location and what the seller says about the land." },
-    { icon: MessageCircle, title: "WhatsApp the seller", text: "One tap opens a chat with the owner or broker. No login, no middle-man fees from us." },
+    { icon: MessageCircle, title: "WhatsApp the seller", text: "One tap opens a chat with the seller. No login, and no fee from us — ever." },
   ];
   return (
     <ol className="grid gap-3 sm:gap-4 md:grid-cols-3">
@@ -109,17 +109,18 @@ export function SellOnWhatsAppBand() {
       <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
           <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
-            <WhatsAppIcon className="size-3.5" /> For owners &amp; brokers
+            <WhatsAppIcon className="size-3.5" /> For sellers
           </p>
           <h2 className="mt-4 text-[1.9rem] leading-[1.1] font-extrabold sm:text-[2.25rem]">
-            List your land in 3 minutes — right from WhatsApp.
+            Your land deserves the right buyer.
           </h2>
           <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-white/80 sm:text-base">
-            Send us a message, answer a few simple questions and share photos. We verify your listing and publish it. You get a
-            permanent <strong className="text-white">Seller ID</strong> to track your plots and enquiries.
+            Just send us a message on WhatsApp — in Hindi or English. Answer a few simple questions and share some photos. Our team
+            checks your listing and puts it live, and buyers call you directly. You also get a permanent{" "}
+            <strong className="text-white">Seller ID</strong> to manage everything in one place.
           </p>
           <ul className="mt-6 grid gap-2.5 text-[15px] text-white/90">
-            {["No documents needed to list", "Buyers contact you directly", "Free to list while we launch"].map((t) => (
+            {["Chat in Hindi or English", "No documents needed to list", "Buyers contact you directly", "Free to list while we launch"].map((t) => (
               <li key={t} className="flex items-center gap-2.5">
                 <BadgeCheck className="size-5 text-brand-200" aria-hidden /> {t}
               </li>
@@ -142,12 +143,12 @@ export function SellOnWhatsAppBand() {
 
 function ChatMockup() {
   const bubbles: { from: "me" | "bot"; text: string; buttons?: string[] }[] = [
-    { from: "me", text: "SELL — Hi, I want to list my land" },
-    { from: "bot", text: "Namaste 🙏 What type of land is it?", buttons: ["Agricultural", "Residential"] },
-    { from: "me", text: "Agricultural, 2 bigha in Sathiyaon" },
-    { from: "bot", text: "Great! What price do you expect?" },
+    { from: "me", text: "SELL — I want to list my land" },
+    { from: "bot", text: "Namaste ji 🙏 What kind of land is it?", buttons: ["Agricultural land", "Residential plot"] },
+    { from: "me", text: "Khet, 2 bigha in Sathiyaon" },
+    { from: "bot", text: "Thank you 🙏 And your asking price?" },
     { from: "me", text: "18 lakh" },
-    { from: "bot", text: "✅ Received! We'll verify and publish it.\nYour Seller ID: SLR-7A41K2" },
+    { from: "bot", text: "✅ Thank you! Our team will check it and message you as soon as it's live.\nSeller ID: SLR-7A41K2" },
   ];
   return (
     <div className="mx-auto w-full max-w-[22rem]" aria-hidden>
@@ -157,7 +158,7 @@ function ChatMockup() {
             <span className="flex size-9 items-center justify-center rounded-full bg-white/15 text-sm font-bold">P</span>
             <div className="leading-tight">
               <p className="text-sm font-semibold">{site.name} Assistant</p>
-              <p className="text-[11px] text-white/70">online</p>
+              <p className="text-[11px] text-white/70">Listing assistant</p>
             </div>
           </div>
           <div className="space-y-2 px-3 py-4 text-[13px] leading-snug">
@@ -193,7 +194,7 @@ function ChatMockup() {
 export function TrustGrid() {
   const items = [
     { icon: BadgeCheck, title: "Phone-verified sellers", text: "Every seller confirms their WhatsApp number before a plot goes live." },
-    { icon: LocateFixed, title: "Location shown approximately", text: "We show the area, not the exact plot — protecting owners until you talk." },
+    { icon: LocateFixed, title: "Location shown approximately", text: "We show the area, not the exact plot — protecting sellers until you talk." },
     { icon: CircleDollarSign, title: "We never take buyer money", text: "No tokens, no advance through us. Deal directly and pay only after checking papers." },
     { icon: ShieldCheck, title: "Check the documents", text: "We verify the seller's phone, not ownership. Always see khatauni and registry first." },
   ];
@@ -214,19 +215,19 @@ export function TrustGrid() {
 export function HowItWorksBoth() {
   const lanes = [
     {
-      who: "Buying land",
+      who: "Looking for land",
       steps: [
-        { title: "Search", text: "Pick a place, type of land and your budget." },
-        { title: "Explore", text: "See photos, price, size and the area on a map." },
-        { title: "Contact", text: "WhatsApp or call the seller directly." },
+        { title: "Tell us where", text: "Pick a place, the kind of land and your budget." },
+        { title: "See it honestly", text: "Real photos, the price, the size, and the area on a map." },
+        { title: "Talk to the seller", text: "Call or WhatsApp directly. Visit, check the papers, decide at your own pace." },
       ],
     },
     {
       who: "Selling land",
       steps: [
-        { title: "List", text: "Add your land in a few minutes — on the website or WhatsApp." },
-        { title: "Get discovered", text: "Buyers searching your area find it." },
-        { title: "Connect", text: "Interested buyers contact you directly." },
+        { title: "List in minutes", text: "On WhatsApp or here — in Hindi or English. No documents needed to list." },
+        { title: "We check, then it goes live", text: "Our team reviews every listing, so buyers can trust what they see." },
+        { title: "Buyers call you", text: "People looking for land in your area contact you directly." },
       ],
     },
   ];
@@ -255,10 +256,10 @@ export function HowItWorksBoth() {
 /** Four short reasons — no marketing fluff. */
 export function WhyUs() {
   const items = [
-    { icon: Search, title: "Search by location", text: "Land near the village, town or road you care about." },
-    { icon: MessageCircle, title: "Talk directly to sellers", text: "WhatsApp or call. No login, no fee for buyers." },
-    { icon: BadgeCheck, title: "Fresh availability", text: "Sellers confirm every week that their land is still available." },
-    { icon: ShieldCheck, title: "Verified sellers", text: "Phone verified, and identity verified where shown." },
+    { icon: Search, title: "Land near you", text: "Search by village, town or road — in bigha, acre, gaj or sq ft." },
+    { icon: MessageCircle, title: "Straight to the seller", text: "Call or WhatsApp. No login, no fee for buyers, nobody in between." },
+    { icon: BadgeCheck, title: "Fresh, not forgotten", text: "Every week sellers confirm their land is still available." },
+    { icon: ShieldCheck, title: "Checked before it's live", text: "Our team reviews every listing. Every seller's phone is verified." },
   ];
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

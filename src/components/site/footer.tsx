@@ -37,7 +37,7 @@ export async function SiteFooter() {
         <div>
           <Logo inverted />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/65">
-            A land-only marketplace. Find plots near you and talk to owners and brokers directly — no login, no fees for buyers.
+            Where people looking for land meet the sellers who have it — simply and directly. No login and no fees for buyers.
           </p>
         </div>
         {columns.map((col) => (

@@ -4,19 +4,21 @@ import { Prisma, type Seller, type WhatsAppConversation } from "@/generated/pris
 import { AreaUnit, LandType, type ListingStatus, type HiddenReason, type SellerType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { matchState, splitCityAndState } from "@/lib/india";
-import { formatPrice } from "@/lib/format";
 import { LAND_TYPES, buildTitle, placeName } from "@/lib/land";
 import { maskPhoneForLogging } from "@/lib/phone";
 import { site } from "@/lib/site";
 import { formatArea, formatSqftHint, toSqft } from "@/lib/units";
 import { listingInputSchema, type ListingInput } from "@/lib/validation/listing";
 import { trackEvent } from "@/server/analytics";
-import { CITY_NAME_PATTERN, resolveCity } from "@/server/cities";
+import { extractListing, replyToSeller, type ExtractedListing } from "@/server/ai/assistant";
+import { isAiEnabled } from "@/server/ai/config";
+import { CITY_NAME_PATTERN, englishPlaceName, isDevanagari, resolveCity } from "@/server/cities";
 import { isKycAvailable } from "@/server/kyc/provider";
 import { changeListingStatus, createListing, findOrCreateSeller, plotsAwaitingAvailability } from "@/server/listings/service";
 import type { StoredImage } from "@/server/storage";
 import type { OutgoingMessage } from "./client";
 import { recordOutboundOnly, sendAndRecord } from "./messaging";
+import { LANGUAGE_PICKER, UNIT_ROWS, area as areaText, copy, daysAgo, landHint, landLabel, price as priceText, statusWord, toLang, type Copy, type Lang } from "./copy";
 import { notifyVerifyIdentity } from "./notify";
 import {
   LAND_TYPE_ORDER,
@@ -28,11 +30,11 @@ import {
   parseAvailabilityReply,
   parseCoordinates,
   parseLandType,
+  parseLanguage,
   parseListNumber,
   parseName,
   parseNumber,
   parsePrice,
-  parseSellerType,
   parseUnit,
   type BotCommand,
 } from "./parse";
@@ -40,11 +42,18 @@ import {
 /**
  * The WhatsApp listing assistant — a small state machine.
  *
- *   IDLE ─SELL→ ASK_NAME → ASK_SELLER_TYPE → ASK_LAND_TYPE → ASK_CITY →
+ *   (language) → IDLE ─SELL→ ASK_NAME → ASK_LAND_TYPE → ASK_STATE → ASK_CITY →
  *   ASK_LOCALITY → ASK_AREA (→ ASK_AREA_UNIT) → ASK_PRICE → ASK_PHOTOS →
  *   ASK_LOCATION → ASK_DESCRIPTION → CONFIRM ─Submit→ PENDING listing → IDLE
  *
- * Known sellers skip ASK_NAME / ASK_SELLER_TYPE. HUMAN means a person from
+ * Language: a new chat starts with "English / हिंदी" (stored on the
+ * conversation; LANGUAGE / भाषा switches anytime). Every message comes from
+ * copy.ts in that language. Chats that existed before default to English.
+ * Everyone is simply a "seller" — we don't ask owner vs broker.
+ *
+ * Steps whose answer is already in the draft are skipped, so a seller who
+ * writes "2 bigha khet Azamgarh 18 lakh" (understood by the optional AI,
+ * src/server/ai) isn't asked again. Known sellers skip ASK_NAME. HUMAN means a person from
  * our team is chatting; the bot stays silent until the seller sends MENU.
  * The step lives in WhatsAppConversation.step and partial answers in .draft.
  *
@@ -125,7 +134,6 @@ export function describeStep(step: string): string {
 /** Steps in which the seller is in the middle of a listing. */
 const FLOW_ORDER: BotStep[] = [
   "ASK_NAME",
-  "ASK_SELLER_TYPE",
   "ASK_LAND_TYPE",
   "ASK_STATE",
   "ASK_CITY",
@@ -139,7 +147,8 @@ const FLOW_ORDER: BotStep[] = [
 ];
 
 function isInFlow(step: BotStep): boolean {
-  return FLOW_ORDER.includes(step) || step === "ASK_AREA_UNIT" || step === "SUBMITTING";
+  // ASK_SELLER_TYPE: no longer asked, but older chats may still be paused on it.
+  return FLOW_ORDER.includes(step) || step === "ASK_AREA_UNIT" || step === "ASK_SELLER_TYPE" || step === "SUBMITTING";
 }
 
 export const MAX_PHOTOS = 10;
@@ -172,6 +181,8 @@ const draftSchema = z
     returnToConfirm: z.boolean(),
     /** ASK_SOLD_WHICH: property ids in the order we numbered them. */
     soldChoices: z.array(z.string()),
+    /** What to do once the seller picks a language. */
+    afterLanguage: z.enum(["START", "MENU"]),
   })
   .partial();
 export type BotDraft = z.infer<typeof draftSchema>;
@@ -213,6 +224,7 @@ class Turn {
   seller: Seller | null;
   /** Set when this turn ended with a question for the seller (so we don't repeat the listing question over it). */
   asked = false;
+  lang: Lang;
 
   constructor(
     public conv: ConversationWithSeller,
@@ -221,6 +233,22 @@ class Turn {
     this.step = toBotStep(conv.step);
     this.draft = readDraft(conv.draft);
     this.seller = conv.seller;
+    this.lang = toLang(conv.language);
+  }
+
+  /** The assistant's words in this chat's language. */
+  get c(): Copy {
+    return copy(this.lang);
+  }
+
+  get hasLanguage() {
+    return this.conv.language === "en" || this.conv.language === "hi";
+  }
+
+  async setLanguage(lang: Lang) {
+    this.lang = lang;
+    this.conv = { ...this.conv, language: lang };
+    await db.whatsAppConversation.update({ where: { id: this.conv.id }, data: { language: lang } });
   }
 
   get phone() {
@@ -307,9 +335,7 @@ export async function runBot(conversationId: string, input: BotInput, opts: { si
       step: turn.step,
       err: err instanceof Error ? err.message : String(err),
     });
-    await turn
-      .text("Sorry, something went wrong on our side 🙏 Please try again in a moment, or send *TALK* to reach our team.")
-      .catch(() => {});
+    await turn.text(turn.c.errorGeneric).catch(() => {});
   }
   return turn.replies;
 }
@@ -320,12 +346,29 @@ async function handle(t: Turn, input: BotInput) {
   const text = (input.kind === "text" ? input.text : input.kind === "interactive" && !replyId ? input.replyTitle : undefined)?.trim();
   const command = text ? detectCommand(text) : null;
 
+  // ── Language: chosen by tap, by typing ("hindi"), or asked for (LANGUAGE / भाषा).
+  const picked = replyId === "lang:en" ? "en" : replyId === "lang:hi" ? "hi" : !t.hasLanguage || command === "LANGUAGE" ? parseLanguage(text) : null;
+  if (picked) return chooseLanguage(t, picked);
+  if (command === "LANGUAGE") return askLanguage(t, isInFlow(t.step) ? undefined : "MENU");
+  if (!t.hasLanguage) {
+    // Chats that were already going, and answers to our own messages (weekly check, sold
+    // buttons, STATUS…), carry on in English. A fresh "hi" / "SELL" first picks a language.
+    const carryOn =
+      isInFlow(t.step) ||
+      t.step === "HUMAN" ||
+      t.step === "ASK_SOLD_WHICH" ||
+      Boolean(replyId && !replyId.startsWith("menu:")) ||
+      (command !== null && command !== "GREETING" && command !== "MENU" && command !== "START");
+    if (!carryOn) return askLanguage(t, command === "START" || replyId === "menu:list" ? "START" : "MENU");
+    await t.setLanguage("en");
+  }
+
   // ── A person from our team is handling this chat: stay silent unless asked back.
   if (t.step === "HUMAN") {
     if (command === "MENU" || command === "START" || replyId === "menu:list" || replyId === "menu:bot") {
       await t.save("IDLE", null);
       if (command === "START" || replyId === "menu:list") return startListing(t);
-      return sendMenu(t, "👋 You're back with the InstaPlots assistant.");
+      return sendMenu(t, t.c.backWithAssistant);
     }
     return;
   }
@@ -334,9 +377,7 @@ async function handle(t: Turn, input: BotInput) {
   if (t.step === "ASK_SOLD_WHICH") {
     const n = !replyId && !command && input.kind === "text" ? parseListNumber(text) : null;
     if (n !== null) return pickSoldByNumber(t, n);
-    if (!replyId && !command && input.kind === "text") {
-      return reprompt(t, "Please reply with the number from the list, or tap *Choose property* 👇");
-    }
+    if (!replyId && !command && input.kind === "text") return reprompt(t, t.c.replyWithNumber);
     await t.save("IDLE", null); // anything else moves on
   }
 
@@ -354,7 +395,7 @@ async function handle(t: Turn, input: BotInput) {
   if (replyId === "confirm:cancel") return cancel(t);
   if (replyId === "confirm:submit" && (t.step === "IDLE" || t.step === "SUBMITTING")) {
     // A second tap on an old summary — the listing was already sent.
-    if (t.step === "IDLE") await t.text("✅ This listing has already been submitted. Send *STATUS* to see your plots.");
+    if (t.step === "IDLE") await t.text(t.c.alreadySubmitted);
     return;
   }
   if (replyId === "confirm:restart" && isInFlow(t.step)) return restartDetails(t);
@@ -369,26 +410,47 @@ async function handle(t: Turn, input: BotInput) {
   if (input.kind === "image") return handleImage(t, input.image ?? null);
 
   if (input.kind === "other") {
-    if (!isInFlow(t.step)) return sendMenu(t, unsupportedNote(input.otherType));
-    await t.text(unsupportedNote(input.otherType));
+    if (!isInFlow(t.step)) return sendMenu(t, unsupportedNote(t, input.otherType));
+    await t.text(unsupportedNote(t, input.otherType));
     return reprompt(t);
   }
 
   await handleStep(t, { ...input, text, replyId });
 }
 
-function unsupportedNote(type?: string) {
-  if (type === "audio" || type === "voice") {
-    return "🎙️ Sorry, I can't listen to voice notes yet. Please type your answer — or send *TALK* and someone from our team will help.";
+// ───────────────────────────── Language ─────────────────────────────
+
+async function askLanguage(t: Turn, after?: "START" | "MENU") {
+  t.asked = true;
+  if (after && !isInFlow(t.step)) await t.save(t.step === "ASK_SOLD_WHICH" ? "IDLE" : t.step, { ...t.draft, afterLanguage: after });
+  await t.reply({ type: "buttons", body: LANGUAGE_PICKER.body, buttons: LANGUAGE_PICKER.buttons });
+}
+
+async function chooseLanguage(t: Turn, lang: Lang) {
+  await t.setLanguage(lang);
+  const after = t.draft.afterLanguage;
+  if (after) {
+    const { afterLanguage, ...rest } = t.draft;
+    void afterLanguage;
+    await t.save(t.step, rest);
   }
-  return "Sorry, I can only read text, photos and location pins 🙏";
+  if (isInFlow(t.step) && t.step !== "SUBMITTING") return reprompt(t, t.c.languageSet);
+  if (after === "START") {
+    await t.text(t.c.languageSet);
+    return startListing(t);
+  }
+  return sendMenu(t, t.c.languageSet);
+}
+
+function unsupportedNote(t: Turn, type?: string) {
+  return type === "audio" || type === "voice" ? t.c.voiceNote : t.c.unsupported;
 }
 
 /** Runs a side action mid-listing, then repeats the current question so the seller knows where they are. */
 async function withResume(t: Turn, action: () => Promise<void>) {
   t.asked = false;
   await action();
-  if (!t.asked && isInFlow(t.step) && t.step !== "SUBMITTING") await reprompt(t, "👇 Let's continue your listing.");
+  if (!t.asked && isInFlow(t.step) && t.step !== "SUBMITTING") await reprompt(t, t.c.continueListing);
 }
 
 async function handleCommand(t: Turn, command: BotCommand, text: string): Promise<boolean> {
@@ -400,13 +462,13 @@ async function handleCommand(t: Turn, command: BotCommand, text: string): Promis
       await cancel(t);
       return true;
     case "HELP":
-      await t.text(helpText());
-      if (isInFlow(t.step)) await reprompt(t, "👇 Let's continue your listing.");
+      await t.text(t.c.help({ url: site.url }));
+      if (isInFlow(t.step)) await reprompt(t, t.c.continueListing);
       return true;
     case "MENU":
     case "GREETING":
       if (isInFlow(t.step)) {
-        await reprompt(t, command === "GREETING" ? "Namaste 🙏 We were in the middle of your listing." : undefined);
+        await reprompt(t, command === "GREETING" ? t.c.greetingMidListing : undefined);
         return true;
       }
       await sendMenu(t);
@@ -476,37 +538,18 @@ function stepTakesNo(t: Turn): boolean {
   }
 }
 
-// ───────────────────────────── Menu / help / commands ─────────────────────────────
-
-function helpText() {
-  return [
-    "Here's what I can do 🙂",
-    "",
-    "• *SELL* — list your land (about 2 minutes)",
-    "• *STATUS* — see your plots",
-    "• *ID* — your Seller ID",
-    "• *YES* — your plot is still available",
-    "• *NO* — your plot is sold (e.g. *NO 2* for plot 2)",
-    "• *SOLD* — mark a plot as sold",
-    "• *TALK* — chat with a person from our team",
-    "• *CANCEL* — stop the current listing",
-    "",
-    `Manage your plots online: ${site.url}/seller`,
-  ].join("\n");
-}
+// ───────────────────────────── Menu / cancel / human ─────────────────────────────
 
 async function sendMenu(t: Turn, lead?: string) {
   const seller = t.seller ?? (await t.loadSeller());
-  const intro = seller
-    ? `Namaste ${firstName(seller.name)} 🙏\nYour Seller ID: *${seller.code}*`
-    : `Namaste 🙏 Welcome to *${site.name}* — sell your land directly to buyers, anywhere in India. Listing takes about 2 minutes, right here on WhatsApp.`;
+  const intro = seller ? t.c.welcomeBack({ name: seller.name, code: seller.code }) : t.c.welcomeNew;
   await t.reply({
     type: "buttons",
-    body: `${lead ? `${lead}\n\n` : ""}${intro}\n\nWhat would you like to do?`,
+    body: `${lead ? `${lead}\n\n` : ""}${intro}`,
     buttons: [
-      { id: "menu:list", title: "List my land" },
-      { id: "menu:status", title: "My plots" },
-      { id: "menu:human", title: "Talk to us" },
+      { id: "menu:list", title: t.c.btnList },
+      { id: "menu:status", title: t.c.btnMine },
+      { id: "menu:human", title: t.c.btnTalk },
     ],
   });
 }
@@ -516,57 +559,33 @@ async function cancel(t: Turn) {
   await t.save("IDLE", null);
   await t.reply({
     type: "buttons",
-    body: hadDraft
-      ? "Okay, I've cancelled this listing. Nothing was submitted.\n\nWhenever you're ready, tap *List my land* or send *SELL*."
-      : "Okay 👍 Whenever you're ready, tap *List my land* or send *SELL*.",
+    body: hadDraft ? t.c.cancelled : t.c.whenReady,
     buttons: [
-      { id: "menu:list", title: "List my land" },
-      { id: "menu:status", title: "My plots" },
+      { id: "menu:list", title: t.c.btnList },
+      { id: "menu:status", title: t.c.btnMine },
     ],
   });
 }
 
 async function handOverToHuman(t: Turn) {
   await t.save("HUMAN", t.draft);
-  await t.text(
-    "🙋 Sure! Someone from the InstaPlots team will reply here soon.\n\nYou can type your question now. To go back to the assistant anytime, send *MENU*.",
-  );
+  await t.text(t.c.human);
 }
 
-const STATUS_WORDS: Record<ListingStatus, string> = {
-  PENDING: "⏳ Pending approval",
-  ACTIVE: "✅ Live",
-  HIDDEN: "🙈 Hidden",
-  SOLD: "🏁 Sold",
-  REJECTED: "❌ Rejected",
-};
-
-function statusWords(p: { status: ListingStatus; hiddenReason: HiddenReason | null; availabilityCheckSentAt?: Date | null }) {
-  if (p.status === "HIDDEN" && p.hiddenReason === "AVAILABILITY_UNCONFIRMED") return "⏸️ Unavailable – reply *YES* to reactivate";
-  if (p.status === "ACTIVE" && p.availabilityCheckSentAt) return "✅ Live – reply *YES* if still available";
-  return STATUS_WORDS[p.status];
-}
-
-/** "today", "yesterday", "5 days ago". */
-function daysAgo(d: Date): string {
-  const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-  if (days <= 0) return "today";
-  if (days === 1) return "yesterday";
-  return `${days} days ago`;
+function statusWords(t: Turn, p: { status: ListingStatus; hiddenReason: HiddenReason | null; availabilityCheckSentAt?: Date | null }) {
+  if (p.status === "HIDDEN" && p.hiddenReason === "AVAILABILITY_UNCONFIRMED") return t.c.unavailableReplyYes;
+  if (p.status === "ACTIVE" && p.availabilityCheckSentAt) return t.c.liveReplyYes;
+  return statusWord(t.lang, p.status);
 }
 
 async function sendStatus(t: Turn) {
   const seller = await t.loadSeller();
   if (!seller) {
     if (isInFlow(t.step)) {
-      await t.text("You don't have any plots with us yet — the one you're adding now will be your first! 🙂");
+      await t.text(t.c.noPlotsYetInFlow);
       return;
     }
-    await t.reply({
-      type: "buttons",
-      body: "You haven't listed any plots with us yet.\n\nTap *List my land* to add your first one — it takes about 2 minutes.",
-      buttons: [{ id: "menu:list", title: "List my land" }],
-    });
+    await t.reply({ type: "buttons", body: t.c.noPlotsYet, buttons: [{ id: "menu:list", title: t.c.btnList }] });
     return;
   }
   const plots = await db.property.findMany({
@@ -577,17 +596,17 @@ async function sendStatus(t: Turn) {
   });
   const total = await db.property.count({ where: { sellerId: seller.id } });
   const lines = plots.map((p, i) => {
-    const confirmed = p.lastConfirmedAt && p.status === "ACTIVE" ? ` · confirmed ${daysAgo(p.lastConfirmedAt)}` : "";
+    const confirmed = p.lastConfirmedAt && p.status === "ACTIVE" ? ` · ${t.c.confirmed({ when: daysAgo(t.lang, p.lastConfirmedAt) })}` : "";
     const link = p.status === "ACTIVE" ? `\n   ${site.url}/property/${p.slug}` : "";
-    return `${i + 1}. *${p.title}* (${p.code})\n   ${statusWords(p)}${confirmed}${link}`;
+    return `${i + 1}. *${p.title}* (${p.code})\n   ${statusWords(t, p)}${confirmed}${link}`;
   });
-  const more = total > plots.length ? `\n…and ${total - plots.length} more.` : "";
+  const more = total > plots.length ? `\n${t.c.andMore({ n: total - plots.length })}` : "";
   await t.text(
     [
-      plots.length ? `📋 *Your plots*\n\n${lines.join("\n\n")}${more}` : "You don't have any plots listed yet. Send *SELL* to add one.",
+      plots.length ? `${t.c.yourListings}\n\n${lines.join("\n\n")}${more}` : t.c.noneListed,
       "",
-      `Your Seller ID: *${seller.code}*`,
-      `See and manage everything at ${site.url}/seller`,
+      t.c.idLine({ code: seller.code }),
+      t.c.manageAt({ url: site.url }),
     ].join("\n"),
   );
 }
@@ -595,12 +614,10 @@ async function sendStatus(t: Turn) {
 async function sendSellerId(t: Turn) {
   const seller = await t.loadSeller();
   if (!seller) {
-    await t.text("You don't have a Seller ID yet — you'll get one as soon as you list your first plot. Send *SELL* to start.");
+    await t.text(t.c.noIdYet);
     return;
   }
-  await t.text(
-    `🪪 Your Seller ID is *${seller.code}*\n\nUse it to sign in at ${site.url}/seller — we'll send a code to this WhatsApp number. Keep it handy; it never changes.`,
-  );
+  await t.text(t.c.yourId({ code: seller.code, url: site.url }));
 }
 
 // ───────────────────────────── Weekly availability: YES / NO ─────────────────────────────
@@ -625,7 +642,7 @@ async function confirmAvailability(t: Turn) {
     select: { id: true, title: true, slug: true },
   });
   if (awaiting.length === 0 && hidden.length === 0) {
-    await t.text("Thanks! 👍 Nothing needs confirming right now — your plots are up to date.\n\nSend *STATUS* to see them.");
+    await t.text(t.c.nothingToConfirm);
     return;
   }
   for (const p of [...awaiting, ...hidden]) {
@@ -633,16 +650,11 @@ async function confirmAvailability(t: Turn) {
   }
 
   const parts: string[] = [];
-  if (awaiting.length === 1) parts.push(`Great — your listing will remain live. 👍\n\n*${awaiting[0].title}*`);
-  if (awaiting.length > 1) parts.push(`Great — your listings will remain live. 👍\n\n${awaiting.map((p) => `• ${p.title}`).join("\n")}`);
-  if (hidden.length === 1) {
-    parts.push(`${awaiting.length ? "And it's" : "👍 Thank you! It's"} live again — buyers can see it now:\n\n*${hidden[0].title}*\n${plotLink(hidden[0].slug)}`);
-  }
-  if (hidden.length > 1) {
-    parts.push(
-      `${awaiting.length ? "And these are" : "👍 Thank you! These are"} live again — buyers can see them now:\n\n${hidden.map((p) => `• ${p.title}`).join("\n")}`,
-    );
-  }
+  if (awaiting.length === 1) parts.push(t.c.staysLiveOne({ title: awaiting[0].title }));
+  if (awaiting.length > 1) parts.push(t.c.staysLiveMany({ list: awaiting.map((p) => `• ${p.title}`).join("\n") }));
+  const also = awaiting.length ? "1" : "";
+  if (hidden.length === 1) parts.push(t.c.backLiveOne({ also, title: hidden[0].title, link: plotLink(hidden[0].slug) }));
+  if (hidden.length > 1) parts.push(t.c.backLiveMany({ also, list: hidden.map((p) => `• ${p.title}`).join("\n") }));
   await t.text(parts.join("\n\n"));
 }
 
@@ -659,14 +671,14 @@ type SoldCandidate = { id: string; title: string; code: string; price: bigint };
 async function answerNo(t: Turn, number: number | null) {
   const seller = await t.loadSeller();
   if (!seller) {
-    await sendMenu(t, "Okay 👍");
+    await sendMenu(t, "👍");
     return;
   }
   const awaiting = await plotsAwaitingAvailability(seller.id);
   if (awaiting.length > 0) {
     if (number !== null) {
       const plot = awaiting[number - 1];
-      if (!plot) return askWhichSold(t, awaiting, `There's no number ${number} in the list 🙏`);
+      if (!plot) return askWhichSold(t, awaiting, t.c.noNumber({ n: number }));
       return markSold(t, seller.id, plot);
     }
     if (awaiting.length === 1) return markSold(t, seller.id, awaiting[0]);
@@ -676,7 +688,7 @@ async function answerNo(t: Turn, number: number | null) {
   // Nothing awaiting (e.g. the plot was already hidden for no reply) — be careful and confirm.
   const plots = await sellablePlots(seller.id);
   if (plots.length === 0) {
-    await t.text("Okay 👍 You don't have any live plots right now.\n\nSend *STATUS* to see your plots, or *SELL* to list a new one.");
+    await t.text(t.c.noLivePlots);
     return;
   }
   const picked = number !== null ? plots[number - 1] : undefined;
@@ -690,22 +702,22 @@ async function askWhichSold(t: Turn, plots: SoldCandidate[], lead?: string) {
   t.asked = true;
   const shown = plots.slice(0, 10);
   if (!isInFlow(t.step)) await t.save("ASK_SOLD_WHICH", { soldChoices: shown.map((p) => p.id) });
-  await t.reply(whichSoldMessage(shown, lead, !isInFlow(t.step)));
+  await t.reply(whichSoldMessage(t, shown, lead, !isInFlow(t.step)));
 }
 
-function whichSoldMessage(plots: SoldCandidate[], lead: string | undefined, acceptsNumber: boolean): OutgoingMessage {
-  const list = plots.map((p, i) => `${i + 1}. ${p.title} — ${formatPrice(p.price)}`).join("\n");
+function whichSoldMessage(t: Turn, plots: SoldCandidate[], lead: string | undefined, acceptsNumber: boolean): OutgoingMessage {
+  const list = plots.map((p, i) => `${i + 1}. ${p.title} — ${priceText(t.lang, p.price)}`).join("\n");
   return {
     type: "list",
-    body: `${lead ? `${lead}\n\n` : ""}Which property is sold?\n\n${list}\n\n${acceptsNumber ? "Reply with its number, or tap below." : "Tap below to choose."}`,
-    buttonLabel: "Choose property",
+    body: `${lead ? `${lead}\n\n` : ""}${t.c.whichSold}\n\n${list}\n\n${acceptsNumber ? t.c.replyNumberOrTap : t.c.tapToChoose}`,
+    buttonLabel: t.c.chooseProperty,
     rows: plots.map((p, i) => ({ id: `nosold:${p.id}`, title: `${i + 1}. ${p.code}`, description: p.title })),
   };
 }
 
 async function pickSoldByNumber(t: Turn, n: number) {
   const id = t.draft.soldChoices?.[n - 1];
-  if (!id) return reprompt(t, `There's no number ${n} in the list 🙏`);
+  if (!id) return reprompt(t, t.c.noNumber({ n }));
   return pickSold(t, id);
 }
 
@@ -720,15 +732,15 @@ async function pickSold(t: Turn, propertyId: string) {
     : null;
   if (t.step === "ASK_SOLD_WHICH") await t.save("IDLE", null);
   if (!seller || !plot) {
-    await t.text("Sorry, I couldn't find that property. Send *STATUS* to see your plots.");
+    await t.text(t.c.notFound);
     return;
   }
   if (plot.status === "SOLD") {
-    await t.text(`*${plot.title}* is already marked as sold. 👍`);
+    await t.text(t.c.alreadySold({ title: plot.title }));
     return;
   }
   if (plot.status !== "ACTIVE" && plot.status !== "HIDDEN") {
-    await t.text(`*${plot.title}* isn't live, so there's nothing to mark. Send *STATUS* to see your plots.`);
+    await t.text(t.c.notLive({ title: plot.title }));
     return;
   }
   return markSold(t, seller.id, plot);
@@ -740,17 +752,17 @@ async function markSold(t: Turn, sellerId: string, plot: { id: string; title: st
   if (t.step === "ASK_SOLD_WHICH") await t.save("IDLE", null);
   const others = await plotsAwaitingAvailability(sellerId);
   if (others.length === 0) {
-    await t.text(`Got it. We've marked your property as sold.\n\n*${plot.title}*\n\nCongratulations! 🎉 Send *SELL* anytime to list another property.`);
+    await t.text(t.c.soldCongrats({ title: plot.title }));
     return;
   }
   t.asked = true;
-  const list = others.map((p, i) => `${others.length > 1 ? `${i + 1}. ` : ""}${p.title} — ${formatPrice(p.price)}`).join("\n");
+  const list = others.map((p, i) => `${others.length > 1 ? `${i + 1}. ` : ""}${p.title} — ${priceText(t.lang, p.price)}`).join("\n");
   await t.reply({
     type: "buttons",
-    body: `Got it. We've marked *${plot.title}* as sold. Congratulations! 🎉\n\n${others.length > 1 ? "Are the others still available?" : "Is this one still available?"}\n\n${list}`,
+    body: t.c.soldAskOthers({ title: plot.title, many: others.length > 1 ? "1" : "", list }),
     buttons: [
-      { id: "avail:yes", title: "YES, available" },
-      { id: "avail:no", title: others.length > 1 ? "Another is sold" : "NO, it's sold too" },
+      { id: "avail:yes", title: t.c.btnYesAvailable },
+      { id: "avail:no", title: others.length > 1 ? t.c.btnAnotherSold : t.c.btnAlsoSold },
     ],
   });
 }
@@ -771,20 +783,16 @@ async function startSold(t: Turn) {
   const seller = await t.loadSeller();
   const plots = seller ? await sellablePlots(seller.id) : [];
   if (plots.length === 0) {
-    await t.text("You don't have any live plots to mark as sold. Send *STATUS* to see your plots.");
+    await t.text(t.c.noSellable);
     return;
   }
   if (plots.length === 1) return askSoldConfirm(t, plots[0]);
   t.asked = true;
   await t.reply({
     type: "list",
-    body: "Congratulations! 🎉 Which plot has been sold?",
-    buttonLabel: "Choose plot",
-    rows: plots.map((p) => ({
-      id: `sold:pick:${p.id}`,
-      title: `${p.code} · ${formatArea(p.area, p.areaUnit)}`,
-      description: p.title,
-    })),
+    body: t.c.whichSoldCongrats,
+    buttonLabel: t.c.choosePlot,
+    rows: plots.map((p) => ({ id: `sold:pick:${p.id}`, title: `${p.code} · ${areaText(t.lang, p.area, p.areaUnit)}`, description: p.title })),
   });
 }
 
@@ -792,10 +800,10 @@ async function askSoldConfirm(t: Turn, p: { id: string; title: string; code: str
   t.asked = true;
   await t.reply({
     type: "buttons",
-    body: `Mark *${p.title}* (${p.code}) as sold?\n\nBuyers will no longer see it on ${site.name}.`,
+    body: t.c.confirmSold({ title: p.title, code: p.code }),
     buttons: [
-      { id: `sold:yes:${p.id}`, title: "Yes, it's sold" },
-      { id: `sold:no:${p.id}`, title: "No, still available" },
+      { id: `sold:yes:${p.id}`, title: t.c.btnYesSold },
+      { id: `sold:no:${p.id}`, title: t.c.btnStillAvailable },
     ],
   });
 }
@@ -811,7 +819,7 @@ async function handleSoldReply(t: Turn, replyId: string) {
         })
       : null;
   if (!seller || !plot) {
-    await t.text("Sorry, I couldn't find that plot. Send *STATUS* to see your plots.");
+    await t.text(t.c.notFound);
     return;
   }
   if (action === "pick") return askSoldConfirm(t, plot);
@@ -821,17 +829,15 @@ async function handleSoldReply(t: Turn, replyId: string) {
       (plot.status === "ACTIVE" && plot.availabilityCheckSentAt) || (plot.status === "HIDDEN" && plot.hiddenReason === "AVAILABILITY_UNCONFIRMED");
     if (pendingCheck) {
       await changeListingStatus(plot.id, { type: "CONFIRM_AVAILABLE" }, { notify: false, via: "whatsapp" });
-      await withResume(t, () =>
-        t.text(plot.status === "ACTIVE" ? `Great — your listing will remain live. 👍\n\n*${plot.title}*` : `👍 *${plot.title}* is live again — buyers can see it now.`),
-      );
+      await withResume(t, () => t.text(plot.status === "ACTIVE" ? t.c.staysLiveOne({ title: plot.title }) : t.c.liveAgainShort({ title: plot.title })));
       return;
     }
-    await withResume(t, () => t.text(`👍 Okay — *${plot.title}* stays as it is.`));
+    await withResume(t, () => t.text(t.c.staysAsIs({ title: plot.title })));
     return;
   }
   if (action === "yes") {
     if (plot.status !== "ACTIVE" && plot.status !== "HIDDEN") {
-      await t.text(`*${plot.title}* (${plot.code}) is already ${STATUS_WORDS[plot.status].replace(/^\S+\s/, "").toLowerCase()}.`);
+      await t.text(t.c.alreadyStatus({ title: plot.title, code: plot.code, status: statusWord(t.lang, plot.status).replace(/^\S+\s/, "").toLowerCase() }));
       return;
     }
     await withResume(t, () => markSold(t, seller.id, plot));
@@ -840,41 +846,30 @@ async function handleSoldReply(t: Turn, replyId: string) {
 
 // ───────────────────────────── Listing flow ─────────────────────────────
 
-async function startListing(t: Turn) {
+async function startListing(t: Turn, prefill: BotDraft = {}, lead?: string) {
   const seller = await t.loadSeller();
   if (seller?.isBlocked) {
     await t.save("IDLE", null);
-    await t.text("Sorry, we can't accept new listings from this number right now. Send *TALK* if you think this is a mistake.");
+    await t.text(t.c.blocked);
     return;
   }
-  if (!t.isSimulation) await trackEvent("listing_started", { sellerId: seller?.id ?? null, props: { via: "whatsapp" } });
-  if (seller) {
-    await goTo(
-      t,
-      "ASK_LAND_TYPE",
-      { name: seller.name, sellerType: seller.sellerType },
-      `Namaste ${firstName(seller.name)} 🙏 Welcome back!\nYour Seller ID: *${seller.code}*\n\nLet's list your new plot. (Send *CANCEL* anytime to stop.)`,
-    );
-    return;
-  }
-  await goTo(
-    t,
-    "ASK_NAME",
-    {},
-    `Namaste 🙏 Let's list your land on *${site.name}*. It takes about 2 minutes, and buyers will contact you directly.\n\n(Send *CANCEL* anytime to stop.)`,
-  );
+  if (!t.isSimulation) await trackEvent("listing_started", { sellerId: seller?.id ?? null, props: { via: "whatsapp", lang: t.lang } });
+  const intro = seller ? t.c.startReturning({ name: seller.name, code: seller.code }) : t.c.startNew;
+  const draft: BotDraft = { ...prefill, ...(seller ? { name: seller.name, sellerType: seller.sellerType } : {}) };
+  await goTo(t, "ASK_NAME", draft, lead ? `${intro}\n\n${lead}` : intro);
 }
 
 /** "Start over" from the summary: keep who the seller is, redo the plot details. */
 async function restartDetails(t: Turn) {
   const seller = t.seller ?? (await t.loadSeller());
-  const keep: BotDraft = seller ? { name: seller.name, sellerType: seller.sellerType } : { name: t.draft.name, sellerType: t.draft.sellerType };
-  if (!keep.name || !keep.sellerType) return goTo(t, "ASK_NAME", {}, "No problem — let's start again from the top.");
-  await goTo(t, "ASK_LAND_TYPE", keep, "No problem — let's start again. 🔄");
+  const name = seller?.name ?? t.draft.name;
+  if (!name) return goTo(t, "ASK_NAME", {}, t.c.restartTop);
+  await goTo(t, "ASK_LAND_TYPE", { name, sellerType: seller?.sellerType ?? t.draft.sellerType }, t.c.restart);
 }
 
 function nextStep(step: BotStep): BotStep {
   if (step === "ASK_AREA_UNIT") return "ASK_PRICE";
+  if (step === "ASK_SELLER_TYPE") return "ASK_LAND_TYPE"; // older chats paused on the removed question
   const i = FLOW_ORDER.indexOf(step);
   return i >= 0 && i < FLOW_ORDER.length - 1 ? FLOW_ORDER[i + 1] : "CONFIRM";
 }
@@ -889,11 +884,31 @@ async function advance(t: Turn, from: BotStep, draft: BotDraft, lead?: string) {
   return goTo(t, nextStep(from), draft, lead);
 }
 
-/** Saves the step and asks its question (skipping steps that answer themselves). */
-async function goTo(t: Turn, step: BotStep, draft: BotDraft, lead?: string): Promise<void> {
-  if (step === "ASK_SELLER_TYPE" && draft.sellerType) return advance(t, step, draft, lead);
-  if (step === "ASK_NAME" && draft.name) return advance(t, step, draft, lead);
+/** A question whose answer we already have (typed earlier, or understood from a longer message). */
+function answered(step: BotStep, d: BotDraft): boolean {
+  switch (step) {
+    case "ASK_NAME":
+      return Boolean(d.name);
+    case "ASK_LAND_TYPE":
+      return Boolean(d.landType);
+    case "ASK_STATE":
+      return Boolean(d.cityState);
+    case "ASK_CITY":
+      return Boolean(d.cityId);
+    case "ASK_LOCALITY":
+      return Boolean(d.locality);
+    case "ASK_AREA":
+      return Boolean(d.area && d.areaUnit);
+    case "ASK_PRICE":
+      return Boolean(d.price);
+    default:
+      return false;
+  }
+}
 
+/** Saves the step and asks its question, skipping questions already answered (unless we're fixing that answer). */
+async function goTo(t: Turn, step: BotStep, draft: BotDraft, lead?: string): Promise<void> {
+  if (!draft.returnToConfirm && answered(step, draft)) return advance(t, step, draft, lead);
   await t.save(step, draft);
   await t.reply(await promptFor(t, step, lead));
 }
@@ -918,163 +933,123 @@ function citiesInState(state: string) {
   return db.city.findMany({ where: { isLive: true, state }, orderBy: [{ properties: { _count: "desc" } }, { name: "asc" }], take: 9 });
 }
 
-const LAND_TYPE_HINTS: Record<LandType, string> = {
-  AGRICULTURAL: "Khet / farmland, orchard",
-  RESIDENTIAL_PLOT: "Plot for a house, in a colony or village",
-  COMMERCIAL: "Shop, showroom, market road",
-  INDUSTRIAL: "Factory, warehouse, godown",
-  OTHER: "Any other kind of land",
-};
-
-const UNIT_ROWS: { unit: AreaUnit; title: string; description: string }[] = [
-  { unit: "BIGHA", title: "Bigha", description: "Common for farmland" },
-  { unit: "BISWA", title: "Biswa", description: "1 Bigha = 20 Biswa" },
-  { unit: "MARLA", title: "Marla", description: "Punjab, Haryana, Chandigarh" },
-  { unit: "KANAL", title: "Kanal", description: "1 Kanal = 20 Marla" },
-  { unit: "ACRE", title: "Acre / Killa", description: "43,560 sq ft" },
-  { unit: "SQFT", title: "Square feet", description: "Common for house plots" },
-  { unit: "SQYD", title: "Gaj (sq yd)", description: "1 Gaj = 9 sq ft" },
-  { unit: "SQM", title: "Square metre", description: "≈ 10.76 sq ft" },
-  { unit: "HECTARE", title: "Hectare", description: "≈ 2.47 acres" },
-];
-
 async function promptFor(t: Turn, step: BotStep, lead?: string): Promise<OutgoingMessage> {
   const pre = lead ? `${lead}\n\n` : "";
   const d = t.draft;
+  const c = t.c;
   switch (step) {
     case "ASK_NAME": {
       const suggested = t.conv.profileName ? parseName(t.conv.profileName) : null;
       if (suggested && suggested.length <= 40) {
-        return {
-          type: "buttons",
-          body: `${pre}First, what is your *name*?\n\nShould we use *${suggested}*? Tap the button, or just type your name.`,
-          buttons: [{ id: "name:profile", title: `Yes, ${firstName(suggested)}`.slice(0, 20) }],
-        };
+        return { type: "buttons", body: `${pre}${c.askNameSuggested({ name: suggested })}`, buttons: [{ id: "name:profile", title: c.btnUseName({ name: suggested }).slice(0, 20) }] };
       }
-      return { type: "text", text: `${pre}First, what is your *name*? (e.g. Ramesh Yadav)` };
+      return { type: "text", text: `${pre}${c.askName}` };
     }
-    case "ASK_SELLER_TYPE":
-      return {
-        type: "buttons",
-        body: `${pre}Are you the *owner* of this land, or a *broker / agent*?`,
-        buttons: [
-          { id: "seller:OWNER", title: "I'm the owner" },
-          { id: "seller:BROKER", title: "I'm a broker" },
-        ],
-      };
     case "ASK_LAND_TYPE":
       return {
         type: "list",
-        body: `${pre}What kind of land is it?`,
-        buttonLabel: "Choose land type",
-        rows: LAND_TYPE_ORDER.map((lt) => ({ id: `type:${lt}`, title: landTypeLabel(lt), description: LAND_TYPE_HINTS[lt] })),
+        body: `${pre}${c.askLandType}`,
+        buttonLabel: c.chooseLandType,
+        rows: LAND_TYPE_ORDER.map((lt) => ({ id: `type:${lt}`, title: landLabel(t.lang, lt), description: landHint(t.lang, lt) })),
       };
     case "ASK_STATE": {
       const states = await popularStates();
-      return {
-        type: "list",
-        body: `${pre}Which *state* is the land in?\n\nPick from the list, or just type it — e.g. _Punjab_, _Uttar Pradesh_, _Gujarat_.`,
-        buttonLabel: "Choose state",
-        rows: states.map((st) => ({ id: `state:${st}`, title: st })),
-      };
+      return { type: "list", body: `${pre}${c.askState}`, buttonLabel: c.chooseState, rows: states.map((st) => ({ id: `state:${st}`, title: st })) };
     }
     case "ASK_CITY": {
       const cities = d.cityState ? await citiesInState(d.cityState) : [];
-      const where = d.cityState ? ` in ${d.cityState}` : "";
-      if (cities.length === 0) {
-        return { type: "text", text: `${pre}🏙️ Which *city or district*${where} is the land in? Just type it — e.g. _Mohali_, _Azamgarh_, _Nashik_.` };
-      }
+      if (cities.length === 0) return { type: "text", text: `${pre}${c.askCityTyped({ state: d.cityState ?? "" })}` };
       return {
         type: "list",
-        body: `${pre}Which *city or district*${where} is the land in?\n\nPick from the list, or type it if yours isn't there.`,
-        buttonLabel: "Choose city",
-        rows: cities.map((c) => ({ id: `city:${c.id}`, title: c.name, description: c.state })),
+        body: `${pre}${c.askCityList({ state: d.cityState ?? "" })}`,
+        buttonLabel: c.chooseCity,
+        rows: cities.map((city) => ({ id: `city:${city.id}`, title: city.name, description: city.state })),
       };
     }
     case "ASK_LOCALITY":
-      return {
-        type: "text",
-        text: `${pre}📍 Which *village or area* is the land in? Please add a nearby *landmark* too, so buyers can find it.\n\n_e.g. Rampur, near Panchayat Bhawan — or Sector 70, opposite the market_`,
-      };
+      return { type: "text", text: `${pre}${c.askLocality}` };
     case "ASK_AREA":
-      return {
-        type: "text",
-        text: `${pre}📐 How big is the land? Send the size with the unit — e.g. *2 bigha*, *10 marla*, *1 kanal*, *1.5 acre*, *1200 sq ft* or *200 gaj*.`,
-      };
+      return { type: "text", text: `${pre}${c.askArea}` };
     case "ASK_AREA_UNIT":
       return {
         type: "list",
-        body: `${pre}*${formatNumberPlain(d.pendingArea ?? 0)}* — in which unit?`,
-        buttonLabel: "Choose unit",
-        rows: UNIT_ROWS.map((u) => ({ id: `unit:${u.unit}`, title: u.title, description: u.description })),
+        body: `${pre}${c.askUnit({ n: formatNumberPlain(d.pendingArea ?? 0) })}`,
+        buttonLabel: c.chooseUnit,
+        rows: UNIT_ROWS[t.lang].map((u) => ({ id: `unit:${u.unit}`, title: u.title, description: u.description })),
       };
     case "ASK_PRICE":
-      return {
-        type: "text",
-        text: `${pre}💰 What is the *total asking price* for the whole land? e.g. *18 lakh*, *1.2 crore* or *1800000*.`,
-      };
+      return { type: "text", text: `${pre}${c.askPrice}` };
     case "ASK_PHOTOS": {
       const count = d.photos?.length ?? 0;
       return {
         type: "buttons",
-        body:
-          count > 0
-            ? `${pre}📸 You've sent ${count} photo${count === 1 ? "" : "s"} so far. Send more (up to ${MAX_PHOTOS}), or tap *Done*.`
-            : `${pre}📸 Now send *photos* of the land — up to ${MAX_PHOTOS}. Plots with photos get *far more enquiries* from buyers.\n\nTip: show the road, the boundary and the full plot. Send them, then tap *Done*.`,
+        body: `${pre}${count > 0 ? c.askPhotosMore({ n: count, max: MAX_PHOTOS }) : c.askPhotosFirst({ max: MAX_PHOTOS })}`,
         buttons: [
-          { id: "photos:done", title: "Done" },
-          { id: "photos:skip", title: "Skip photos" },
+          { id: "photos:done", title: c.btnDone },
+          { id: "photos:skip", title: c.btnSkipPhotos },
         ],
       };
     }
     case "ASK_LOCATION":
-      return {
-        type: "buttons",
-        body: `${pre}🗺️ Can you share the land's *location pin*? Tap 📎 → *Location* → send the spot on the map (easiest when you're at the plot).\n\nBuyers only see the approximate area, never the exact pin.`,
-        buttons: [{ id: "loc:skip", title: "Skip" }],
-      };
+      return { type: "buttons", body: `${pre}${c.askLocation}`, buttons: [{ id: "loc:skip", title: c.btnSkip }] };
     case "ASK_DESCRIPTION":
-      return {
-        type: "buttons",
-        body: `${pre}✍️ Last step: tell buyers about the land in a line or two — road width, electricity, water, boundary, distance to the highway or market, papers ready, etc.\n\nOr tap *Skip* and we'll write a short description for you.`,
-        buttons: [{ id: "desc:skip", title: "Skip" }],
-      };
+      return { type: "buttons", body: `${pre}${c.askDescription}`, buttons: [{ id: "desc:skip", title: c.btnSkip }] };
     case "ASK_SOLD_WHICH": {
       const ids = d.soldChoices ?? [];
       const found = await db.property.findMany({ where: { id: { in: ids } }, select: { id: true, title: true, code: true, price: true } });
       const plots = ids.map((id) => found.find((p) => p.id === id)).filter((p): p is SoldCandidate => Boolean(p));
-      return whichSoldMessage(plots, lead, true);
+      return whichSoldMessage(t, plots, lead, true);
     }
     case "CONFIRM":
       return {
         type: "buttons",
-        body: `${pre}${summary(t)}\n\nAll correct? Tap *Submit* and our team will verify and publish it.`,
+        body: `${pre}${summary(t)}\n\n${c.confirmPrompt}`,
         buttons: [
-          { id: "confirm:submit", title: "Submit ✅" },
-          { id: "confirm:restart", title: "Start over" },
-          { id: "confirm:cancel", title: "Cancel" },
+          { id: "confirm:submit", title: c.btnSubmit },
+          { id: "confirm:restart", title: c.btnStartOver },
+          { id: "confirm:cancel", title: c.btnCancel },
         ],
       };
     default:
-      return { type: "text", text: `${pre}Send *SELL* to list your land, or *HELP* to see what I can do.` };
+      return { type: "text", text: `${pre}${c.idleNudge}` };
   }
+}
+
+/** The plain-words question for a step (given to the AI so it can help the seller answer it). */
+function questionText(t: Turn): string | null {
+  const c = t.c;
+  const map: Partial<Record<BotStep, string>> = {
+    ASK_NAME: c.askName,
+    ASK_LAND_TYPE: c.askLandType,
+    ASK_STATE: c.askState,
+    ASK_CITY: c.askCityTyped({ state: t.draft.cityState ?? "" }),
+    ASK_LOCALITY: c.askLocality,
+    ASK_AREA: c.askArea,
+    ASK_AREA_UNIT: c.askUnit({ n: formatNumberPlain(t.draft.pendingArea ?? 0) }),
+    ASK_PRICE: c.askPrice,
+    ASK_PHOTOS: c.askPhotosFirst({ max: MAX_PHOTOS }),
+    ASK_LOCATION: c.askLocation,
+    ASK_DESCRIPTION: c.askDescription,
+    CONFIRM: c.confirmPrompt,
+  };
+  return map[t.step] ?? null;
 }
 
 function summary(t: Turn): string {
   const d = t.draft;
+  const c = t.c;
   const name = t.seller?.name ?? d.name;
-  const sellerType = t.seller?.sellerType ?? d.sellerType;
-  const lines = ["📋 *Please check your listing*", ""];
+  const lines = [c.checkListing, ""];
   if (d.landType && d.area && d.areaUnit && d.locality) {
     lines.push(`🏷️ *${buildTitle({ area: d.area, areaUnit: d.areaUnit, landType: d.landType, locality: d.locality, village: d.village })}*`);
   }
-  if (d.landType) lines.push(`🌾 Type: ${landTypeLabel(d.landType)}`);
-  if (d.locality) lines.push(`📍 Place: ${d.locality}${d.cityName ? `, ${d.cityName}` : ""}`);
-  if (d.area && d.areaUnit) lines.push(`📐 Size: ${formatArea(d.area, d.areaUnit)}${sqftHintFor(d.area, d.areaUnit)}`);
-  if (d.price) lines.push(`💰 Price: ${formatPrice(d.price)} (total, negotiable)`);
-  lines.push(`📸 Photos: ${d.photos?.length ? d.photos.length : "none"}`);
-  lines.push(`🗺️ Location pin: ${d.latitude !== undefined && d.longitude !== undefined ? "shared ✓" : "not shared"}`);
-  if (name) lines.push(`👤 Seller: ${name}${sellerType ? ` (${sellerType === "OWNER" ? "Owner" : "Broker"})` : ""}`);
+  if (d.landType) lines.push(`🌾 ${c.sumType}: ${landLabel(t.lang, d.landType)}`);
+  if (d.locality) lines.push(`📍 ${c.sumPlace}: ${d.locality}${d.cityName ? `, ${d.cityName}` : ""}`);
+  if (d.area && d.areaUnit) lines.push(`📐 ${c.sumSize}: ${areaText(t.lang, d.area, d.areaUnit)}${sqftHintFor(d.area, d.areaUnit)}`);
+  if (d.price) lines.push(`💰 ${c.sumPrice}: ${priceText(t.lang, d.price)} ${c.sumPriceNote}`);
+  lines.push(`📸 ${c.sumPhotos}: ${d.photos?.length ? d.photos.length : c.sumNone}`);
+  lines.push(`🗺️ ${c.sumPin}: ${d.latitude !== undefined && d.longitude !== undefined ? c.sumShared : c.sumNotShared}`);
+  if (name) lines.push(`👤 ${c.sumSeller}: ${name}`);
   if (d.description) {
     const desc = d.description.length > 280 ? `${d.description.slice(0, 277)}…` : d.description;
     lines.push("", `📝 ${desc}`);
@@ -1089,10 +1064,109 @@ function sqftHintFor(area: number, unit: AreaUnit): string {
   return hint ? ` (${hint})` : "";
 }
 
+// ───────────────────────────── Optional AI help ─────────────────────────────
+
+/**
+ * Merges details the AI understood into the draft — only questions not yet
+ * answered, and only values that pass the same checks as typed answers.
+ * Returns the new draft and what was understood (for "👍 Noted: …").
+ */
+async function mergeExtracted(t: Turn, ex: ExtractedListing): Promise<{ draft: BotDraft; items: string[] }> {
+  const d: BotDraft = { ...t.draft };
+  const items: string[] = [];
+  if (!d.name && !t.seller && ex.name) {
+    const name = parseName(ex.name);
+    if (name) d.name = name;
+  }
+  if (!d.landType && ex.landType && Object.hasOwn(LAND_TYPES, ex.landType)) {
+    d.landType = ex.landType as LandType;
+    items.push(landLabel(t.lang, d.landType));
+  }
+  if (!(d.area && d.areaUnit) && ex.area && ex.unit && (Object.values(AreaUnit) as string[]).includes(ex.unit)) {
+    d.area = ex.area;
+    d.areaUnit = ex.unit as AreaUnit;
+    items.push(areaText(t.lang, d.area, d.areaUnit));
+  }
+  if (!d.price && ex.priceRupees) {
+    d.price = ex.priceRupees;
+    items.push(priceText(t.lang, d.price));
+  }
+  if (!d.cityState && ex.state) {
+    const state = matchState(ex.state);
+    if (state) d.cityState = state;
+  }
+  if (!d.cityId && ex.city) {
+    const { name } = splitCityAndState(cleanFreeText(ex.city, 60));
+    if (CITY_NAME_PATTERN.test(name) && !isDevanagari(name)) {
+      const city = await resolveCity({ cityName: name, state: d.cityState }).catch(() => null);
+      if (city) {
+        d.cityId = city.id;
+        d.cityName = city.name;
+        d.cityState = city.state;
+      }
+    }
+  }
+  if (!d.locality && ex.locality && /\p{L}/u.test(ex.locality)) {
+    d.locality = cleanFreeText(ex.locality, 120);
+    d.village = villageFrom(d.locality);
+  }
+  const place = [d.locality, d.cityName].filter(Boolean).join(", ");
+  if (place && (d.locality !== t.draft.locality || d.cityName !== t.draft.cityName)) items.push(place);
+  return { draft: d, items };
+}
+
+/**
+ * When the fixed parser didn't understand a message (and AI is switched on):
+ * first try to pull listing details out of it; if that fills the current
+ * question, move on. Otherwise send a short, kind AI reply and ask again.
+ * Returns false when AI is off or had nothing useful — the caller then sends
+ * its normal fixed reply.
+ */
+async function aiAssist(t: Turn, text: string | undefined): Promise<boolean> {
+  if (!text || !isAiEnabled()) return false;
+  const chatKey = t.conv.id;
+  if (isInFlow(t.step) && t.step !== "SUBMITTING" && t.step !== "CONFIRM") {
+    const ex = await extractListing(text, chatKey);
+    if (ex) {
+      const { draft, items } = await mergeExtracted(t, ex);
+      if (answered(t.step, draft)) {
+        return advance(t, t.step, draft, items.length ? t.c.understood({ items: items.join(" · ") }) : undefined).then(() => true);
+      }
+      if (items.length) await t.save(t.step, draft);
+    }
+  }
+  const reply = await replyToSeller({ lang: t.lang, text, question: isInFlow(t.step) ? questionText(t) : null, chatKey });
+  if (!reply) return false;
+  if (isInFlow(t.step)) await reprompt(t, reply);
+  else await sendMenu(t, reply);
+  return true;
+}
+
+/** Idle and not a command: a seller describing their land starts a pre-filled listing; anything else gets a helpful reply. */
+async function aiIdle(t: Turn, text: string | undefined): Promise<boolean> {
+  if (!text || !isAiEnabled() || text.length < 8) return false;
+  const ex = await extractListing(text, t.conv.id);
+  if (ex) {
+    const listingFields = [ex.landType, ex.area, ex.priceRupees, ex.city, ex.locality].filter((v) => v !== undefined).length;
+    if (listingFields >= 2) {
+      const saved = t.draft;
+      t.draft = {};
+      const { draft, items } = await mergeExtracted(t, ex);
+      t.draft = saved;
+      await startListing(t, draft, items.length ? t.c.understood({ items: items.join(" · ") }) : undefined);
+      return true;
+    }
+  }
+  return aiAssist(t, text);
+}
+
+// ───────────────────────────── Answers ─────────────────────────────
+
 /** Answers to the current question. */
 async function handleStep(t: Turn, input: BotInput & { text?: string }) {
   const { replyId, text } = input;
   const d = t.draft;
+  const c = t.c;
 
   switch (t.step) {
     case "ASK_SOLD_WHICH":
@@ -1100,36 +1174,34 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
 
     case "IDLE":
     case "SUBMITTING":
-      if (input.kind === "location") return sendMenu(t, "Thanks for the location 📍");
+      if (input.kind === "location") return sendMenu(t, c.thanksLocationIdle);
+      if (t.step === "IDLE" && input.kind === "text" && (await aiIdle(t, text))) return;
       return sendMenu(t);
 
     case "ASK_NAME": {
       let name: string | null = null;
-      if (replyId === "name:profile" || (text && /^yes\b/i.test(text))) name = t.conv.profileName ? parseName(t.conv.profileName) : null;
+      if (replyId === "name:profile" || (text && /^(?:yes|haan|han|हाँ|हां)\b/i.test(text))) name = t.conv.profileName ? parseName(t.conv.profileName) : null;
       if (!name && text) name = parseName(text);
-      if (!name) return reprompt(t, "Please type your name (just your name, e.g. *Ramesh Yadav*).");
+      if (!name) return (await aiAssist(t, text)) || reprompt(t, c.typeName);
       return acceptName(t, name);
     }
 
-    case "ASK_SELLER_TYPE": {
-      const fromId = replyId?.startsWith("seller:") ? replyId.slice(7) : null;
-      const type: SellerType | null = fromId === "OWNER" || fromId === "BROKER" ? fromId : text ? parseSellerType(text) : null;
-      if (!type) return reprompt(t, "Please tap one of the buttons 👇");
-      return advance(t, "ASK_SELLER_TYPE", { ...d, sellerType: type }, type === "OWNER" ? "Great, thank you! 🙏" : "Great — brokers are very welcome. 🤝");
-    }
+    case "ASK_SELLER_TYPE":
+      // Older chats paused on the question we no longer ask: everyone is a seller.
+      return advance(t, "ASK_SELLER_TYPE", { ...d, sellerType: d.sellerType ?? "OWNER" });
 
     case "ASK_LAND_TYPE": {
       const fromId = replyId?.startsWith("type:") ? replyId.slice(5) : null;
       const landType = fromId && Object.hasOwn(LAND_TYPES, fromId) ? (fromId as LandType) : text ? parseLandType(text) : null;
-      if (!landType) return reprompt(t, "Please choose the land type from the list 👇");
-      return advance(t, "ASK_LAND_TYPE", { ...d, landType }, `${landTypeLabel(landType)} ✓`);
+      if (!landType) return (await aiAssist(t, text)) || reprompt(t, c.chooseLandTypeFromList);
+      return advance(t, "ASK_LAND_TYPE", { ...d, landType }, `${landLabel(t.lang, landType)} ✓`);
     }
 
     case "ASK_STATE": {
       const fromId = replyId?.startsWith("state:") ? replyId.slice(6) : null;
       const state = matchState(fromId ?? text ?? "");
-      if (!state) return reprompt(t, "I didn't recognise that state. Please pick one from the list, or type its name (e.g. *Punjab*).");
-      return advance(t, "ASK_STATE", { ...d, cityState: state, cityId: undefined, cityName: undefined }, `🗺️ State: *${state}*`);
+      if (!state) return (await aiAssist(t, text)) || reprompt(t, c.unknownState);
+      return advance(t, "ASK_STATE", { ...d, cityState: state, cityId: undefined, cityName: undefined }, c.stateOk({ state }));
     }
 
     case "ASK_CITY": {
@@ -1140,17 +1212,18 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
       }
       const typed = cleanFreeText(text ?? "", 60);
       // "Mohali, Punjab" typed in full is fine too; the state we already have wins.
-      const { name } = splitCityAndState(typed);
-      if (!CITY_NAME_PATTERN.test(name)) return reprompt(t, "Please type the city or district name (letters only).");
-      const city = await resolveCity({ cityName: name, state: d.cityState });
-      if (!city) return reprompt(t, "Please type the city or district name (letters only).");
+      let { name } = splitCityAndState(typed);
+      // Typed in Hindi: use the place's English name, so it matches the existing city page.
+      if (isDevanagari(name)) name = (await englishPlaceName([name, d.cityState, "India"].filter(Boolean).join(", "))) ?? "";
+      const city = name && CITY_NAME_PATTERN.test(name) ? await resolveCity({ cityName: name, state: d.cityState }) : null;
+      if (!city) return (await aiAssist(t, text)) || reprompt(t, isDevanagari(typed) ? c.typeCityEnglish : c.typeCity);
       return advance(t, "ASK_CITY", { ...d, cityId: city.id, cityName: city.name, cityState: city.state }, `🏙️ *${city.name}* ✓`);
     }
 
     case "ASK_LOCALITY": {
-      if (input.kind === "location") return reprompt(t, "Thanks! I'll ask for the pin in a moment — first, please *type* the village or area name.");
+      if (input.kind === "location") return reprompt(t, c.typeLocalityFirst);
       const locality = cleanFreeText(text ?? "", 120);
-      if (locality.length < 2 || !/\p{L}/u.test(locality)) return reprompt(t, "Please type the village or area name.");
+      if (locality.length < 2 || !/\p{L}/u.test(locality)) return reprompt(t, c.typeLocality);
       return advance(t, "ASK_LOCALITY", { ...d, locality, village: villageFrom(locality) }, `📍 *${locality}* ✓`);
     }
 
@@ -1160,7 +1233,7 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
       if (parsed) return acceptArea(t, parsed.area, parsed.unit);
       const n = parseNumber(text);
       if (n && n > 0) return goTo(t, "ASK_AREA_UNIT", { ...d, pendingArea: n });
-      return reprompt(t, "Sorry, I didn't get the size 🙏");
+      return (await aiAssist(t, text)) || reprompt(t, c.didntGetSize);
     }
 
     case "ASK_AREA_UNIT": {
@@ -1172,7 +1245,7 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
         const unit = parseUnit(text);
         if (unit && d.pendingArea) return acceptArea(t, d.pendingArea, unit);
       }
-      return reprompt(t, "Please choose the unit from the list 👇");
+      return reprompt(t, c.chooseUnitFromList);
     }
 
     case "ASK_PRICE": {
@@ -1180,18 +1253,16 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
         const v = Number(replyId.slice(6));
         if (Number.isFinite(v) && v >= 10_000) return acceptPrice(t, v);
         await t.save("ASK_PRICE", { ...d, suggestedPrice: undefined });
-        return reprompt(t, "No problem — please type the total price again.");
+        return reprompt(t, c.typePriceAgain);
       }
       if (!text) return reprompt(t);
-      if (d.suggestedPrice && /^(?:no|nahi|nahin|nope|galat|wrong)\b/i.test(text)) {
+      if (d.suggestedPrice && /^(?:no|nahi|nahin|nope|galat|wrong|नहीं|गलत|ग़लत)/i.test(text.trim())) {
         await t.save("ASK_PRICE", { ...d, suggestedPrice: undefined });
-        return reprompt(t, "No problem — please type the total price again.");
+        return reprompt(t, c.typePriceAgain);
       }
-      const price = parsePrice(text);
-      if (price && looksLikePerUnitPrice(text)) {
-        return reprompt(t, "Please send the *total* price for the whole land, not the rate per unit 🙏");
-      }
-      if (price) return acceptPrice(t, price);
+      const amount = parsePrice(text);
+      if (amount && looksLikePerUnitPrice(text)) return reprompt(t, c.totalNotPerUnit);
+      if (amount) return acceptPrice(t, amount);
       // "18" almost always means 18 lakh.
       const n = parseNumber(text);
       if (n && n >= 1 && n < 1000 && /^\d+(?:\.\d+)?$/.test(normalizeInput(text))) {
@@ -1199,59 +1270,50 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
         await t.save("ASK_PRICE", { ...d, suggestedPrice: suggestion });
         await t.reply({
           type: "buttons",
-          body: `Did you mean *${formatPrice(suggestion)}*?`,
+          body: c.didYouMean({ price: priceText(t.lang, suggestion) }),
           buttons: [
-            { id: `price:${suggestion}`, title: `Yes, ${formatPrice(suggestion)}`.slice(0, 20) },
-            { id: "price:no", title: "No" },
+            { id: `price:${suggestion}`, title: c.btnYesPrice({ price: priceText(t.lang, suggestion) }).slice(0, 20) },
+            { id: "price:no", title: c.btnNo },
           ],
         });
         return;
       }
-      return reprompt(t, "Sorry, I didn't get the price 🙏");
+      return (await aiAssist(t, text)) || reprompt(t, c.didntGetPrice);
     }
 
     case "ASK_PHOTOS": {
       const lowered = text ? normalizeInput(text) : "";
-      if (replyId === "photos:done" || /^(?:done|ho gaya|hogaya|ho gya|bas|finish|finished|complete|that'?s all|ok done|next)\b/.test(lowered)) {
-        if (!d.photos?.length) {
-          return reprompt(t, "You haven't sent any photos yet. Send a few now — or tap *Skip photos* to continue without them.");
-        }
-        return advance(t, "ASK_PHOTOS", d, `👍 ${d.photos.length} photo${d.photos.length === 1 ? "" : "s"} added.`);
+      if (replyId === "photos:done" || /^(?:done|ho gaya|hogaya|ho gya|bas|finish|finished|complete|that'?s all|ok done|next|हो गया|बस)/.test(lowered)) {
+        if (!d.photos?.length) return reprompt(t, c.noPhotosYet);
+        return advance(t, "ASK_PHOTOS", d, c.photosAdded({ n: d.photos.length }));
       }
-      if (replyId === "photos:skip" || /^(?:skip|no photos?|nahi|nahin|no|later|baad me|baad mein)\b/.test(lowered)) {
-        return advance(
-          t,
-          "ASK_PHOTOS",
-          d,
-          "Okay, no photos for now. (You can send them to us here later — listings with photos sell faster!)",
-        );
+      if (replyId === "photos:skip" || /^(?:skip|no photos?|nahi|nahin|no|later|baad me|baad mein|नहीं|बाद में|फ़ोटो बाद में|फोटो बाद में)/.test(lowered)) {
+        return advance(t, "ASK_PHOTOS", d, c.noPhotosOk);
       }
       if (input.kind === "location") {
-        return advance(t, "ASK_LOCATION", { ...d, latitude: input.latitude, longitude: input.longitude, locationAsked: true }, "📍 Location saved — thank you!");
+        return advance(t, "ASK_LOCATION", { ...d, latitude: input.latitude, longitude: input.longitude, locationAsked: true }, c.locationSaved);
       }
-      return reprompt(t, "Please send photos of the land, or tap a button 👇");
+      return (await aiAssist(t, text)) || reprompt(t, c.sendPhotosOrTap);
     }
 
     case "ASK_LOCATION": {
       if (input.kind === "location" && isCoord(input.latitude, input.longitude)) {
-        return advance(t, "ASK_LOCATION", { ...d, latitude: input.latitude, longitude: input.longitude, locationAsked: true }, "📍 Location saved — thank you!");
+        return advance(t, "ASK_LOCATION", { ...d, latitude: input.latitude, longitude: input.longitude, locationAsked: true }, c.locationSaved);
       }
       const lowered = text ? normalizeInput(text) : "";
-      if (replyId === "loc:skip" || /^(?:skip|no|nahi|nahin|later|not now|don'?t know|pata nahi)\b/.test(lowered)) {
-        return advance(t, "ASK_LOCATION", { ...d, locationAsked: true }, "Okay, no problem.");
+      if (replyId === "loc:skip" || /^(?:skip|no|nahi|nahin|later|not now|don'?t know|pata nahi|छोड़ें|नहीं|पता नहीं|बाद में)/.test(lowered)) {
+        return advance(t, "ASK_LOCATION", { ...d, locationAsked: true }, c.noProblem);
       }
       const coords = text ? parseCoordinates(text) : null;
-      if (coords) return advance(t, "ASK_LOCATION", { ...d, ...coords, locationAsked: true }, "📍 Location saved — thank you!");
-      return reprompt(t, "Please send the location pin (📎 → Location), or tap *Skip*.");
+      if (coords) return advance(t, "ASK_LOCATION", { ...d, ...coords, locationAsked: true }, c.locationSaved);
+      return (await aiAssist(t, text)) || reprompt(t, c.sendPinOrSkip);
     }
 
     case "ASK_DESCRIPTION": {
-      if (replyId === "desc:skip" || (text && /^(?:skip|no|nahi|nahin|nothing|kuch nahi)$/i.test(normalizeInput(text)))) {
+      if (replyId === "desc:skip" || (text && /^(?:skip|no|nahi|nahin|nothing|kuch nahi|छोड़ें|नहीं|कुछ नहीं)$/i.test(normalizeInput(text)))) {
         return advance(t, "ASK_DESCRIPTION", { ...d, description: defaultDescription(t), descriptionGenerated: true, features: [] });
       }
-      if (input.kind === "location") {
-        return reprompt(t, "📍 Got the location! Now please type a short description, or tap *Skip*.");
-      }
+      if (input.kind === "location") return reprompt(t, c.gotLocationNowDesc);
       const written = cleanFreeText(text ?? "", 1800, true);
       if (!written) return reprompt(t);
       const description = written.length >= 15 ? written : `${defaultDescription(t)} ${written}`;
@@ -1260,62 +1322,56 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
 
     case "CONFIRM": {
       const lowered = text ? normalizeInput(text) : "";
-      if (replyId === "confirm:submit" || /^(?:submit|ok|okay|confirm|done|correct|sahi|sahi hai|theek hai|thik hai|submit ✅)\b/.test(lowered)) {
+      if (replyId === "confirm:submit" || /^(?:submit|ok|okay|confirm|done|correct|sahi|sahi hai|theek hai|thik hai|submit ✅|भेजें|भेज दो|सही है|ठीक है)/.test(lowered)) {
         return submit(t);
       }
-      if (/^(?:start over|restart|edit|change|again|dobara)\b/.test(lowered)) return restartDetails(t);
-      return reprompt(t, "Tap *Submit* to send it for verification, *Start over* to change something, or *Cancel*.");
+      if (/^(?:start over|restart|edit|change|again|dobara|फिर से|दोबारा)/.test(lowered)) return restartDetails(t);
+      return (await aiAssist(t, text)) || reprompt(t, c.confirmHint);
     }
   }
 }
 
 async function acceptName(t: Turn, name: string) {
-  await advance(t, "ASK_NAME", { ...t.draft, name }, `Thanks, ${firstName(name)}! 🙏`);
+  await advance(t, "ASK_NAME", { ...t.draft, name }, t.c.thanksName({ name }));
 }
 
 async function acceptArea(t: Turn, area: number, unit: AreaUnit) {
   const { pendingArea, ...rest } = t.draft;
   void pendingArea;
-  await advance(t, "ASK_AREA", { ...rest, area, areaUnit: unit }, `📐 *${formatArea(area, unit)}* ✓`);
+  await advance(t, "ASK_AREA", { ...rest, area, areaUnit: unit }, `📐 *${areaText(t.lang, area, unit)}* ✓`);
 }
 
-async function acceptPrice(t: Turn, price: number) {
+async function acceptPrice(t: Turn, amount: number) {
   const { suggestedPrice, ...rest } = t.draft;
   void suggestedPrice;
-  await advance(t, "ASK_PRICE", { ...rest, price }, `💰 *${formatPrice(price)}* (total) — noted ✓`);
+  await advance(t, "ASK_PRICE", { ...rest, price: amount }, `💰 *${priceText(t.lang, amount)}* ✓`);
 }
 
 // ───────────────────────────── Photos ─────────────────────────────
 
 async function handleImage(t: Turn, image: StoredImage | null) {
-  if (!isInFlow(t.step)) {
-    return sendMenu(t, "Thanks for the photo! 📸 To list a plot, tap *List my land* and send the photos when I ask.");
-  }
+  if (!isInFlow(t.step)) return sendMenu(t, t.c.photoThanksIdle);
   if (!image) {
-    await t.text("Sorry, I couldn't save that photo 🙏 Please try sending it again.");
+    await t.text(t.c.photoFailed);
     return;
   }
   const count = await appendPhoto(t.conv.id, image);
   if (count === null) {
-    await t.text(`You've already sent ${MAX_PHOTOS} photos — that's the maximum. 👍`);
+    await t.text(t.c.photoMax({ max: MAX_PHOTOS }));
     if (t.step === "ASK_PHOTOS") await advance(t, "ASK_PHOTOS", readDraft((await reloadDraft(t.conv.id)) ?? null));
     return;
   }
   t.draft = { ...t.draft, photos: [...(t.draft.photos ?? []), image] };
 
   if (t.step !== "ASK_PHOTOS") {
-    await t.text(`📸 Photo added to your listing (${count} so far).`);
+    await t.text(t.c.photoAddedOutside({ n: count }));
     return;
   }
   if (count >= MAX_PHOTOS) {
     t.draft = readDraft(await reloadDraft(t.conv.id));
-    return advance(t, "ASK_PHOTOS", t.draft, `✅ ${MAX_PHOTOS} photos received — that's the maximum. Great set!`);
+    return advance(t, "ASK_PHOTOS", t.draft, t.c.photoMaxDone({ max: MAX_PHOTOS }));
   }
-  await t.reply({
-    type: "buttons",
-    body: `✅ Photo ${count} received. Send more, or tap *Done*.`,
-    buttons: [{ id: "photos:done", title: "Done" }],
-  });
+  await t.reply({ type: "buttons", body: t.c.photoReceived({ n: count }), buttons: [{ id: "photos:done", title: t.c.btnDone }] });
 }
 
 /**
@@ -1366,12 +1422,12 @@ async function submit(t: Turn) {
   const d = t.draft;
   const seller = await t.loadSeller();
   const name = seller?.name ?? d.name;
-  const sellerType = seller?.sellerType ?? d.sellerType;
-  if (!name) return goTo(t, "ASK_NAME", { ...d, returnToConfirm: true }, "One more thing before we submit:");
-  if (!sellerType) return goTo(t, "ASK_SELLER_TYPE", { ...d, returnToConfirm: true }, "One more thing before we submit:");
+  // Everyone is a "seller"; the stored type only matters for older records.
+  const sellerType: SellerType = seller?.sellerType ?? d.sellerType ?? "OWNER";
+  if (!name) return goTo(t, "ASK_NAME", { ...d, returnToConfirm: true }, t.c.oneMoreThing);
   if (seller?.isBlocked) {
     await t.save("IDLE", null);
-    await t.text("Sorry, we can't accept new listings from this number right now. Send *TALK* if you think this is a mistake.");
+    await t.text(t.c.blocked);
     return;
   }
 
@@ -1400,7 +1456,7 @@ async function submit(t: Turn) {
       delete fixed.latitude;
       delete fixed.longitude;
     }
-    return goTo(t, step, fixed, `⚠️ One thing needs fixing: ${issue?.message ?? "please check this answer"}.`);
+    return goTo(t, step, fixed, t.c.needsFixing({ issue: issue?.message ?? "please check this answer" }));
   }
   // Guard against a double tap on Submit: only one turn may move CONFIRM → SUBMITTING.
   const claimed = await db.whatsAppConversation.updateMany({
@@ -1426,17 +1482,10 @@ async function submit(t: Turn) {
 
     if (t.isSimulation) {
       // Mirrors notifySeller(…, "LISTING_RECEIVED") so the simulator shows the real experience.
-      await t.reply(
-        {
-          type: "text",
-          text: `✅ Your land has been submitted.\n\n${property.title}\n${placeName(property)}${d.cityName ? `, ${d.cityName}` : ""} · ${formatPrice(property.price)}\n\nWe'll review it and message you when it's live — usually within a few hours.\n\nSeller ID: *${s.code}*`,
-        },
-        "system",
-      );
+      const plot = `${property.title}\n${placeName(property)}${d.cityName ? `, ${d.cityName}` : ""} · ${priceText(t.lang, property.price)}`;
+      await t.reply({ type: "text", text: t.c.nReceived({ plot, code: s.code }) }, "system");
     }
-    await t.text(
-      `🙏 Thank you, ${firstName(s.name)}! We'll message you here as soon as your plot is live.\n\nTo list another plot, send *SELL*. To check your plots, send *STATUS*.`,
-    );
+    await t.text(t.c.submitted({ name: s.name }));
     await nudgeIdentity(t, s);
   } catch (err) {
     await db.whatsAppConversation.update({ where: { id: t.conv.id }, data: { step: "CONFIRM" } });
@@ -1456,32 +1505,19 @@ async function nudgeIdentity(t: Turn, s: Seller) {
     return;
   }
   // Mirrors notifyVerifyIdentity so the simulator shows the real experience.
-  await t.reply(
-    {
-      type: "text",
-      previewUrl: false,
-      text: `One small step, ${firstName(s.name)}: verify your identity so buyers see *✓ Identity verified* on your listings.\n\nIt takes 2 minutes, once. We never show your Aadhaar to anyone.\n\n${site.url}/seller/verify`,
-    },
-    "system",
-  );
+  await t.reply({ type: "text", previewUrl: false, text: t.c.nVerifyIdentity({ name: s.name, url: site.url }) }, "system");
 }
 
 // ───────────────────────────── Helpers ─────────────────────────────
 
-/** "Other" reads as plain "Land" elsewhere; in the chat we say what it is. */
-function landTypeLabel(lt: LandType): string {
-  return lt === "OTHER" ? "Other land" : LAND_TYPES[lt].label;
-}
-
+/** The description we write when the seller skips it (public, so in English like the rest of the listing page). */
 function defaultDescription(t: Turn): string {
   const d = t.draft;
-  const sellerType = t.seller?.sellerType ?? d.sellerType;
   const what = d.landType ? LAND_TYPES[d.landType].label.toLowerCase() : "land";
   const size = d.area && d.areaUnit ? `${formatArea(d.area, d.areaUnit)} ` : "";
   const where = [d.locality, d.cityName].filter(Boolean).join(", ");
-  const by = sellerType === "BROKER" ? "Listed by a local broker." : "Listed directly by the owner.";
-  return `${size}${what}${where ? ` in ${where}` : ""}. ${by} Contact the seller on WhatsApp or call for details and a site visit.`.replace(/^./, (c) =>
-    c.toUpperCase(),
+  return `${size}${what}${where ? ` in ${where}` : ""}. Listed by the seller on ${site.name}. Call or WhatsApp the seller for details and a site visit.`.replace(/^./, (ch) =>
+    ch.toUpperCase(),
   );
 }
 
@@ -1493,16 +1529,12 @@ function villageFrom(locality: string): string | undefined {
 }
 
 function cleanFreeText(text: string, max: number, multiline = false): string {
-  let t = text.normalize("NFC").replace(/[​-‍﻿]/g, "");
-  t = multiline ? t.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim() : t.replace(/\s+/g, " ").trim();
-  if (t.length <= max) return t;
-  const cut = t.slice(0, max);
+  let s = text.normalize("NFC").replace(/[​-‍﻿]/g, "");
+  s = multiline ? s.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim() : s.replace(/\s+/g, " ").trim();
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max);
   const lastSpace = cut.lastIndexOf(" ");
   return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trim();
-}
-
-function firstName(name: string): string {
-  return name.trim().split(/\s+/)[0] ?? name;
 }
 
 function formatNumberPlain(n: number): string {

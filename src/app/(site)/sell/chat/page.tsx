@@ -34,7 +34,8 @@ export default async function SellChatPage({ searchParams }: { searchParams: Pro
           <div className="rounded-2xl bg-white p-5 ring-1 ring-line">
             <h1 className="text-base font-bold text-ink">List your land by chat</h1>
             <p className="mt-1 text-sm leading-relaxed text-muted">
-              The assistant asks one question at a time. Your listing is checked by our team before buyers see it.
+              The assistant asks one simple question at a time — in Hindi or English, whichever you prefer. Our team checks every
+              listing before buyers see it, so serious buyers trust it.
             </p>
             <h2 className="mt-5 text-xs font-semibold tracking-wide text-muted uppercase">Keep these ready</h2>
             <ul className="mt-2 space-y-2.5 text-sm text-ink-soft">
