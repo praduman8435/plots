@@ -99,7 +99,7 @@ function ChatThread({
           </span>
           <p className="text-[16px] font-bold text-ink">List your land in 2 minutes</p>
           <p className="text-[14px] leading-snug text-muted">
-            Answer a few simple questions — in Hindi or English — add photos, and buyers contact you directly. Free, no documents needed.
+            Answer a few simple questions — in Hindi or English — add photos, and buyers contact you directly. Free to list.
           </p>
           <button
             type="button"

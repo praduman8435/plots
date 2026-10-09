@@ -120,7 +120,7 @@ export function SellOnWhatsAppBand() {
             <strong className="text-white">Seller ID</strong> to manage everything in one place.
           </p>
           <ul className="mt-6 grid gap-2.5 text-[15px] text-white/90">
-            {["Chat in Hindi or English", "No documents needed to list", "Buyers contact you directly", "Free to list while we launch"].map((t) => (
+            {["Chat in Hindi or English", "Buyers contact you directly", "Free to list while we launch"].map((t) => (
               <li key={t} className="flex items-center gap-2.5">
                 <BadgeCheck className="size-5 text-brand-200" aria-hidden /> {t}
               </li>
@@ -225,7 +225,7 @@ export function HowItWorksBoth() {
     {
       who: "Selling land",
       steps: [
-        { title: "List in minutes", text: "On WhatsApp or here — in Hindi or English. No documents needed to list." },
+        { title: "List in minutes", text: "On WhatsApp or here — in Hindi or English, in a few simple steps." },
         { title: "We check, then it goes live", text: "Our team reviews every listing, so buyers can trust what they see." },
         { title: "Buyers call you", text: "People looking for land in your area contact you directly." },
       ],

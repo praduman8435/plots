@@ -32,7 +32,7 @@ export default async function SellPage() {
         <div className="container-page py-12 sm:py-16 lg:py-20">
           <h1 className="max-w-3xl text-[2.3rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">Your land. Your price. The right buyer.</h1>
           <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
-            List in a few simple steps — on WhatsApp in Hindi or English, or right here. We check every listing, then buyers looking for land in your area call you directly. No documents needed to list.
+            List in a few simple steps — on WhatsApp in Hindi or English, or right here. We check every listing, then buyers looking for land in your area call you directly.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
