@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { normalizePhoneNumber } from "@/lib/phone";
@@ -55,7 +56,8 @@ export async function POST(req: Request) {
       },
     });
     // "New buyer enquiry" on WhatsApp, so the seller has the buyer's number even if they only called.
-    await notifyEnquiry(enquiry.id);
+    // Sent after the response: the buyer's tap never waits on WhatsApp.
+    after(() => notifyEnquiry(enquiry.id));
   }
   return Response.json({ ok: true });
 }

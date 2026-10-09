@@ -111,11 +111,14 @@ export async function changeListingStatusAction(propertyId: string, action: Admi
     return { ok: false, message: "This plot was hidden by an admin — use Unhide instead." };
   }
 
-  await changeListingStatus(
+  const result = await changeListingStatus(
     p.id,
     a.type === "REJECT" ? { type: "REJECT", reason: a.reason } : a.type === "HIDE" ? { type: "HIDE", by: "ADMIN" } : { type: a.type },
     { via: "admin" },
   );
+  if (result === "seller_blocked") return { ok: false, message: "This seller is suspended. Lift the suspension before making their plots live." };
+  if (result === "conflict") return { ok: false, message: "This listing just changed (maybe the seller replied). Refresh the page and try again." };
+  if (result === "noop") return { ok: false, message: "Nothing to change — refresh the page." };
   await recordAudit(admin, {
     action: `listing.${a.type}`,
     targetType: "listing",
@@ -237,20 +240,8 @@ export async function updateListingAction(propertyId: string, payload: ListingFo
   const city = await resolveCity({ ...parsed.listing });
   if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
 
-  await updateListing(existing.id, { ...parsed.listing, title: parsed.title });
-  // Photos: the form sends the full, ordered list (first = cover).
-  await db.$transaction([
-    db.propertyImage.deleteMany({ where: { propertyId: existing.id } }),
-    db.propertyImage.createMany({
-      data: parsed.images.map((img, position) => ({
-        propertyId: existing.id,
-        url: img.url,
-        width: img.width || null,
-        height: img.height || null,
-        position,
-      })),
-    }),
-  ]);
+  // Photos: the form sends the full, ordered list (first = cover). Saved with the fields in one transaction.
+  await updateListing(existing.id, { ...parsed.listing, title: parsed.title }, { city, images: parsed.images });
 
   await revalidateListing(existing.id);
   await recordAudit(admin, { action: "listing.EDIT", targetType: "listing", targetId: existing.id, propertyId: existing.id, sellerId: existing.sellerId });

@@ -107,27 +107,49 @@ export async function createListing(params: {
 }
 
 /** Admin edit. Recomputes normalised area; keeps the title unless one is given. */
-export async function updateListing(propertyId: string, input: ListingInput & { title?: string }) {
-  const city = await resolveCity({ ...input });
-  if (!city) throw new Error("Could not determine the city for this listing");
-  return db.property.update({
-    where: { id: propertyId },
-    data: {
-      cityId: city.id,
-      title: input.title?.trim() || buildTitle(input),
-      description: input.description,
-      landType: input.landType,
-      features: input.features,
-      locality: input.locality,
-      village: input.village ?? null,
-      latitude: input.latitude ?? null,
-      longitude: input.longitude ?? null,
-      area: input.area,
-      areaUnit: input.areaUnit,
-      areaSqft: toSqft(input.area, input.areaUnit, city.bighaInSqft, city.marlaInSqft),
-      price: BigInt(input.price),
-      priceNegotiable: input.priceNegotiable,
-    },
+/**
+ * Saves an edited listing — fields, photos and (for seller edits) the move
+ * back to "Pending approval" — in ONE transaction, so an edit can never go
+ * live half-applied or skip re-review. The city is resolved by the caller
+ * (it may call a geocoder, which must not run inside a transaction).
+ */
+export async function updateListing(
+  propertyId: string,
+  input: ListingInput & { title?: string },
+  opts: {
+    city: { id: string; bighaInSqft: number; marlaInSqft: number };
+    images?: { url: string; width?: number | null; height?: number | null }[];
+    backToReview?: boolean;
+  },
+) {
+  const { city } = opts;
+  await db.$transaction(async (tx) => {
+    await tx.property.update({
+      where: { id: propertyId },
+      data: {
+        cityId: city.id,
+        title: input.title?.trim() || buildTitle(input),
+        description: input.description,
+        landType: input.landType,
+        features: input.features,
+        locality: input.locality,
+        village: input.village ?? null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        area: input.area,
+        areaUnit: input.areaUnit,
+        areaSqft: toSqft(input.area, input.areaUnit, city.bighaInSqft, city.marlaInSqft),
+        price: BigInt(input.price),
+        priceNegotiable: input.priceNegotiable,
+        ...(opts.backToReview ? { status: "PENDING", hiddenReason: null, rejectionReason: null, availabilityCheckSentAt: null } : {}),
+      },
+    });
+    if (opts.images) {
+      await tx.propertyImage.deleteMany({ where: { propertyId } });
+      await tx.propertyImage.createMany({
+        data: opts.images.map((img, position) => ({ propertyId, url: img.url, width: img.width || null, height: img.height || null, position })),
+      });
+    }
   });
 }
 
@@ -153,9 +175,13 @@ type StatusOpts = {
  *   ACTIVE → (no reply to weekly check in 24h) HIDDEN "Unavailable" → (YES) ACTIVE
  * Nothing is ever deleted; SOLD and HIDDEN plots stay for history and can be relisted.
  */
-export async function changeListingStatus(propertyId: string, action: StatusAction, opts: StatusOpts = {}) {
-  await applyStatusChange(propertyId, action, opts);
-  await refreshListingPages(propertyId);
+/** What a status change did. "conflict": the plot changed meanwhile, nothing was written. */
+export type StatusChangeResult = "applied" | "noop" | "conflict" | "seller_blocked";
+
+export async function changeListingStatus(propertyId: string, action: StatusAction, opts: StatusOpts = {}): Promise<StatusChangeResult> {
+  const result = await applyStatusChange(propertyId, action, opts);
+  if (result === "applied") await refreshListingPages(propertyId);
+  return result;
 }
 
 /**
@@ -176,96 +202,107 @@ async function refreshListingPages(propertyId: string) {
   }
 }
 
-async function applyStatusChange(propertyId: string, action: StatusAction, opts: StatusOpts) {
+/**
+ * The one place listing status changes are written. Two rules hold for every
+ * caller (admin, seller dashboard, WhatsApp assistant, daily job):
+ *  - A write only lands if the plot's status fields are still what we read
+ *    (compare-and-set). Two changes racing — e.g. the daily job hiding a plot
+ *    for "no reply" while the seller's YES arrives — can't both win, and the
+ *    loser sends no notification.
+ *  - A suspended seller's plot can never be made live.
+ */
+async function applyStatusChange(propertyId: string, action: StatusAction, opts: StatusOpts): Promise<StatusChangeResult> {
   const notify = (event: Parameters<typeof notifySeller>[1]) => (opts.notify === false ? Promise.resolve(false) : notifySeller(propertyId, event));
-  const p = await db.property.findUniqueOrThrow({ where: { id: propertyId } });
+  const p = await db.property.findUniqueOrThrow({ where: { id: propertyId }, include: { seller: { select: { isBlocked: true } } } });
   const now = new Date();
   const ev = { sellerId: p.sellerId, propertyId: p.id, props: { via: opts.via ?? null } };
   const awaitingReply = p.availabilityCheckSentAt !== null;
+  const goesLive = action.type === "APPROVE" || action.type === "UNHIDE" || action.type === "CONFIRM_AVAILABLE";
+  if (goesLive && p.seller.isBlocked) return "seller_blocked";
+
+  /** Compare-and-set on the fields the state machine depends on. */
+  const write = async (data: Prisma.PropertyUpdateManyMutationInput) => {
+    const r = await db.property.updateMany({
+      where: { id: p.id, status: p.status, hiddenReason: p.hiddenReason, availabilityCheckSentAt: p.availabilityCheckSentAt },
+      data,
+    });
+    return r.count === 1;
+  };
 
   switch (action.type) {
     case "APPROVE": {
       // Also used by admin "Relist" for SOLD plots.
-      await db.property.update({
-        where: { id: p.id },
-        data: {
-          status: "ACTIVE",
-          hiddenReason: null,
-          rejectionReason: null,
-          soldAt: null,
-          publishedAt: p.publishedAt ?? now,
-          freshnessAt: now,
-          availabilityCheckSentAt: null,
-        },
+      const ok = await write({
+        status: "ACTIVE",
+        hiddenReason: null,
+        rejectionReason: null,
+        soldAt: null,
+        publishedAt: p.publishedAt ?? now,
+        freshnessAt: now,
+        availabilityCheckSentAt: null,
       });
+      if (!ok) return "conflict";
       // Approval also confirms the seller's phone (we've spoken to them / WhatsApp proved it).
       await db.seller.updateMany({ where: { id: p.sellerId, phoneVerifiedAt: null }, data: { phoneVerifiedAt: now } });
       await trackEvent("listing_approved", ev);
       await notify("LISTING_LIVE");
-      return;
+      return "applied";
     }
     case "REJECT":
-      await db.property.update({ where: { id: p.id }, data: { status: "REJECTED", rejectionReason: action.reason } });
+      if (!(await write({ status: "REJECTED", rejectionReason: action.reason }))) return "conflict";
       await trackEvent("listing_rejected", ev);
       await notify("LISTING_REJECTED");
-      return;
+      return "applied";
     case "HIDE":
-      await db.property.update({
-        where: { id: p.id },
-        data: { status: "HIDDEN", hiddenReason: action.by === "ADMIN" ? "BY_ADMIN" : "BY_SELLER", availabilityCheckSentAt: null },
-      });
-      return;
+      if (!(await write({ status: "HIDDEN", hiddenReason: action.by === "ADMIN" ? "BY_ADMIN" : "BY_SELLER", availabilityCheckSentAt: null }))) return "conflict";
+      return "applied";
     case "HIDE_UNCONFIRMED":
-      await db.property.update({
-        where: { id: p.id },
-        data: { status: "HIDDEN", hiddenReason: "AVAILABILITY_UNCONFIRMED", availabilityCheckSentAt: null },
-      });
+      // Only a live plot still waiting for its YES/NO can lapse.
+      if (p.status !== "ACTIVE" || !awaitingReply) return "noop";
+      if (!(await write({ status: "HIDDEN", hiddenReason: "AVAILABILITY_UNCONFIRMED", availabilityCheckSentAt: null }))) return "conflict";
       await trackEvent("availability_no_response", ev);
       await notify("LISTING_UNAVAILABLE");
-      return;
+      return "applied";
     case "UNHIDE":
-      if (p.status !== "HIDDEN") return;
-      await db.property.update({ where: { id: p.id }, data: { status: "ACTIVE", hiddenReason: null, freshnessAt: now } });
-      return;
+      if (p.status !== "HIDDEN") return "noop";
+      if (!(await write({ status: "ACTIVE", hiddenReason: null, freshnessAt: now }))) return "conflict";
+      return "applied";
     case "CONFIRM_AVAILABLE": {
       // "YES, still available" — keeps a live plot live, or brings back a plot that
       // was hidden for no reply / by the seller, or relists a sold one. Never overrides an admin hide.
       const reactivating = p.status === "HIDDEN" || p.status === "SOLD";
-      if (p.status !== "ACTIVE" && !reactivating) return;
-      if (p.status === "HIDDEN" && p.hiddenReason === "BY_ADMIN") return;
-      await db.property.update({
-        where: { id: p.id },
-        data: {
-          status: "ACTIVE",
-          hiddenReason: null,
-          soldAt: null,
-          lastConfirmedAt: now,
-          freshnessAt: now,
-          availabilityCheckSentAt: null,
-          ...(awaitingReply || p.hiddenReason === "AVAILABILITY_UNCONFIRMED" ? { availabilityResponseAt: now } : {}),
-        },
+      if (p.status !== "ACTIVE" && !reactivating) return "noop";
+      if (p.status === "HIDDEN" && p.hiddenReason === "BY_ADMIN") return "noop";
+      const ok = await write({
+        status: "ACTIVE",
+        hiddenReason: null,
+        soldAt: null,
+        lastConfirmedAt: now,
+        freshnessAt: now,
+        availabilityCheckSentAt: null,
+        ...(awaitingReply || p.hiddenReason === "AVAILABILITY_UNCONFIRMED" ? { availabilityResponseAt: now } : {}),
       });
+      if (!ok) return "conflict";
       await trackEvent(reactivating ? "property_reactivated" : "availability_yes", ev);
       if (reactivating && awaitingReply === false && p.hiddenReason === "AVAILABILITY_UNCONFIRMED") await trackEvent("availability_yes", ev);
       if (reactivating) await notify("LISTING_REACTIVATED");
-      return;
+      return "applied";
     }
-    case "MARK_SOLD":
-      if (p.status === "SOLD") return;
-      await db.property.update({
-        where: { id: p.id },
-        data: {
-          status: "SOLD",
-          soldAt: now,
-          hiddenReason: null,
-          availabilityCheckSentAt: null,
-          ...(awaitingReply ? { availabilityResponseAt: now } : {}),
-        },
+    case "MARK_SOLD": {
+      if (p.status === "SOLD") return "noop";
+      const ok = await write({
+        status: "SOLD",
+        soldAt: now,
+        hiddenReason: null,
+        availabilityCheckSentAt: null,
+        ...(awaitingReply ? { availabilityResponseAt: now } : {}),
       });
+      if (!ok) return "conflict";
       if (awaitingReply) await trackEvent("availability_no", ev);
       await trackEvent("property_sold", ev);
       await notify("MARKED_SOLD");
-      return;
+      return "applied";
+    }
   }
 }
 

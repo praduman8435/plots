@@ -325,7 +325,8 @@ model Property {
   @@index([status, price])
   @@index([status, areaSqft])
   @@index([status, publishedAt])
-  @@index([status, freshnessAt])
+  /// Default "Recommended" order (search, home, city pages): see the migration for NULLS LAST.
+  @@index([status, freshnessAt(sort: Desc), publishedAt(sort: Desc), id])
   @@index([status, availabilityCheckSentAt])
   @@index([sellerId, status])
   @@map("properties")

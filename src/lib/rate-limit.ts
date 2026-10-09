@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { log } from "@/lib/log";
 import { getTrustedClientIp } from "@/lib/request-ip";
 
 /**
@@ -68,7 +69,7 @@ export async function hitRateLimit(name: LimitName, subject: string, now = Date.
   } catch (err) {
     // Fail open: the limiter must never take the site down on its own. The
     // database is the same one every request needs, so this is rare.
-    console.error("rate-limit: counter unavailable", { name, err: err instanceof Error ? err.message : String(err) });
+    log("error", "rate_limit.unavailable", { policy: name, err });
     return { ok: true };
   }
 
@@ -78,6 +79,8 @@ export async function hitRateLimit(name: LimitName, subject: string, now = Date.
   }
 
   if (count <= limit) return { ok: true };
+  // Logged once per window (the first refusal), never with the subject (it may be an IP).
+  if (count === limit + 1) log("warn", "rate_limited", { policy: name });
   return { ok: false, retryAfterSeconds: Math.max(1, Math.ceil((windowStart.getTime() + windowMs - now) / 1000)) };
 }
 

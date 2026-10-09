@@ -1,4 +1,5 @@
 import { getAdminSession } from "@/lib/admin/session";
+import { log } from "@/lib/log";
 import { hitRateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { getSellerSession } from "@/lib/seller/session";
 import { MAX_UPLOAD_BYTES, UnsupportedImageError, isAllowedImageType, saveImage } from "@/server/storage";
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     return Response.json(image, { status: 201 });
   } catch (err) {
     if (err instanceof UnsupportedImageError) return Response.json({ error: err.message }, { status: 415 });
-    console.error("upload failed", { by: admin ? "admin" : "seller", err: err instanceof Error ? err.message : String(err) });
+    log("error", "upload.failed", { by: admin ? "admin" : "seller", err });
     return Response.json({ error: "Couldn't read this photo. Try another one." }, { status: 400 });
   }
 }

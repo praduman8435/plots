@@ -35,7 +35,9 @@ export async function sellerListingAction(propertyId: string, action: SellerActi
     UNHIDE: { type: "UNHIDE" },
   };
   // The seller is looking at the result on screen, so no WhatsApp echo.
-  await changeListingStatus(p.id, map[action], { notify: false, via: "dashboard" });
+  const result = await changeListingStatus(p.id, map[action], { notify: false, via: "dashboard" });
+  if (result === "conflict") return { ok: false, message: "This plot just changed. Refresh the page and try again." };
+  if (result === "seller_blocked") return { ok: false, message: "Your account is paused. Please contact us on WhatsApp." };
 
   revalidatePath("/seller/dashboard");
   revalidatePath(`/property/${p.slug}`);
@@ -97,12 +99,8 @@ export async function updateSellerListing(propertyId: string, payload: ListingFo
   const limited = await hitRateLimit("listingUpdatePerSeller", seller.id);
   if (!limited.ok) return { ok: false, message: "Too many edits in a short time. Please try again in a little while." };
 
-  await updateListing(p.id, parsed.data);
-  await db.$transaction([
-    db.propertyImage.deleteMany({ where: { propertyId: p.id } }),
-    db.propertyImage.createMany({ data: images.map((img, position) => ({ propertyId: p.id, url: img.url, width: img.width, height: img.height, position })) }),
-    db.property.update({ where: { id: p.id }, data: { status: "PENDING", hiddenReason: null, rejectionReason: null, availabilityCheckSentAt: null } }),
-  ]);
+  // Fields, photos and the move back to review land together (one transaction).
+  await updateListing(p.id, parsed.data, { city, images, backToReview: true });
 
   revalidatePath("/seller/dashboard");
   revalidatePath(`/property/${p.slug}`);

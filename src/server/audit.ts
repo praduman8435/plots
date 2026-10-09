@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { log } from "@/lib/log";
 
 export type AuditEntry = {
   action: string;
@@ -40,7 +41,7 @@ export async function recordAudit(admin: { id: string; email: string }, entry: A
       await db.report.updateMany({ where: { id: reportId, status: "PENDING" }, data: { status: "UNDER_REVIEW", assignedAdminId: admin.id } });
     }
   } catch (err) {
-    console.error("audit: failed to record", { action: entry.action, targetType: entry.targetType, err: err instanceof Error ? err.message : String(err) });
+    log("error", "audit.write_failed", { action: entry.action, targetType: entry.targetType, err });
   }
 }
 

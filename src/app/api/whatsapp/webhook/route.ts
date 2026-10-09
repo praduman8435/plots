@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { NextRequest } from "next/server";
-import { maskPhoneForLogging, normalizePhoneNumber } from "@/lib/phone";
+import { after, type NextRequest } from "next/server";
+import { log } from "@/lib/log";
+import { normalizePhoneNumber } from "@/lib/phone";
 import { processInbound, type InboundMessage } from "@/server/whatsapp/inbound";
 
 /**
@@ -10,8 +11,9 @@ import { processInbound, type InboundMessage } from "@/server/whatsapp/inbound";
  * POST — inbound messages. The raw body is authenticated with
  *        X-Hub-Signature-256 (HMAC-SHA256 with WHATSAPP_APP_SECRET), then each
  *        message is handed to the listing assistant. Delivery statuses are
- *        ignored. Always answers 200 once authenticated, so Meta doesn't
- *        retry messages we already stored (retries are de-duplicated anyway).
+ *        ignored. Answers 200 as soon as the signature checks out and does
+ *        the work after the response (`after`): Meta expects a quick reply
+ *        and retries slow ones; retries are de-duplicated by message id anyway.
  */
 
 export async function GET(request: NextRequest) {
@@ -36,7 +38,7 @@ export async function POST(request: Request) {
       return new Response("Invalid signature", { status: 401 });
     }
   } else if (process.env.NODE_ENV === "production") {
-    console.error("whatsapp-webhook: WHATSAPP_APP_SECRET is not set — rejecting unauthenticated webhook");
+    log("error", "whatsapp.webhook_not_configured");
     return new Response("Webhook not configured", { status: 401 });
   }
 
@@ -47,17 +49,16 @@ export async function POST(request: Request) {
     return new Response("Bad request", { status: 400 });
   }
 
-  for (const msg of parseWebhookPayload(payload)) {
-    try {
-      await processInbound(msg);
-    } catch (err) {
-      console.error("whatsapp-webhook: failed to process message", {
-        from: maskPhoneForLogging(msg.from),
-        kind: msg.kind,
-        err: err instanceof Error ? err.message : String(err),
-      });
+  const messages = parseWebhookPayload(payload);
+  if (messages.length) after(async () => {
+    for (const msg of messages) {
+      try {
+        await processInbound(msg);
+      } catch (err) {
+        log("error", "whatsapp.inbound_failed", { kind: msg.kind, err });
+      }
     }
-  }
+  });
   return Response.json({ ok: true });
 }
 

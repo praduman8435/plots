@@ -18,7 +18,8 @@
     "postinstall": "prisma generate",
     "check:profile": "tsx --conditions=react-server scripts/check-seller-profile.ts",
     "check:security": "tsx --conditions=react-server scripts/check-security.ts",
-    "check:http": "tsx --conditions=react-server scripts/check-http-security.ts"
+    "check:http": "tsx --conditions=react-server scripts/check-http-security.ts",
+    "check:integrity": "tsx --conditions=react-server scripts/check-integrity.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
