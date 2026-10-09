@@ -49,6 +49,10 @@ const nextConfig: NextConfig = {
   // Explicit: no public browser source maps in production builds.
   productionBrowserSourceMaps: false,
   images: {
+    // AVIF first (~30–50% smaller than WebP for photos), WebP for browsers without it.
+    formats: ["image/avif", "image/webp"],
+    // 75 for photos; 50 only for the dimmed hero background.
+    qualities: [50, 75],
     // Photos uploaded on Vercel live in Vercel Blob (see src/server/storage.ts).
     remotePatterns: [{ protocol: "https", hostname: "*.public.blob.vercel-storage.com", pathname: "/plots/**" }],
   },

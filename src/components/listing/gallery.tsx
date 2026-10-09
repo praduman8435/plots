@@ -39,14 +39,14 @@ export function Gallery({ images, title, overlay }: { images: Img[]; title: stri
         >
           {images.map((img, i) => (
             <button key={img.url + i} type="button" onClick={() => openAt(i)} className="relative h-full w-full shrink-0 snap-center" aria-label={`Open photo ${i + 1}`}>
-              <Image src={img.url} alt={`${title} — photo ${i + 1}`} fill priority={i === 0} sizes="100vw" className="object-cover" />
+              <Image src={img.url} alt={`${title} — photo ${i + 1}`} fill loading={i === 0 ? "eager" : "lazy"} fetchPriority={i === 0 ? "high" : "auto"} sizes="100vw" className="object-cover" />
             </button>
           ))}
         </div>
         {overlay}
         {images.length > 1 && (
           <>
-            <span className="absolute right-4 bottom-10 rounded-full bg-black/55 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
+            <span className="absolute right-4 bottom-10 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white">
               {index + 1} / {images.length}
             </span>
             <div className="absolute inset-x-0 bottom-10 flex justify-center gap-1.5">
@@ -67,7 +67,7 @@ export function Gallery({ images, title, overlay }: { images: Img[]; title: stri
             onClick={() => openAt(i)}
             className={cn("group relative overflow-hidden bg-mist", i === 0 ? "col-span-3 row-span-2" : "col-span-1 row-span-1", images.length === 1 && "col-span-4", images.length === 2 && i === 1 && "row-span-2")}
           >
-            <Image src={img.url} alt={`${title} — photo ${i + 1}`} fill priority={i === 0} sizes={i === 0 ? "60vw" : "20vw"} className="object-cover transition duration-500 group-hover:scale-[1.03]" />
+            <Image src={img.url} alt={`${title} — photo ${i + 1}`} fill loading="lazy" fetchPriority={i === 0 ? "high" : "auto"} sizes={i === 0 ? "60vw" : "20vw"} className="object-cover transition duration-500 group-hover:scale-[1.03]" />
           </button>
         ))}
         <button

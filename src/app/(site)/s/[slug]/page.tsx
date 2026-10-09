@@ -149,7 +149,7 @@ export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
             <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {profile.listings.map((p, i) => (
                 <li key={p.id} className="flex flex-col gap-2.5">
-                  <PropertyCard p={p} priority={i < 2} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" />
+                  <PropertyCard p={p} priority={i === 0 && profile.page === 1} sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" />
                   <ContactActions
                     variant="bar"
                     source="card"

@@ -2,6 +2,7 @@ import { ArrowRight, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { HeroSearch } from "@/components/site/hero-search";
+import { IntentLink } from "@/components/ui/intent-link";
 import { HowItWorksBoth, LandTypeTiles, ListingRail, SectionHeading, WhyUs } from "@/components/site/sections";
 import { ButtonLink } from "@/components/ui/button";
 import { getCitiesWithCounts, getLatestListings, getMarketStats } from "@/server/listings/queries";
@@ -24,7 +25,8 @@ export default async function HomePage() {
     <>
       {/* ───── Hero: search first ───── */}
       <section className="relative isolate overflow-hidden bg-brand-950">
-        <Image src="/demo/land-066.webp" alt="" fill priority sizes="100vw" className="-z-10 object-cover object-[50%_60%] opacity-60" />
+        {/* The LCP on phones. Dimmed to 60% behind text, so a lighter encode (q50) is visually identical. */}
+        <Image src="/demo/land-066.webp" alt="" fill preload fetchPriority="high" quality={50} sizes="100vw" className="-z-10 object-cover object-[50%_60%] opacity-60" />
         <div className="absolute inset-0 -z-10 bg-linear-to-b from-brand-950/70 via-brand-950/40 to-brand-950/80" />
         <div className="container-page pt-12 pb-10 sm:pt-24 sm:pb-20">
           <h1 className="max-w-2xl text-[2.4rem] leading-[1.05] font-extrabold text-white sm:text-6xl">Find the right land for you.</h1>
@@ -51,14 +53,14 @@ export default async function HomePage() {
         <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 sm:overflow-visible sm:px-0">
           {cities.map((c) => (
             <li key={c.id} className="w-[44%] shrink-0 snap-start sm:w-auto">
-              <Link href={`/${c.slug}`} className="group relative block aspect-[4/5] overflow-hidden rounded-3xl bg-mist sm:aspect-[4/3]">
+              <IntentLink href={`/${c.slug}`} className="group relative block aspect-[4/5] overflow-hidden rounded-3xl bg-mist sm:aspect-[4/3]">
                 <Image src={cityCover(c.slug)} alt="" fill sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 44vw" className="object-cover transition duration-500 group-hover:scale-[1.04]" />
                 <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4 text-white">
                   <p className="text-lg font-bold">{c.name}</p>
                   <p className="text-sm text-white/80">{c.live} {c.live === 1 ? "plot" : "plots"} available</p>
                 </div>
-              </Link>
+              </IntentLink>
             </li>
           ))}
         </ul>

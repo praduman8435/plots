@@ -1,5 +1,5 @@
 import { ArrowRight, BadgeCheck, CircleDollarSign, FileSearch, LocateFixed, MessageCircle, Search, ShieldCheck } from "lucide-react";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/intent-link";
 import { ButtonA, ButtonLink } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { LAND_TYPES, LAND_TYPE_SLUGS } from "@/lib/land";
@@ -40,7 +40,7 @@ export function LandTypeTiles({ counts, citySlug }: { counts: Partial<Record<Lan
         const count = counts[type] ?? 0;
         const href = citySlug ? `/${citySlug}/${LAND_TYPE_SLUGS[type]}` : `/search?type=${type}`;
         return (
-          <Link
+          <IntentLink
             key={type}
             href={href}
             className="group relative overflow-hidden rounded-3xl border border-line bg-white p-4 shadow-soft transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card sm:p-6"
@@ -53,7 +53,7 @@ export function LandTypeTiles({ counts, citySlug }: { counts: Partial<Record<Lan
               {count} {count === 1 ? "plot" : "plots"} available
             </p>
             <ArrowRight className="absolute top-5 right-5 size-4 text-faint transition group-hover:translate-x-0.5 group-hover:text-brand-600" aria-hidden />
-          </Link>
+          </IntentLink>
         );
       })}
     </div>
@@ -64,11 +64,10 @@ export function LandTypeTiles({ counts, citySlug }: { counts: Partial<Record<Lan
 export function ListingRail({ items }: { items: PropertyCardData[] }) {
   return (
     <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-4">
-      {items.map((p, i) => (
+      {items.map((p) => (
         <PropertyCard
           key={p.id}
           p={p}
-          priority={i < 2}
           className="w-[84%] shrink-0 snap-start sm:w-auto"
           sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 84vw"
         />

@@ -10,7 +10,7 @@ const nav = [
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-line/70 bg-white/85 backdrop-blur-xl supports-[backdrop-filter]:bg-white/75">
+    <header className="sticky top-0 z-40 border-b border-line/70 bg-white/95 md:bg-white/75 md:backdrop-blur-xl">
       <div className="container-page flex h-16 items-center justify-between gap-4 lg:h-[72px]">
         <Logo />
         <nav aria-label="Main" className="hidden items-center gap-1 md:flex">

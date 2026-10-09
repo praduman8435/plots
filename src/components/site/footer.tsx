@@ -1,6 +1,6 @@
 import { ShieldCheck } from "lucide-react";
-import Link from "next/link";
 import { WhatsAppIcon } from "@/components/ui/icons";
+import { IntentLink } from "@/components/ui/intent-link";
 import { Logo } from "@/components/ui/logo";
 import { LAND_TYPES } from "@/lib/land";
 import { getCitiesWithCounts } from "@/server/listings/queries";
@@ -51,9 +51,9 @@ export async function SiteFooter() {
                       {l.label}
                     </a>
                   ) : (
-                    <Link href={l.href} className="transition hover:text-white">
+                    <IntentLink href={l.href} className="transition hover:text-white">
                       {l.label}
-                    </Link>
+                    </IntentLink>
                   )}
                 </li>
               ))}

@@ -50,6 +50,7 @@
   --animate-fade-up: fade-up 0.5s var(--ease-out-soft) both;
   --animate-sheet-up: sheet-up 0.32s var(--ease-out-soft) both;
   --animate-fade-in: fade-in 0.2s ease-out both;
+  --animate-link-pending: link-pending 0.9s ease-in-out infinite;
 
   @keyframes fade-up {
     from { opacity: 0; transform: translateY(10px); }
@@ -62,6 +63,10 @@
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+  @keyframes link-pending {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(300%); }
   }
 }
 
@@ -85,6 +90,15 @@
 
   p {
     text-wrap: pretty;
+  }
+
+  /* No double-tap-to-zoom wait on controls: taps register immediately. */
+  a,
+  button,
+  label,
+  summary,
+  [role="button"] {
+    touch-action: manipulation;
   }
 
   ::selection {
@@ -114,6 +128,21 @@
   input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
+  }
+}
+
+/* Respect "reduce motion": no slide-ins, smooth scrolling or looping animations. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

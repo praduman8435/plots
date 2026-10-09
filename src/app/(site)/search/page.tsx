@@ -75,7 +75,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
     <div className="pb-24 md:pb-16">
       <SearchTracker query={queryKey} filtered={filtered} results={total} />
       {/* Search bar */}
-      <div className="sticky top-16 z-30 border-b border-line bg-white/95 backdrop-blur-xl lg:top-[72px]">
+      <div className="sticky top-16 z-30 border-b border-line bg-white/95 lg:top-[72px]">
         <div className="container-page flex items-center gap-2.5 py-3">
           <form action="/search" method="get" role="search" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full bg-mist px-4 ring-1 ring-line focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-400">
             {f.city && <input type="hidden" name="city" value={f.city} />}
@@ -168,7 +168,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
             <>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
                 {items.map((p, i) => (
-                  <PropertyCard key={p.id} p={p} priority={i < 2} sizes="(min-width: 1280px) 28vw, (min-width: 1024px) 36vw, (min-width: 640px) 50vw, 100vw" />
+                  <PropertyCard key={p.id} p={p} priority={i === 0} sizes="(min-width: 1280px) 28vw, (min-width: 1024px) 36vw, (min-width: 640px) 50vw, 100vw" />
                 ))}
               </div>
               {pages > 1 && (

@@ -1,6 +1,7 @@
 import { ArrowRight, MapPin } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { IntentLink } from "@/components/ui/intent-link";
+import { LinkPending } from "@/components/ui/link-pending";
 import { cn } from "@/lib/cn";
 import { formatPrice } from "@/lib/format";
 import { freshnessLabel } from "@/lib/freshness";
@@ -8,7 +9,12 @@ import { LAND_TYPES, placeName } from "@/lib/land";
 import { formatArea } from "@/lib/units";
 import type { PropertyCardData } from "@/server/listings/queries";
 
-/** Easy to scan: photo, price, size + type, place, freshness. One tap opens the property. */
+/**
+ * Easy to scan: photo, price, size + type, place, freshness. One tap opens the property.
+ * `priority`: the first card on a page — its photo is the likely LCP, so it is
+ * fetched eagerly at high priority (not preloaded: which card is "first on
+ * screen" depends on the viewport).
+ */
 export function PropertyCard({
   p,
   priority = false,
@@ -27,7 +33,7 @@ export function PropertyCard({
     <article className={cn("group relative flex flex-col overflow-hidden rounded-3xl bg-white ring-1 ring-line transition duration-300 hover:shadow-card", className)}>
       <div className="relative aspect-[4/3] overflow-hidden bg-mist">
         {cover ? (
-          <Image src={cover.url} alt="" fill sizes={sizes} priority={priority} className="object-cover transition duration-500 ease-out group-hover:scale-[1.03]" />
+          <Image src={cover.url} alt="" fill sizes={sizes} loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} className="object-cover transition duration-500 ease-out group-hover:scale-[1.03]" />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-faint">Photos coming soon</div>
         )}
@@ -37,9 +43,10 @@ export function PropertyCard({
       <div className="flex flex-1 flex-col p-4 sm:p-5">
         <p className="tabular text-[1.4rem] leading-none font-extrabold tracking-tight text-ink">{formatPrice(p.price)}</p>
         <h3 className="mt-2 text-[15px] font-semibold text-ink">
-          <Link href={`/property/${p.slug}`} className="after:absolute after:inset-0 focus-visible:outline-none">
+          <IntentLink href={`/property/${p.slug}`} className="after:absolute after:inset-0 focus-visible:outline-none">
             {formatArea(p.area, p.areaUnit)} · {LAND_TYPES[p.landType].label}
-          </Link>
+            <LinkPending className="absolute inset-x-0 top-0 z-10 h-[3px]" />
+          </IntentLink>
         </h3>
         <p className="mt-1 flex items-center gap-1 text-sm text-muted">
           <MapPin className="size-3.5 shrink-0" aria-hidden />

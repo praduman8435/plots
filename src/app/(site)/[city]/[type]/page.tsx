@@ -87,7 +87,7 @@ export default async function CityTypePage(props: PageProps<"/[city]/[type]">) {
           <>
             <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
               {listings.map((p, i) => (
-                <PropertyCard key={p.id} p={p} priority={i < 2} />
+                <PropertyCard key={p.id} p={p} priority={i === 0} />
               ))}
             </div>
             <div className="mt-8 flex justify-center">

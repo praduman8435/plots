@@ -3,6 +3,7 @@
 import { Home, Plus, Search, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { LinkPending } from "@/components/ui/link-pending";
 import { cn } from "@/lib/cn";
 
 const items = [
@@ -21,7 +22,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Main"
-      className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 backdrop-blur-xl md:hidden"
+      className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 md:hidden"
     >
       <ul className="mx-auto grid max-w-md grid-cols-4 px-2 pt-1.5">
         {items.map(({ href, label, icon: Icon, match, primary }) => {
@@ -32,7 +33,7 @@ export function BottomNav() {
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-xl py-1 text-[11px] font-semibold transition",
+                  "relative flex flex-col items-center gap-0.5 rounded-xl py-1 text-[11px] font-semibold transition",
                   active ? "text-brand-700" : "text-muted",
                 )}
               >
@@ -46,6 +47,7 @@ export function BottomNav() {
                   </span>
                 )}
                 {label}
+                <LinkPending className="absolute inset-x-4 -top-1.5 h-[2px]" />
               </Link>
             </li>
           );

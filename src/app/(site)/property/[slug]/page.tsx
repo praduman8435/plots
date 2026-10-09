@@ -272,7 +272,7 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
       )}
 
       {/* Mobile sticky contact bar — the main action is never hidden */}
-      <div className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 px-4 pt-3 shadow-[0_-8px_24px_-12px_rgb(14_26_20/0.18)] backdrop-blur-xl lg:hidden">
+      <div className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 px-4 pt-3 shadow-[0_-8px_24px_-12px_rgb(14_26_20/0.18)] lg:hidden">
         {available ? (
           <ContactActions variant="bar" source="detail" plot={plotRef} sellerPhone={p.seller.phone} sellerName={p.seller.name} />
         ) : (
