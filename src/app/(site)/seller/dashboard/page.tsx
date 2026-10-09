@@ -79,7 +79,7 @@ export default async function SellerDashboard() {
               <h1 className="truncate text-2xl font-extrabold sm:text-3xl lg:text-2xl">Welcome, {seller.name.split(" ")[0]}</h1>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/75">
                 <span className="inline-flex items-center gap-1"><BadgeCheck className="size-4 text-brand-200" aria-hidden /> Phone verified</span>
-                {seller.identityStatus === "VERIFIED" && <span className="inline-flex items-center gap-1"><Fingerprint className="size-4 text-brand-200" aria-hidden /> Identity verified</span>}
+                {seller.identityStatus === "VERIFIED" && <span className="inline-flex items-center gap-1"><Fingerprint className="size-4 text-brand-200" aria-hidden /> Aadhaar verified</span>}
               </p>
             </div>
             <form action={sellerSignOut}>
@@ -111,7 +111,7 @@ export default async function SellerDashboard() {
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700"><Fingerprint className="size-5" aria-hidden /></span>
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">Verify your identity — 2 minutes</span>
-              <span className="block text-sm text-muted">Buyers trust listings with ✓ Identity verified.</span>
+              <span className="block text-sm text-muted">Buyers trust listings with ✓ Aadhaar verified.</span>
             </span>
             <span className="text-sm font-semibold text-brand-700">Verify</span>
           </Link>

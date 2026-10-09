@@ -407,8 +407,8 @@ function catalog(lang: Lang) {
         : `नमस्ते ${first(String(v.name))} जी 🙏 आपका सेलर अकाउंट तैयार है।\n\nसेलर ID: *${v.code}*\n\nइससे अपनी ज़मीन जोड़ें और देखें: ${v.url}/seller\n\nWhatsApp से कभी भी ज़मीन लिस्ट करने के लिए बस *बेचना* लिखें।`,
     nVerifyIdentity: (v: Vars) =>
       en
-        ? `One small step, ${first(String(v.name))} ji: verify your identity so buyers see *✓ Identity verified* on your listings.\n\nIt takes 2 minutes, once. We never show your Aadhaar to anyone.\n\n${v.url}/seller/verify`
-        : `${first(String(v.name))} जी, एक छोटा-सा कदम: अपनी पहचान सत्यापित करें ताकि खरीदार आपकी लिस्टिंग पर *✓ पहचान सत्यापित* देखें।\n\nसिर्फ़ एक बार, 2 मिनट। आपका आधार हम किसी को नहीं दिखाते।\n\n${v.url}/seller/verify`,
+        ? `One small step, ${first(String(v.name))} ji: verify your identity so buyers see *✓ Aadhaar verified* on your listings.\n\nIt takes 2 minutes, once. We never show your Aadhaar to anyone.\n\n${v.url}/seller/verify`
+        : `${first(String(v.name))} जी, एक छोटा-सा कदम: अपनी पहचान सत्यापित करें ताकि खरीदार आपकी लिस्टिंग पर *✓ Aadhaar verified* देखें।\n\nसिर्फ़ एक बार, 2 मिनट। आपका आधार हम किसी को नहीं दिखाते।\n\n${v.url}/seller/verify`,
     nReceived: (v: Vars) =>
       en
         ? `✅ Your land has reached us.\n\n${v.plot}\n\nOur team will check it and message you when it's live — usually within a few hours.\n\nSeller ID: *${v.code}*`

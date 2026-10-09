@@ -93,7 +93,7 @@ export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
                   )}
                   {profile.identityVerified && (
                     <li className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-brand-800 ring-1 ring-brand-100">
-                      <Fingerprint className="size-3.5" aria-hidden /> Identity verified
+                      <Fingerprint className="size-3.5" aria-hidden /> Aadhaar verified
                     </li>
                   )}
                 </ul>

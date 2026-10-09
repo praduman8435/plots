@@ -40,7 +40,7 @@ export function ContactActions({
   plot: PlotRef;
   sellerPhone: string;
   sellerName: string;
-  variant: "bar" | "panel" | "icon";
+  variant: "bar" | "dock" | "panel" | "icon";
   source: "detail" | "card";
 }) {
   const [pending, setPending] = useState<Channel | null>(null);
@@ -84,6 +84,15 @@ export function ContactActions({
         >
           <WhatsAppIcon className="size-5" />
         </button>
+      ) : variant === "dock" ? (
+        <div className="flex shrink-0 gap-2">
+          <Button size="lg" variant="secondary" onClick={() => start("CALL")} className="size-12 px-0" aria-label={`Call ${sellerName}`}>
+            <Phone />
+          </Button>
+          <Button size="lg" onClick={() => start("WHATSAPP")} className="h-12 px-5">
+            <WhatsAppIcon /> WhatsApp
+          </Button>
+        </div>
       ) : variant === "bar" ? (
         <div className="flex gap-2">
           <Button size="lg" onClick={() => start("WHATSAPP")} className="h-12 flex-1 px-4 md:h-10 md:text-sm">

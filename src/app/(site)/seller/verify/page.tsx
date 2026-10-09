@@ -19,8 +19,8 @@ export default async function VerifyIdentityPage(props: PageProps<"/seller/verif
         {seller.identityStatus === "VERIFIED" ? (
           <div className="rounded-[1.75rem] bg-white p-8 text-center shadow-card ring-1 ring-line">
             <BadgeCheck className="mx-auto size-10 text-brand-600" aria-hidden />
-            <h1 className="mt-4 text-2xl font-extrabold">Identity verified</h1>
-            <p className="mt-2 text-muted">Buyers see ✓ Identity verified on your listings.</p>
+            <h1 className="mt-4 text-2xl font-extrabold">Aadhaar verified</h1>
+            <p className="mt-2 text-muted">Buyers see ✓ Aadhaar verified on your listings.</p>
             <ButtonLink href="/seller/dashboard" size="lg" className="mt-6">Back to my properties</ButtonLink>
           </div>
         ) : kyc ? (

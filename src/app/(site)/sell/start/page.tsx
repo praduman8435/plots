@@ -47,7 +47,7 @@ export default async function SellStartPage(props: PageProps<"/sell/start">) {
               {kyc ? (
                 <>
                   <p className="mt-2 text-[15px] text-muted">
-                    A one-time check with your Aadhaar through {kyc.label}. Buyers then see <strong className="text-ink">✓ Identity verified</strong> on your listings.
+                    A one-time check with your Aadhaar through {kyc.label}. Buyers then see <strong className="text-ink">✓ Aadhaar verified</strong> on your listings.
                   </p>
                   <ul className="mt-5 space-y-2.5 text-sm text-ink-soft">
                     <li className="flex gap-2.5"><Lock className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden /> We never store your Aadhaar number.</li>
@@ -92,7 +92,7 @@ export default async function SellStartPage(props: PageProps<"/sell/start">) {
                 </div>
                 <p className="mt-3 text-sm text-white/75">
                   {seller.name}
-                  {seller.identityStatus === "VERIFIED" ? " · Identity verified ✓" : " · Phone verified ✓"}
+                  {seller.identityStatus === "VERIFIED" ? " · Aadhaar verified ✓" : " · Phone verified ✓"}
                 </p>
               </div>
               <ButtonLink href="/seller/plots/new" size="xl" className="mt-7 w-full">

@@ -23,7 +23,6 @@ export const cardSelect = {
   lastConfirmedAt: true,
   createdAt: true,
   status: true,
-  description: true,
   city: { select: { name: true, slug: true } },
   seller: { select: { name: true, sellerType: true, phone: true, phoneVerifiedAt: true } },
   images: { select: { url: true, width: true, height: true }, orderBy: { position: "asc" }, take: 1 },

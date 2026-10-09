@@ -9,7 +9,7 @@ export const site = {
   supportPhone: process.env.NEXT_PUBLIC_SUPPORT_PHONE ?? "+919999999999",
   /** Shown on every detail page. We verify the seller's phone — never ownership. */
   disclaimer:
-    "InstaPlots verifies every seller's phone number, and their identity with Aadhaar wherever you see ✓ Identity verified. We don't check land ownership or documents — always verify papers (khatauni, registry) before paying anything.",
+    "InstaPlots verifies every seller's phone number, and their identity with Aadhaar wherever you see ✓ Aadhaar verified. We don't check land ownership or documents — always verify papers (khatauni, registry) before paying anything.",
 } as const;
 
 /** Top-level paths a City.slug must never take, since /[city] sits at the root. */

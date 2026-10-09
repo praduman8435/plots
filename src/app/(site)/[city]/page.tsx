@@ -75,7 +75,7 @@ export default async function CityPage(props: PageProps<"/[city]">) {
     },
     {
       q: "Is the land verified?",
-      a: "We verify the seller's phone number, and identity where you see “Identity verified”. We don't check the land's legal papers — visit the land and verify ownership and documents before paying.",
+      a: "We verify the seller's phone number, and identity where you see “Aadhaar verified”. We don't check the land's legal papers — visit the land and verify ownership and documents before paying.",
     },
   ].filter(Boolean) as { q: string; a: string }[];
 

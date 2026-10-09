@@ -11,7 +11,7 @@ export function IdentityCard({ next, providerLabel, failed, title = "Verify your
       </span>
       <h1 className="mt-5 text-2xl leading-tight font-extrabold sm:text-3xl">{title}</h1>
       <p className="mt-2 text-[15px] text-muted">
-        A quick Aadhaar check through {providerLabel}. Buyers then see <strong className="text-ink">✓ Identity verified</strong> on all your listings. You won&apos;t be asked again.
+        A quick Aadhaar check through {providerLabel}. Buyers then see <strong className="text-ink">✓ Aadhaar verified</strong> on all your listings. You won&apos;t be asked again.
       </p>
       {failed && (
         <p role="alert" className="mt-4 flex items-start gap-2 rounded-2xl bg-red-50 p-3.5 text-sm text-red-800 ring-1 ring-red-100">
