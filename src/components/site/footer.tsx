@@ -79,7 +79,6 @@ export async function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="container-page flex flex-col gap-1 py-5 text-xs text-white/45 sm:flex-row sm:justify-between md:pb-5">
           <p>© {new Date().getFullYear()} {site.name}. Made for India&apos;s land buyers.</p>
-          <p>Seed photos: Wikimedia Commons contributors (CC licences)</p>
         </div>
       </div>
     </footer>

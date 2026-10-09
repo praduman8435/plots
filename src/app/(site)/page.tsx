@@ -29,9 +29,9 @@ export default async function HomePage() {
         <Image src="/demo/land-066.webp" alt="" fill preload fetchPriority="high" quality={50} sizes="100vw" className="-z-10 object-cover object-[50%_60%] opacity-60" />
         <div className="absolute inset-0 -z-10 bg-linear-to-b from-brand-950/70 via-brand-950/40 to-brand-950/80" />
         <div className="container-page pt-12 pb-10 sm:pt-16 sm:pb-14 lg:pt-20 lg:pb-16">
-          <h1 className="max-w-2xl text-[2.4rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">The right land, straight from the seller.</h1>
+          <h1 className="max-w-2xl text-[2.4rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">Your piece of land is waiting.</h1>
           <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
-            Farmland, house plots and shop land near you — with real photos and honest prices. When you find the one, call or WhatsApp the seller directly. No login, no fee.
+            Farmland, house plots and shop land near you, with real photos and the real price. Like one? Call or WhatsApp the seller. No login, no fee.
           </p>
           <div className="mt-7 max-w-4xl sm:mt-8 lg:max-w-[52rem]">
             <HeroSearch />
