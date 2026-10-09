@@ -13,7 +13,7 @@ import "server-only";
  *   AI_BASE_URL=…         (only for "compatible", or to override; empty or "default" = provider's URL)
  *   AI_TIMEOUT_MS=8000
  *   AI_MAX_CALLS_PER_DAY=500            (all chats together)
- *   AI_MAX_CALLS_PER_CHAT_PER_DAY=25    (one seller)
+ *   AI_MAX_CALLS_PER_CHAT_PER_DAY=60    (one seller)
  */
 export type AiProvider = "openai" | "anthropic" | "xai" | "gemini" | "groq" | "openrouter" | "compatible";
 
@@ -69,7 +69,7 @@ export function getAiConfig(env: Record<string, string | undefined> = process.en
     baseUrl,
     timeoutMs: int(env.AI_TIMEOUT_MS, 8000),
     maxPerDay: int(env.AI_MAX_CALLS_PER_DAY, 500),
-    maxPerChatPerDay: int(env.AI_MAX_CALLS_PER_CHAT_PER_DAY, 25),
+    maxPerChatPerDay: int(env.AI_MAX_CALLS_PER_CHAT_PER_DAY, 60),
   };
 }
 

@@ -17,6 +17,7 @@ import {
   parseSellerType,
   parseUnit,
   looksLikePerUnitPrice,
+  looksLikeQuestion,
   parseAvailabilityReply,
   parseListNumber,
 } from "../src/server/whatsapp/parse";
@@ -305,6 +306,15 @@ check("parseName(Ramesh Yadav)", parseName("Ramesh Yadav"), "Ramesh Yadav");
 check("parseName(मेरा नाम सुरेश है)", parseName("मेरा नाम सुरेश है"), "सुरेश");
 check("parseName(9876543210)", parseName("9876543210"), null);
 check("parseName(x)", parseName("x"), null);
+check("parseName(kya bhai)", parseName("kya bhai"), null);
+check("parseName(who are you)", parseName("who are you"), null);
+check("parseName(कौन हो आप)", parseName("कौन हो आप"), null);
+check("parseName(Ramesh ji?)", parseName("Ramesh ji?"), null);
+check("parseName(Asha Devi)", parseName("Asha Devi"), "Asha Devi");
+check("looksLikeQuestion(who are you)", looksLikeQuestion("who are you"), true);
+check("looksLikeQuestion(kaise kaam karta hai)", looksLikeQuestion("kaise kaam karta hai"), true);
+check("looksLikeQuestion(Rampur, near school)", looksLikeQuestion("Rampur, near school"), false);
+check("looksLikeQuestion(Kabirpur)", looksLikeQuestion("Kabirpur"), false);
 
 // ── Language + Hindi phrases ──
 const languageCases: [string, "en" | "hi" | null][] = [

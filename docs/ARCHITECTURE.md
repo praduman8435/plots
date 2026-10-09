@@ -171,9 +171,11 @@ Shared caches only hold pages without per-visitor content. Contact, report and v
 
 - **Language.** A new chat starts with "English / हिंदी" (stored on `whatsapp_conversations.language`); *LANGUAGE* / *भाषा* switches anytime. Every message, including notifications, comes from `src/server/whatsapp/copy.ts` in the seller's language. Hindi replies ("हाँ", "नहीं 2", "२ बीघा", "18 लाख", state names in Devanagari) are understood. A city typed in Hindi is matched to its English name via OpenStreetMap, so it never creates a duplicate city. Older chats continue in English.
 - **Sellers only.** The assistant no longer asks owner vs broker; everyone is a seller (the stored field stays for older records).
-- **Optional AI** (`src/server/ai`). Off unless `AI_ENABLED=true` and a real `AI_API_KEY` exist. Providers: OpenAI, Anthropic Claude, xAI Grok, Gemini (OpenAI endpoint), Groq, OpenRouter, or any OpenAI-compatible URL, all through plain `fetch`. It is used only where the fixed parser didn't understand:
-  1. *Extraction.* Listing details are pulled out of free-form messages ("2 bigha khet Azamgarh 18 lakh"). The details are validated like typed answers, and questions already answered are skipped.
-  2. *Reply.* A short, respectful answer in the seller's language, followed by the same question again.
+- **Optional AI agent** (`src/server/ai`). Off unless `AI_ENABLED=true` and a real `AI_API_KEY` exist. Providers: OpenAI, Anthropic Claude, xAI Grok, Gemini (OpenAI endpoint), Groq, OpenRouter, or any OpenAI-compatible URL, all through plain `fetch`. When on, the AI reads typed messages first (`aiAgent` in `bot.ts`) with the current question, what's known so far and the last 10 messages, and returns an intent, listing details and a short reply:
+  1. *Intents.* answer, correction, yes/no, question, small talk, sell, buy, status, sold, talk to a person, stop. The bot maps each to its own safe steps (save the answer, update an earlier answer, tap-equivalent buttons, start a pre-filled listing, show status, hand over, link buyers to the right city page, ask before stopping).
+  2. *Details.* Pulled out of free-form messages ("2 bigha khet Azamgarh 18 lakh") and validated like typed answers; questions already answered are skipped.
+  3. *Reply.* A short, respectful reply in the language the seller writes in (Hinglish stays Hinglish), followed by the open question.
+  - Short plain answers on structured questions ("2 bigha", "18 lakh", "done") skip the AI; free-text questions (name, city, village, description) and anything with "?" or more than 4 words go to it. Without AI, "kya bhai" / "who are you" are still rejected as a name or village.
 - **AI guardrails:**
   - It can't take actions; listings are still reviewed by our team.
   - Phone and Aadhaar-like numbers are masked before sending, and only links to our own site are kept in replies.

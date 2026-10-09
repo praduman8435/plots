@@ -154,38 +154,63 @@ async function main() {
   check("AI: JSON found inside prose/code fences", JSON.stringify(firstJsonObject('Sure! ```json\n{"area": 2}\n```')) === '{"area":2}');
   check("AI: Aadhaar-like and phone numbers redacted", !/1234|98765/.test(redact("aadhaar 1234 5678 9012, phone +91 98765 43210")));
 
-  // ── Optional AI (mocked provider) ──
+  // ── Optional AI agent (mocked provider) ──
   const realFetch = globalThis.fetch;
   const sent: string[] = [];
-  let mode: "extract" | "reply" | "fail" = "extract";
+  let mode: "ok" | "fail" = "ok";
+  // The mock "understands" a few messages; anything else is unclear with no reply.
+  const said = (prompt: string) => /Seller's latest message: "([\s\S]*)"$/.exec(prompt)?.[1] ?? "";
+  const understand = (msg: string): Record<string, unknown> => {
+    if (/2 bigha khet in Sathiyaon/.test(msg))
+      return { intent: "sell", fields: { landType: "AGRICULTURAL", area: 2, unit: "BIGHA", priceRupees: 1800000, city: city.name, state: city.state, locality: "Sathiyaon" }, reply: "Bahut badhiya ji!" };
+    if (/^kya bhai$/.test(msg)) return { intent: "chat", reply: "Haan ji, boliye! Main aapki zameen list karne mein madad karta hoon." };
+    if (/^who are you\??$/.test(msg)) return { intent: "question", reply: "I'm the InstaPlots assistant, here to help you list your land." };
+    if (/^Suresh Kumar$/.test(msg)) return { intent: "answer", fields: { name: "Suresh Kumar" } };
+    if (/price 20 lakh kar do/.test(msg)) return { intent: "correction", fields: { priceRupees: 2000000 }, reply: "Theek hai ji." };
+    if (/abhi photo nahi hai mere paas/.test(msg)) return { intent: "no" };
+    if (/mujhe .* khet chahiye/.test(msg)) return { intent: "buy", fields: { city: city.name, landType: "AGRICULTURAL" }, reply: "Ji zaroor!" };
+    if (/rehne do, nahi bechna/.test(msg)) return { intent: "stop", reply: "Koi baat nahi ji." };
+    if (/how much should I ask/.test(msg)) return { intent: "question", reply: "Ji, aap total keemat likhiye — jaise 18 lakh." };
+    return { intent: "unclear" };
+  };
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (!url.startsWith("https://ai.test/")) return realFetch(input, init);
     const body = JSON.parse(String(init?.body ?? "{}"));
     sent.push(JSON.stringify(body));
     if (mode === "fail") throw new TypeError("network down");
-    const system = String(body.messages?.[0]?.content ?? "");
-    const isExtract = system.startsWith("You extract");
-    const content = isExtract
-      ? mode === "extract"
-        ? JSON.stringify({ landType: "AGRICULTURAL", area: 2, unit: "BIGHA", priceRupees: 1800000, city: city.name, state: city.state, locality: "Sathiyaon" })
-        : "{}"
-      : "Ji, aap total keemat likhiye — jaise 18 lakh.";
+    const content = JSON.stringify(understand(said(String(body.messages?.[1]?.content ?? ""))));
     return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200, headers: { "content-type": "application/json" } });
   }) as typeof fetch;
   Object.assign(process.env, { AI_ENABLED: "true", AI_PROVIDER: "compatible", AI_BASE_URL: "https://ai.test/v1", AI_MODEL: "test-model", AI_API_KEY: "test-key-0123456789abcdefghij" });
+  const draftOf = async (phone: string) => (await db.whatsAppConversation.findUnique({ where: { phone } }))?.draft as Record<string, unknown> | null;
   try {
     const ai = newPhone();
     await tap(ai, "lang:en");
     r = await text(ai, "I have 2 bigha khet in Sathiyaon, call me on 9876543210, price 18 lakh");
-    check("AI: free-text listing starts a pre-filled listing", /Noted/.test(r.body) && (await step(ai)) === "ASK_NAME", { step: await step(ai), body: r.body.slice(0, 200) });
-    check("AI: phone number redacted before leaving the server", sent.length > 0 && sent.every((s) => !s.includes("9876543210")), sent[0]?.slice(0, 200));
+    check("Agent: land described while idle starts a pre-filled listing", /Bahut badhiya/.test(r.body) && /Noted/.test(r.body) && (await step(ai)) === "ASK_NAME", { step: await step(ai), body: r.body.slice(0, 200) });
+    check("Agent: phone number redacted before leaving the server", sent.length > 0 && sent.every((s) => !s.includes("9876543210")), sent[0]?.slice(0, 200));
+    check("Agent: sees the recent chat", /Recent chat/.test(sent.at(-1) ?? ""));
+    r = await text(ai, "kya bhai");
+    check("Agent: small talk gets a human reply, not taken as a name", /Haan ji, boliye/.test(r.body) && (await step(ai)) === "ASK_NAME" && !(await draftOf(ai))?.name, r.body.slice(0, 200));
     r = await text(ai, "Suresh Kumar");
-    check("AI: answered questions are skipped → straight to photos", (await step(ai)) === "ASK_PHOTOS", { step: await step(ai), body: r.body.slice(0, 160) });
-    const draft = (await db.whatsAppConversation.findUnique({ where: { phone: ai } }))?.draft as Record<string, unknown>;
-    check("AI: extracted values validated into the draft", draft?.landType === "AGRICULTURAL" && draft?.area === 2 && draft?.price === 1800000 && draft?.cityId === city.id, draft);
+    check("Agent: name understood, answered questions skipped → photos", (await step(ai)) === "ASK_PHOTOS" && /Suresh/.test(r.body), { step: await step(ai), body: r.body.slice(0, 160) });
+    const d1 = await draftOf(ai);
+    check("Agent: extracted values validated into the draft", d1?.landType === "AGRICULTURAL" && d1?.area === 2 && d1?.price === 1800000 && d1?.cityId === city.id && d1?.name === "Suresh Kumar", d1);
+    r = await text(ai, "who are you?");
+    check("Agent: a question is answered, then the open question again", /InstaPlots assistant/.test(r.body) && /photos/i.test(r.body) && (await step(ai)) === "ASK_PHOTOS", r.body.slice(0, 200));
+    r = await text(ai, "price 20 lakh kar do please, galti ho gayi");
+    check("Agent: a correction updates an earlier answer", (await draftOf(ai))?.price === 2000000 && /Noted/.test(r.body) && (await step(ai)) === "ASK_PHOTOS", r.body.slice(0, 200));
+    r = await text(ai, "abhi photo nahi hai mere paas");
+    check("Agent: 'no' in words skips photos like the button", (await step(ai)) === "ASK_LOCATION", { step: await step(ai), body: r.body.slice(0, 160) });
+    r = await text(ai, "rehne do, nahi bechna abhi");
+    check("Agent: stopping asks first", /stop this listing/i.test(r.body) && (await step(ai)) === "ASK_LOCATION", r.body.slice(0, 160));
 
-    mode = "reply";
+    const buyer = newPhone();
+    await tap(buyer, "lang:en");
+    r = await text(buyer, `mujhe ${city.name} mein khet chahiye`);
+    check("Agent: a buyer gets the right page", r.body.includes(`/${city.slug}/agricultural-land`) && /Ji zaroor/.test(r.body), r.body.slice(0, 200));
+
     const ai2 = newPhone();
     await tap(ai2, "lang:en");
     await text(ai2, "SELL");
@@ -193,19 +218,28 @@ async function main() {
     await tap(ai2, "type:AGRICULTURAL");
     await tap(ai2, `state:${city.state}`);
     await tap(ai2, `city:${city.id}`);
+    r = await text(ai2, "who are you");
+    check("Agent: 'who are you' is not taken as the village", /InstaPlots assistant/.test(r.body) && (await step(ai2)) === "ASK_LOCALITY" && !(await draftOf(ai2))?.locality, r.body.slice(0, 200));
     await text(ai2, "Rampur");
+    const calls = sent.length;
     await text(ai2, "2 bigha");
+    check("Agent: short plain answers skip the AI", sent.length === calls && (await step(ai2)) === "ASK_PRICE");
     r = await text(ai2, "how much should I ask?");
-    check("AI: unclear answer gets a helpful reply, then the question again", /total keemat/.test(r.body) && /asking price/i.test(r.body) && (await step(ai2)) === "ASK_PRICE", r.body.slice(0, 200));
+    check("Agent: unclear answer gets a helpful reply, then the question again", /total keemat/.test(r.body) && /asking price/i.test(r.body) && (await step(ai2)) === "ASK_PRICE", r.body.slice(0, 200));
 
     mode = "fail";
     r = await text(ai2, "what do you think?");
-    check("AI: provider failure → normal fixed reply", /didn't get the price/i.test(r.body) && (await step(ai2)) === "ASK_PRICE", r.body.slice(0, 160));
+    check("Agent: provider failure → normal fixed reply", /didn't get the price/i.test(r.body) && (await step(ai2)) === "ASK_PRICE", r.body.slice(0, 160));
 
     process.env.AI_ENABLED = "false";
     sent.length = 0;
     r = await text(ai2, "hmm not sure");
     check("AI off → no provider call, fixed reply", sent.length === 0 && /didn't get the price/i.test(r.body));
+    const plain = newPhone();
+    await tap(plain, "lang:en");
+    await text(plain, "SELL");
+    r = await text(plain, "kya bhai");
+    check("AI off: 'kya bhai' is not accepted as a name", (await step(plain)) === "ASK_NAME", r.body.slice(0, 160));
   } finally {
     globalThis.fetch = realFetch;
     for (const k of ["AI_ENABLED", "AI_PROVIDER", "AI_BASE_URL", "AI_MODEL", "AI_API_KEY"]) delete process.env[k];

@@ -4,8 +4,8 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
 
 /**
- * Shows an approximate area (≈500 m circle), never an exact pin: brokers
- * and owners keep control of the exact plot until they've talked to a buyer.
+ * Shows an approximate area (≈500 m circle), never an exact pin: sellers
+ * keep control of the exact plot until they've talked to a buyer.
  * The circle centre is shifted by a stable, per-plot offset so the real
  * point can't be read from the circle's middle.
  *
@@ -29,12 +29,14 @@ export function ApproxMap({ lat, lng, seed, label }: { lat: number; lng: number;
         zoom: 14,
         scrollWheelZoom: false,
         dragging: !L.Browser.mobile,
-        zoomControl: true,
+        zoomControl: false,
         attributionControl: true,
       });
+      // No "Leaflet" prefix; OpenStreetMap's credit stays (their tile policy requires it), kept small in globals.css.
+      map.attributionControl.setPrefix(false);
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 17,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        attribution: '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a>',
       }).addTo(map);
       L.circle(center, { radius: 550, color: "#0b7d4c", weight: 2, fillColor: "#16975d", fillOpacity: 0.16 }).addTo(map);
     });

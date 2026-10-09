@@ -394,6 +394,10 @@ function catalog(lang: Lang) {
     photoReceived: (v: Vars) => (en ? `✅ Photo ${v.n} received. Send more, or tap *Done*.` : `✅ फ़ोटो ${v.n} मिल गई। और भेजें, या *हो गया* दबाएँ।`),
     oneMoreThing: en ? "One more thing before we send it:" : "भेजने से पहले एक और बात:",
     understood: (v: Vars) => (en ? `👍 Noted: ${v.items}` : `👍 समझ गया: ${v.items}`),
+    stopConfirm: en ? "Do you want to stop this listing? What you've filled so far will be cleared." : "क्या आप यह लिस्टिंग रोकना चाहते हैं? अब तक भरी जानकारी हट जाएगी।",
+    btnStop: en ? "Yes, stop" : "हाँ, रोकें",
+    btnKeepGoing: en ? "Continue" : "जारी रखें",
+    browseLand: (v: Vars) => (en ? `👉 See land for sale here: ${v.url}` : `👉 बिकाऊ ज़मीन यहाँ देखें: ${v.url}`),
     needsFixing: (v: Vars) => (en ? `⚠️ One thing needs fixing: ${v.issue}.` : `⚠️ एक चीज़ ठीक करनी है: ${v.issue}।`),
     submitted: (v: Vars) =>
       en

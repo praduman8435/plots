@@ -4,13 +4,13 @@ import { Prisma, type Seller, type WhatsAppConversation } from "@/generated/pris
 import { AreaUnit, LandType, type ListingStatus, type HiddenReason, type SellerType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { matchState, splitCityAndState } from "@/lib/india";
-import { LAND_TYPES, buildTitle, placeName } from "@/lib/land";
+import { LAND_TYPES, LAND_TYPE_SLUGS, buildTitle, placeName } from "@/lib/land";
 import { maskPhoneForLogging } from "@/lib/phone";
 import { site } from "@/lib/site";
 import { formatArea, formatSqftHint, toSqft } from "@/lib/units";
 import { listingInputSchema, type ListingInput } from "@/lib/validation/listing";
 import { trackEvent } from "@/server/analytics";
-import { extractListing, replyToSeller, type ExtractedListing } from "@/server/ai/assistant";
+import { understandMessage, type ExtractedListing } from "@/server/ai/assistant";
 import { isAiEnabled } from "@/server/ai/config";
 import { CITY_NAME_PATTERN, englishPlaceName, isDevanagari, resolveCity } from "@/server/cities";
 import { isKycAvailable } from "@/server/kyc/provider";
@@ -36,6 +36,7 @@ import {
   parseNumber,
   parsePrice,
   parseUnit,
+  looksLikeQuestion,
   type BotCommand,
 } from "./parse";
 
@@ -53,7 +54,9 @@ import {
  *
  * Steps whose answer is already in the draft are skipped, so a seller who
  * writes "2 bigha khet Azamgarh 18 lakh" (understood by the optional AI,
- * src/server/ai) isn't asked again. Known sellers skip ASK_NAME. HUMAN means a person from
+ * src/server/ai) isn't asked again. With AI on, typed messages are read by
+ * the AI first (see aiAgent): it tells answers from questions, small talk,
+ * corrections and requests, and replies like a person before the next question. Known sellers skip ASK_NAME. HUMAN means a person from
  * our team is chatting; the bot stays silent until the seller sends MENU.
  * The step lives in WhatsAppConversation.step and partial answers in .draft.
  *
@@ -224,6 +227,8 @@ class Turn {
   seller: Seller | null;
   /** Set when this turn ended with a question for the seller (so we don't repeat the listing question over it). */
   asked = false;
+  /** The AI already read this message (it runs at most once per turn). */
+  agentTried = false;
   lang: Lang;
 
   constructor(
@@ -1071,31 +1076,37 @@ function sqftHintFor(area: number, unit: AreaUnit): string {
  * answered, and only values that pass the same checks as typed answers.
  * Returns the new draft and what was understood (for "👍 Noted: …").
  */
-async function mergeExtracted(t: Turn, ex: ExtractedListing): Promise<{ draft: BotDraft; items: string[] }> {
+async function mergeExtracted(t: Turn, ex: ExtractedListing, override = false): Promise<{ draft: BotDraft; items: string[] }> {
   const d: BotDraft = { ...t.draft };
   const items: string[] = [];
-  if (!d.name && !t.seller && ex.name) {
+  /** Fill empty answers; a correction may also replace given ones. */
+  const take = (has: unknown) => override || !has;
+  if (take(d.name) && !t.seller && ex.name) {
     const name = parseName(ex.name);
     if (name) d.name = name;
   }
-  if (!d.landType && ex.landType && Object.hasOwn(LAND_TYPES, ex.landType)) {
+  if (take(d.landType) && ex.landType && Object.hasOwn(LAND_TYPES, ex.landType) && ex.landType !== d.landType) {
     d.landType = ex.landType as LandType;
     items.push(landLabel(t.lang, d.landType));
   }
-  if (!(d.area && d.areaUnit) && ex.area && ex.unit && (Object.values(AreaUnit) as string[]).includes(ex.unit)) {
+  if (take(d.area && d.areaUnit) && ex.area && ex.unit && (Object.values(AreaUnit) as string[]).includes(ex.unit) && (ex.area !== d.area || ex.unit !== d.areaUnit)) {
     d.area = ex.area;
     d.areaUnit = ex.unit as AreaUnit;
     items.push(areaText(t.lang, d.area, d.areaUnit));
   }
-  if (!d.price && ex.priceRupees) {
+  if (take(d.price) && ex.priceRupees && ex.priceRupees !== d.price) {
     d.price = ex.priceRupees;
     items.push(priceText(t.lang, d.price));
   }
-  if (!d.cityState && ex.state) {
+  if (ex.state && take(d.cityState)) {
     const state = matchState(ex.state);
-    if (state) d.cityState = state;
+    if (state && state !== d.cityState) {
+      // A different state makes the old city wrong.
+      if (d.cityState) Object.assign(d, { cityId: undefined, cityName: undefined });
+      d.cityState = state;
+    }
   }
-  if (!d.cityId && ex.city) {
+  if (take(d.cityId) && ex.city) {
     const { name } = splitCityAndState(cleanFreeText(ex.city, 60));
     if (CITY_NAME_PATTERN.test(name) && !isDevanagari(name)) {
       const city = await resolveCity({ cityName: name, state: d.cityState }).catch(() => null);
@@ -1106,7 +1117,7 @@ async function mergeExtracted(t: Turn, ex: ExtractedListing): Promise<{ draft: B
       }
     }
   }
-  if (!d.locality && ex.locality && /\p{L}/u.test(ex.locality)) {
+  if (take(d.locality) && ex.locality && /\p{L}/u.test(ex.locality) && cleanFreeText(ex.locality, 120) !== d.locality) {
     d.locality = cleanFreeText(ex.locality, 120);
     d.village = villageFrom(d.locality);
   }
@@ -1115,49 +1126,191 @@ async function mergeExtracted(t: Turn, ex: ExtractedListing): Promise<{ draft: B
   return { draft: d, items };
 }
 
-/**
- * When the fixed parser didn't understand a message (and AI is switched on):
- * first try to pull listing details out of it; if that fills the current
- * question, move on. Otherwise send a short, kind AI reply and ask again.
- * Returns false when AI is off or had nothing useful — the caller then sends
- * its normal fixed reply.
- */
-async function aiAssist(t: Turn, text: string | undefined): Promise<boolean> {
-  if (!text || !isAiEnabled()) return false;
-  const chatKey = t.conv.id;
-  if (isInFlow(t.step) && t.step !== "SUBMITTING" && t.step !== "CONFIRM") {
-    const ex = await extractListing(text, chatKey);
-    if (ex) {
-      const { draft, items } = await mergeExtracted(t, ex);
-      if (answered(t.step, draft)) {
-        return advance(t, t.step, draft, items.length ? t.c.understood({ items: items.join(" · ") }) : undefined).then(() => true);
-      }
-      if (items.length) await t.save(t.step, draft);
-    }
-  }
-  const reply = await replyToSeller({ lang: t.lang, text, question: isInFlow(t.step) ? questionText(t) : null, chatKey });
-  if (!reply) return false;
-  if (isInFlow(t.step)) await reprompt(t, reply);
-  else await sendMenu(t, reply);
-  return true;
+/** Steps where almost any text could pass as an answer, so the AI reads it first. */
+const READ_FIRST: ReadonlySet<BotStep> = new Set<BotStep>(["IDLE", "ASK_NAME", "ASK_CITY", "ASK_LOCALITY", "ASK_DESCRIPTION"]);
+
+/** Elsewhere a short, plain answer ("2 bigha", "18 lakh", "done") goes straight to the parser — faster and free. */
+function readFirst(step: BotStep, text: string): boolean {
+  return READ_FIRST.has(step) || text.includes("?") || text.trim().split(/\s+/).length > 4;
 }
 
-/** Idle and not a command: a seller describing their land starts a pre-filled listing; anything else gets a helpful reply. */
-async function aiIdle(t: Turn, text: string | undefined): Promise<boolean> {
-  if (!text || !isAiEnabled() || text.length < 8) return false;
-  const ex = await extractListing(text, t.conv.id);
-  if (ex) {
-    const listingFields = [ex.landType, ex.area, ex.priceRupees, ex.city, ex.locality].filter((v) => v !== undefined).length;
-    if (listingFields >= 2) {
+/** The last few messages before this one, oldest first, so the AI follows the conversation. */
+async function recentHistory(t: Turn): Promise<{ from: "seller" | "assistant"; text: string }[]> {
+  const rows = await db.whatsAppMessage.findMany({
+    where: { conversationId: t.conv.id },
+    orderBy: { createdAt: "desc" },
+    take: 11,
+    select: { direction: true, body: true, type: true },
+  });
+  if (rows[0]?.direction === "INBOUND") rows.shift(); // the message we're answering now
+  return rows
+    .slice(0, 10)
+    .reverse()
+    .map((m) => ({ from: m.direction === "INBOUND" ? ("seller" as const) : ("assistant" as const), text: m.body?.trim() || `[${m.type}]` }));
+}
+
+/** What we already know about the land being listed (English, for the AI). */
+function knownFacts(t: Turn): string[] {
+  const d = t.draft;
+  const out: string[] = [];
+  if (d.name) out.push(`Seller name: ${d.name}`);
+  if (d.landType) out.push(`Land type: ${landLabel("en", d.landType)}`);
+  const place = [d.locality, d.cityName, d.cityState].filter(Boolean).join(", ");
+  if (place) out.push(`Place: ${place}`);
+  if (d.area && d.areaUnit) out.push(`Size: ${areaText("en", d.area, d.areaUnit)}`);
+  if (d.price) out.push(`Price: ${priceText("en", d.price)}`);
+  if (d.photos?.length) out.push(`Photos: ${d.photos.length}`);
+  return out;
+}
+
+/** "Yes" / "no" in words → the button the seller would have tapped on the current question. */
+function shortcutFor(t: Turn, intent: "yes" | "no"): string | null {
+  const yes = intent === "yes";
+  switch (t.step) {
+    case "CONFIRM":
+      return yes ? "confirm:submit" : null;
+    case "ASK_PHOTOS":
+      return yes ? "photos:done" : "photos:skip";
+    case "ASK_LOCATION":
+      return yes ? null : "loc:skip";
+    case "ASK_DESCRIPTION":
+      return yes ? null : "desc:skip";
+    case "ASK_PRICE":
+      return t.draft.suggestedPrice ? (yes ? `price:${t.draft.suggestedPrice}` : "price:no") : null;
+    case "ASK_NAME":
+      return yes && t.conv.profileName && parseName(t.conv.profileName) ? "name:profile" : null;
+    default:
+      return null;
+  }
+}
+
+/** Where a buyer should look: the city's page when we have it, otherwise search. */
+async function browseUrl(f: ExtractedListing): Promise<string> {
+  if (f.city) {
+    const city = await db.city.findFirst({ where: { isLive: true, name: { equals: f.city.trim(), mode: "insensitive" } }, select: { slug: true } });
+    if (city) {
+      const type = f.landType && Object.hasOwn(LAND_TYPE_SLUGS, f.landType) ? `/${LAND_TYPE_SLUGS[f.landType as LandType]}` : "";
+      return `${site.url}/${city.slug}${type}`;
+    }
+  }
+  return `${site.url}/search`;
+}
+
+const joinLead = (...parts: (string | undefined)[]) => parts.filter(Boolean).join("\n\n") || undefined;
+
+/**
+ * The assistant as an agent (AI on): reads what the seller means and acts on
+ * it with the bot's own safe steps — saves answers and corrections (validated
+ * like typed ones), answers questions and small talk in a sentence or two and
+ * then repeats the open question, starts a listing, shows status, hands over
+ * to our team, points buyers to the website, or asks before stopping a
+ * listing. Returns false when AI is off or had nothing to add — the fixed
+ * flow then handles the message. Runs at most once per message.
+ */
+async function aiAgent(t: Turn, text: string): Promise<boolean> {
+  if (t.agentTried || !isAiEnabled()) return false;
+  t.agentTried = true;
+  const inFlow = isInFlow(t.step) && t.step !== "SUBMITTING";
+  const u = await understandMessage({
+    lang: t.lang,
+    text,
+    step: inFlow ? t.step : "IDLE",
+    question: inFlow ? questionText(t) : null,
+    known: inFlow ? knownFacts(t) : [],
+    sellerName: t.seller?.name ?? null,
+    history: await recentHistory(t),
+    chatKey: t.conv.id,
+  });
+  if (!u) return false;
+  const c = t.c;
+
+  switch (u.intent) {
+    case "human":
+      await handOverToHuman(t);
+      return true;
+    case "status":
+      await withResume(t, () => sendStatus(t));
+      return true;
+    case "sold":
+      await withResume(t, () => startSold(t));
+      return true;
+    case "stop":
+      if (!inFlow) break;
+      t.asked = true;
+      await t.reply({
+        type: "buttons",
+        body: joinLead(u.reply, c.stopConfirm)!,
+        buttons: [
+          { id: "confirm:cancel", title: c.btnStop },
+          { id: "menu:continue", title: c.btnKeepGoing },
+        ],
+      });
+      return true;
+    case "buy":
+      await t.text(joinLead(u.reply, c.browseLand({ url: await browseUrl(u.fields) }))!);
+      if (inFlow) await reprompt(t, c.continueListing);
+      return true;
+    case "yes":
+    case "no": {
+      const replyId = inFlow ? shortcutFor(t, u.intent) : null;
+      if (replyId) {
+        await handleStep(t, { kind: "interactive", replyId });
+        return true;
+      }
+      break;
+    }
+  }
+
+  // ── Not filling a listing: someone describing their land starts one, pre-filled.
+  if (!inFlow) {
+    const details = [u.fields.landType, u.fields.area, u.fields.priceRupees, u.fields.city, u.fields.locality].filter((v) => v !== undefined).length;
+    if (u.intent === "sell" || details >= 2) {
       const saved = t.draft;
       t.draft = {};
-      const { draft, items } = await mergeExtracted(t, ex);
+      const { draft, items } = await mergeExtracted(t, u.fields);
       t.draft = saved;
-      await startListing(t, draft, items.length ? t.c.understood({ items: items.join(" · ") }) : undefined);
+      await startListing(t, draft, joinLead(u.reply, items.length ? c.understood({ items: items.join(" · ") }) : undefined));
+      return true;
+    }
+    if (!u.reply) return false;
+    await sendMenu(t, u.reply);
+    return true;
+  }
+
+  // ── Filling a listing: keep what they told us, then move on or ask again.
+  if (t.step === "ASK_DESCRIPTION" && u.intent === "answer") {
+    const written = cleanFreeText(u.description ?? text, 1800, true);
+    if (written) {
+      const description = written.length >= 15 ? written : `${defaultDescription(t)} ${written}`;
+      await advance(t, "ASK_DESCRIPTION", { ...t.draft, description, descriptionGenerated: false, features: detectFeatures(written) }, u.reply);
       return true;
     }
   }
-  return aiAssist(t, text);
+  const correcting = u.intent === "correction" || t.step === "CONFIRM";
+  const { draft, items } = await mergeExtracted(t, u.fields, correcting);
+  const newName = t.step === "ASK_NAME" && draft.name && draft.name !== t.draft.name ? draft.name : null;
+  const noted = newName ? c.thanksName({ name: newName }) : items.length ? c.understood({ items: items.join(" · ") }) : undefined;
+  if (t.step === "CONFIRM" && items.length) {
+    await goTo(t, "CONFIRM", draft, joinLead(u.reply, noted));
+    return true;
+  }
+  if (answered(t.step, draft)) {
+    await advance(t, t.step, draft, joinLead(u.reply, noted));
+    return true;
+  }
+  if (noted) {
+    await t.save(t.step, draft);
+    await reprompt(t, joinLead(u.reply, noted));
+    return true;
+  }
+  if (!u.reply) return false;
+  await reprompt(t, u.reply);
+  return true;
+}
+
+/** A message the fixed parser didn't understand: let the AI read it (once), if it's on. */
+async function aiAssist(t: Turn, text: string | undefined): Promise<boolean> {
+  return text ? aiAgent(t, text) : false;
 }
 
 // ───────────────────────────── Answers ─────────────────────────────
@@ -1165,6 +1318,7 @@ async function aiIdle(t: Turn, text: string | undefined): Promise<boolean> {
 /** Answers to the current question. */
 async function handleStep(t: Turn, input: BotInput & { text?: string }) {
   const { replyId, text } = input;
+  if (input.kind === "text" && !replyId && text && t.step !== "SUBMITTING" && t.step !== "ASK_SOLD_WHICH" && readFirst(t.step, text) && (await aiAgent(t, text))) return;
   const d = t.draft;
   const c = t.c;
 
@@ -1175,7 +1329,7 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
     case "IDLE":
     case "SUBMITTING":
       if (input.kind === "location") return sendMenu(t, c.thanksLocationIdle);
-      if (t.step === "IDLE" && input.kind === "text" && (await aiIdle(t, text))) return;
+      if (t.step === "IDLE" && input.kind === "text" && (await aiAssist(t, text))) return;
       return sendMenu(t);
 
     case "ASK_NAME": {
@@ -1223,7 +1377,7 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
     case "ASK_LOCALITY": {
       if (input.kind === "location") return reprompt(t, c.typeLocalityFirst);
       const locality = cleanFreeText(text ?? "", 120);
-      if (locality.length < 2 || !/\p{L}/u.test(locality)) return reprompt(t, c.typeLocality);
+      if (locality.length < 2 || !/\p{L}/u.test(locality) || looksLikeQuestion(locality)) return (await aiAssist(t, text)) || reprompt(t, c.typeLocality);
       return advance(t, "ASK_LOCALITY", { ...d, locality, village: villageFrom(locality) }, `📍 *${locality}* ✓`);
     }
 

@@ -461,6 +461,18 @@ export function detectFeatures(text: string): (typeof FEATURE_OPTIONS)[number][]
 }
 
 /** "my name is ramesh yadav" → "Ramesh Yadav". Null if it doesn't look like a name. */
+const QUESTION_START = /^(?:who|what|why|how|where|when|which|kya|kyu|kyun|kyon|kaun|kon|kaise|kaisa|kahan|kaha|kab|kitna|kitne|kitni|क्या|क्यों|कौन|कैसे|कैसा|कहाँ|कहां|कब|कितना|कितने|कितनी)(?:\s|$)/u;
+
+/** "who are you", "kya bhai", "कौन हो?" — a question or small talk, not an answer to "name?" / "village?". */
+export function looksLikeQuestion(text: string): boolean {
+  return /[?？]/.test(text) || QUESTION_START.test(normalizeInput(text));
+}
+
+/** Words people say to the assistant that are never part of a name. */
+const NOT_NAME_WORDS = new Set(
+  "bhai bhaiya bhaya bro sir madam hello hey hii haan han nahi nahin okay ok who what why how you your yes no tum aap bolo batao accha acha achha theek thik hmm hmmm lol test kya kaun kaise kyu kyun भाई भैया सर हाँ हां नहीं ठीक आप तुम बोलो बताओ क्या कौन कैसे".split(" "),
+);
+
 export function parseName(text: string): string | null {
   let t = text
     .normalize("NFC")
@@ -476,6 +488,7 @@ export function parseName(text: string): string | null {
   if (!/\p{L}/u.test(t)) return null;
   if (/\d{3,}/.test(t)) return null;
   if (t.split(" ").length > 6) return null;
+  if (looksLikeQuestion(t) || t.toLowerCase().split(" ").some((w) => NOT_NAME_WORDS.has(w.replace(/[,!.]+$/, "")))) return null;
   if (t === t.toLowerCase() || t === t.toUpperCase()) {
     t = t.replace(/\p{L}+/gu, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
   }
