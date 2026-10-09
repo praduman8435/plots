@@ -188,7 +188,7 @@ export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
         )}
 
         <p className="mx-auto mt-10 max-w-xl text-center text-xs leading-relaxed text-muted">
-          Verification means we checked the seller&apos;s phone{profile.identityVerified ? " and identity" : ""} — not the land&apos;s legal papers. Visit the
+          Verification means we checked the seller&apos;s phone{profile.identityVerified ? " and identity (Aadhaar)" : ""} — not the land&apos;s legal papers. Visit the
           land and verify ownership and documents before paying anything.
         </p>
         <div className="mt-4 flex justify-center">

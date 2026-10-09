@@ -196,7 +196,7 @@ export function TrustGrid() {
     { icon: BadgeCheck, title: "Phone-verified sellers", text: "Every seller confirms their WhatsApp number before a plot goes live." },
     { icon: LocateFixed, title: "Location shown approximately", text: "We show the area, not the exact plot — protecting sellers until you talk." },
     { icon: CircleDollarSign, title: "We never take buyer money", text: "No tokens, no advance through us. Deal directly and pay only after checking papers." },
-    { icon: ShieldCheck, title: "Check the documents", text: "We verify the seller's phone, not ownership. Always see khatauni and registry first." },
+    { icon: ShieldCheck, title: "Check the documents", text: "We verify the seller's phone and identity (Aadhaar), not land ownership. Always see khatauni and registry first." },
   ];
   return (
     <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">

@@ -328,7 +328,7 @@ function SellerCard({
       )}
       {!compact && (
         <p className="mt-3 text-xs leading-relaxed text-muted">
-          Verification means we checked the seller&apos;s phone{identityVerified ? " and identity" : ""} — not the land&apos;s legal papers.
+          Verification means we checked the seller&apos;s phone{identityVerified ? " and identity (Aadhaar)" : ""} — not the land&apos;s legal papers.
         </p>
       )}
     </div>
