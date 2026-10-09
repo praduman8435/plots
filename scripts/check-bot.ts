@@ -142,6 +142,14 @@ async function main() {
   const out = await complete(claude!, { system: "sys", messages: [{ role: "user", content: "hi" }] }, fakeClaude);
   const req = seen as unknown as { url: string; headers: Record<string, string>; body: Record<string, unknown> } | null;
   check("Claude: Messages API shape, key in x-api-key, text returned", out === "Namaste ji" && req?.url.endsWith("/messages") === true && req?.headers["x-api-key"] === "k".repeat(30) && req?.body.system === "sys");
+  const gemini = getAiConfig({ AI_ENABLED: "true", AI_PROVIDER: "gemini", AI_API_KEY: "k".repeat(30), AI_MODEL: "default" });
+  let geminiBody: Record<string, unknown> | null = null;
+  const geminiOut = await complete(gemini!, { system: "s", messages: [{ role: "user", content: "x" }], maxTokens: 200, json: true }, (async (u: RequestInfo | URL, init?: RequestInit) => {
+    geminiBody = String(u).endsWith("/v1beta/openai/chat/completions") ? JSON.parse(String(init?.body)) : null;
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"area":2}' } }] }), { status: 200 });
+  }) as typeof fetch);
+  const gb = geminiBody as Record<string, unknown> | null;
+  check("Gemini: OpenAI-compatible endpoint, short thinking, room for it", geminiOut === '{"area":2}' && gb?.model === "gemini-flash-latest" && gb?.reasoning_effort === "low" && Number(gb?.max_tokens) > 200, JSON.stringify(gb));
   check("AI: HTTP error → null", (await complete(claude!, { system: "s", messages: [{ role: "user", content: "x" }] }, (async () => new Response("no", { status: 500 })) as typeof fetch)) === null);
   check("AI: JSON found inside prose/code fences", JSON.stringify(firstJsonObject('Sure! ```json\n{"area": 2}\n```')) === '{"area":2}');
   check("AI: Aadhaar-like and phone numbers redacted", !/1234|98765/.test(redact("aadhaar 1234 5678 9012, phone +91 98765 43210")));

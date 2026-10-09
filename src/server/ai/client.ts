@@ -2,6 +2,8 @@ import "server-only";
 import { log } from "@/lib/log";
 import type { AiConfig } from "./config";
 
+const GEMINI_THINKING_TOKENS = 1024;
+
 export type AiMessage = { role: "user" | "assistant"; content: string };
 
 /**
@@ -31,7 +33,10 @@ export async function complete(
         headers: { "content-type": "application/json", authorization: `Bearer ${cfg.apiKey}` },
         body: JSON.stringify({
           model: cfg.model,
-          max_tokens: maxTokens,
+          // Gemini's models think before answering and count that against max_tokens:
+          // keep the thinking short and leave room for it, or the answer comes back empty.
+          max_tokens: cfg.provider === "gemini" ? maxTokens + GEMINI_THINKING_TOKENS : maxTokens,
+          ...(cfg.provider === "gemini" ? { reasoning_effort: "low" } : {}),
           temperature: 0.3,
           messages: [{ role: "system", content: input.system }, ...input.messages],
           ...(input.json ? { response_format: { type: "json_object" } } : {}),
