@@ -13,6 +13,8 @@ export type OtpProvider = {
 export class ConsoleOtpProvider implements OtpProvider {
   async sendOtp({ phoneNormalized, code, purpose }: { phoneNormalized: string; code: string; purpose: string }) {
     if (process.env.NODE_ENV === "production" && !isDemoMode()) throw new Error("ConsoleOtpProvider must never run in production.");
+    // Production logs are readable by more people than a login code should be.
+    if (process.env.NODE_ENV === "production") return;
     console.log(
       `\n┌──────────────────────────────────────────────\n│ [DEV OTP] ${maskPhoneForLogging(phoneNormalized)}  code: ${code}  (${purpose})\n└──────────────────────────────────────────────\n`,
     );

@@ -3,6 +3,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   EyeOff,
+  Flag,
   Hourglass,
   MessageCircle,
   PhoneOff,
@@ -18,6 +19,7 @@ import { cn } from "@/lib/cn";
 import { db } from "@/lib/db";
 import { formatNumber } from "@/lib/format";
 import { countAvailabilityAttention } from "@/server/admin/availability";
+import { reportCounts } from "@/server/admin/reports";
 import { loadReviewQueue } from "@/server/admin/review";
 
 export const metadata: Metadata = { title: "Today" };
@@ -40,7 +42,7 @@ export default async function AdminTodayPage() {
   const at = now();
   const weekAgo = daysAgo(7);
 
-  const [pending, oldestPending, chats, availability, next, live, newPlots, enquiries7, newSellers, recentEnquiries] = await Promise.all([
+  const [pending, oldestPending, chats, availability, next, live, newPlots, enquiries7, newSellers, recentEnquiries, reports] = await Promise.all([
     db.property.count({ where: { status: "PENDING" } }),
     db.property.findFirst({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" }, select: { createdAt: true } }),
     db.whatsAppConversation.count({ where: { OR: [{ unreadCount: { gt: 0 } }, { step: "HUMAN" }] } }),
@@ -55,6 +57,7 @@ export default async function AdminTodayPage() {
       take: 3,
       include: { property: { select: { id: true, title: true, code: true, seller: { select: { id: true, name: true, code: true } } } } },
     }),
+    reportCounts(),
   ]);
 
   const actions: Action[] = [
@@ -66,6 +69,16 @@ export default async function AdminTodayPage() {
       href: "/admin/listings?status=PENDING",
       cta: "Review",
       urgent: Boolean(oldestPending && at.getTime() - oldestPending.createdAt.getTime() > 12 * 3_600_000),
+    },
+    reports.PENDING > 0 && {
+      key: "reports",
+      icon: Flag,
+      title: `Review ${reports.PENDING} report${reports.PENDING === 1 ? "" : "s"}`,
+      detail: reports.fraudOpen > 0 ? `${reports.fraudOpen} about possible fraud` : "Buyers flagged a plot or a seller",
+      href: "/admin/reports?status=PENDING",
+      cta: "Review",
+      urgent: reports.fraudOpen > 0,
+      badge: "Fraud",
     },
     chats > 0 && {
       key: "chats",
@@ -123,7 +136,7 @@ export default async function AdminTodayPage() {
                   <span className="block text-[15px] font-semibold text-ink">{a.title}</span>
                   {a.detail && <span className="block truncate text-[13px] text-muted">{a.detail}</span>}
                 </span>
-                {a.urgent && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Waiting</span>}
+                {a.urgent && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">{a.badge ?? "Waiting"}</span>}
                 <ChevronRight className="size-4 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-brand-600" aria-hidden />
               </Link>
             </li>
@@ -188,7 +201,7 @@ export default async function AdminTodayPage() {
   );
 }
 
-type Action = { key: string; icon: LucideIcon; title: string; detail?: string; href: string; cta: string; urgent?: boolean };
+type Action = { key: string; icon: LucideIcon; title: string; detail?: string; href: string; cta: string; urgent?: boolean; badge?: string };
 
 function Stat({ href, label, value }: { href: string; label: string; value: number }) {
   return (

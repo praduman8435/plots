@@ -1,4 +1,5 @@
 import "server-only";
+import { revalidatePath } from "next/cache";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ListingSource, SellerType } from "@/generated/prisma/enums";
 import { createWithUniqueCode, generatePropertyCode, generateSellerCode } from "@/lib/codes";
@@ -153,6 +154,29 @@ type StatusOpts = {
  * Nothing is ever deleted; SOLD and HIDDEN plots stay for history and can be relisted.
  */
 export async function changeListingStatus(propertyId: string, action: StatusAction, opts: StatusOpts = {}) {
+  await applyStatusChange(propertyId, action, opts);
+  await refreshListingPages(propertyId);
+}
+
+/**
+ * Plot pages, the home page and city pages are cached (ISR). Every status
+ * change — from the admin, the dashboard, the WhatsApp assistant or the daily
+ * job — refreshes them right away, so a sold or hidden plot never lingers.
+ * Outside a Next.js request (scripts, tests) there is no cache to refresh.
+ */
+async function refreshListingPages(propertyId: string) {
+  const p = await db.property.findUnique({ where: { id: propertyId }, select: { slug: true, city: { select: { slug: true } } } });
+  if (!p) return;
+  try {
+    revalidatePath(`/property/${p.slug}`);
+    revalidatePath(`/${p.city.slug}`, "layout");
+    revalidatePath("/");
+  } catch {
+    // Not inside a request — nothing cached to refresh.
+  }
+}
+
+async function applyStatusChange(propertyId: string, action: StatusAction, opts: StatusOpts) {
   const notify = (event: Parameters<typeof notifySeller>[1]) => (opts.notify === false ? Promise.resolve(false) : notifySeller(propertyId, event));
   const p = await db.property.findUniqueOrThrow({ where: { id: propertyId } });
   const now = new Date();

@@ -27,7 +27,7 @@ class CapturingDevProvider implements OtpProvider {
 }
 
 export type StartSignupResult =
-  | { ok: true; maskedPhone: string; existingName?: string; devCode?: string; retryAfterSeconds?: number }
+  | { ok: true; maskedPhone: string; existingSeller?: boolean; devCode?: string; retryAfterSeconds?: number }
   | { ok: false; field?: "name" | "phone"; message: string };
 
 /** Step 2 → 3: validate name + mobile and send the code. Works for new and existing sellers alike. */
@@ -37,7 +37,7 @@ export async function startSignup(input: { name: string; phone: string }): Promi
   const phone = normalizePhoneNumber(input.phone ?? "");
   if (!phone.valid) return { ok: false, field: "phone", message: "Enter a valid 10-digit mobile number" };
 
-  const existing = await db.seller.findUnique({ where: { phone: phone.normalized }, select: { name: true, isBlocked: true } });
+  const existing = await db.seller.findUnique({ where: { phone: phone.normalized }, select: { isBlocked: true } });
   if (existing?.isBlocked) return { ok: false, field: "phone", message: "This number can't be used. Please contact us on WhatsApp." };
 
   const base = getOtpProvider();
@@ -46,7 +46,7 @@ export async function startSignup(input: { name: string; phone: string }): Promi
   if (!result.success) {
     if (result.error.type === "COOLDOWN") {
       // A recent code may still be valid — let them enter it.
-      return { ok: true, maskedPhone: maskPhoneForDisplay(phone.normalized), existingName: existing?.name, retryAfterSeconds: result.error.retryAfterSeconds };
+      return { ok: true, maskedPhone: maskPhoneForDisplay(phone.normalized), existingSeller: Boolean(existing), retryAfterSeconds: result.error.retryAfterSeconds };
     }
     return { ok: false, field: "phone", message: result.error.message };
   }
@@ -55,7 +55,8 @@ export async function startSignup(input: { name: string; phone: string }): Promi
   return {
     ok: true,
     maskedPhone: maskPhoneForDisplay(phone.normalized),
-    existingName: existing?.name,
+    // Never the seller's name before the code is checked: a number alone mustn't reveal who owns it.
+    existingSeller: Boolean(existing),
     devCode: provider instanceof CapturingDevProvider && canShowCodeOnScreen() ? (provider.code ?? undefined) : undefined,
   };
 }

@@ -6,6 +6,7 @@ import { parseSellerCode } from "@/lib/codes";
 import { db } from "@/lib/db";
 import { canShowCodeOnScreen } from "@/lib/demo";
 import { maskPhoneForDisplay, normalizePhoneNumber } from "@/lib/phone";
+import { hitIpRateLimit, hitRateLimit } from "@/lib/rate-limit";
 import { createSellerSession, destroySellerSession } from "@/lib/seller/session";
 import { ConsoleOtpProvider, getOtpProvider, type OtpProvider } from "@/server/otp/provider";
 import { safeNext } from "@/server/seller/onboarding";
@@ -44,6 +45,10 @@ export type RequestCodeResult =
 export async function requestSellerCode(input: unknown): Promise<RequestCodeResult> {
   const parsed = identifierSchema.safeParse(input);
   if (!parsed.success) return { ok: false, reason: "INVALID", message: "Enter your Seller ID or mobile number." };
+
+  // "Found / not found" is an answer too: cap lookups per IP so Seller IDs and numbers can't be enumerated.
+  const limited = await hitIpRateLimit("sellerLookupPerIp");
+  if (!limited.ok) return { ok: false, reason: "RATE_LIMITED", message: "Too many attempts. Please wait a few minutes and try again.", retryAfterSeconds: limited.retryAfterSeconds };
 
   const seller = await resolveSeller(parsed.data.identifier);
   if (!seller) {
@@ -105,6 +110,10 @@ export async function signInWithoutCode(input: unknown): Promise<{ ok: false; me
   const code = parsed.success ? parseSellerCode(parsed.data.sellerId) : null;
   const phone = parsed.success ? normalizePhoneNumber(parsed.data.phone) : { valid: false as const };
   if (!code || !phone.valid) return { ok: false, message: "Enter your Seller ID and registered mobile number." };
+
+  // Both values can be learnt by others (the number is on listings), so guessing is capped per IP and per Seller ID.
+  const [byIp, bySeller] = await Promise.all([hitIpRateLimit("noCodeSignInPerIp"), hitRateLimit("noCodeSignInPerSeller", code)]);
+  if (!byIp.ok || !bySeller.ok) return { ok: false, message: "Too many attempts. Please wait 15 minutes and try again." };
 
   const seller = await db.seller.findUnique({ where: { code } });
   if (!seller || seller.phone !== phone.normalized || seller.isBlocked) {

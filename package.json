@@ -16,7 +16,9 @@
     "db:studio": "prisma studio",
     "db:create-admin": "tsx prisma/create-admin.ts",
     "postinstall": "prisma generate",
-    "check:profile": "tsx --conditions=react-server scripts/check-seller-profile.ts"
+    "check:profile": "tsx --conditions=react-server scripts/check-seller-profile.ts",
+    "check:security": "tsx --conditions=react-server scripts/check-security.ts",
+    "check:http": "tsx --conditions=react-server scripts/check-http-security.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
@@ -50,5 +52,11 @@
     "tsx": "^4.23.15",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "overrides": {
+      "mysql2": "^3.24.5",
+      "deepmerge-ts": "^8.0.2"
+    }
+  }
 }

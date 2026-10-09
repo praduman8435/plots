@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/admin/require";
 import { db } from "@/lib/db";
+import { cleanContext, recordAudit } from "@/server/audit";
 import type { AdminActionResult } from "./listings";
 
 const schema = z.object({ sellerId: z.string().min(1).max(64), blocked: z.boolean() });
@@ -13,8 +14,9 @@ const schema = z.object({ sellerId: z.string().min(1).max(64), blocked: z.boolea
  * blocked sellers) and hides their live plots from buyers. Unblocking
  * does NOT auto-republish — an admin reviews and unhides plots one by one.
  */
-export async function setSellerBlockedAction(sellerId: string, blocked: boolean): Promise<AdminActionResult> {
-  await requireAdmin();
+export async function setSellerBlockedAction(sellerId: string, blocked: boolean, context?: unknown): Promise<AdminActionResult> {
+  const admin = await requireAdmin();
+  const ctx = cleanContext(context);
   const parsed = schema.safeParse({ sellerId, blocked });
   if (!parsed.success) return { ok: false, message: "Invalid request." };
 
@@ -35,6 +37,15 @@ export async function setSellerBlockedAction(sellerId: string, blocked: boolean)
     }
   });
 
+  await recordAudit(admin, {
+    action: parsed.data.blocked ? "seller.block" : "seller.unblock",
+    targetType: "seller",
+    targetId: seller.id,
+    sellerId: seller.id,
+    reportId: ctx.reportId,
+    note: ctx.note,
+    meta: { plotsHidden: hidden },
+  });
   revalidatePath("/admin", "layout");
   if (hidden > 0) {
     // Many public pages may have changed: revalidate everything.

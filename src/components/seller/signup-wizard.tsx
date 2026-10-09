@@ -17,7 +17,7 @@ export function SignupWizard() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState<{ maskedPhone: string; existingName?: string } | null>(null);
+  const [sent, setSent] = useState<{ maskedPhone: string; existingSeller?: boolean } | null>(null);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [pending, start] = useTransition();
@@ -57,7 +57,7 @@ export function SignupWizard() {
         if (r.field === "name") setStep("name");
         return;
       }
-      setSent({ maskedPhone: r.maskedPhone, existingName: r.existingName });
+      setSent({ maskedPhone: r.maskedPhone, existingSeller: r.existingSeller });
       setDevCode(r.devCode ?? null);
       setCooldown(r.retryAfterSeconds ?? 45);
       setCode("");
@@ -148,8 +148,8 @@ export function SignupWizard() {
       <Question
         title="Enter the code"
         hint={
-          sent?.existingName
-            ? `Welcome back, ${sent.existingName.split(" ")[0]}! You already have a seller account — we sent a code to ${sent.maskedPhone}.`
+          sent?.existingSeller
+            ? `Welcome back! You already have a seller account — we sent a code to ${sent.maskedPhone}.`
             : `We sent a 6-digit code to your WhatsApp ${sent?.maskedPhone ?? ""}.`
         }
       />

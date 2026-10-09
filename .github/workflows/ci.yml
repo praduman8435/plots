@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typecheck, lint, tests, build, security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: plots
+          POSTGRES_PASSWORD: plots
+          POSTGRES_DB: plots
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U plots" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Throwaway values for the CI database and test server only — not real secrets.
+      DATABASE_URL: postgresql://plots:plots@localhost:5432/plots?schema=public
+      SESSION_SECRET: ci-only-session-secret-not-used-anywhere-else-0123456789
+      CRON_SECRET: ci-only-cron-secret-0123456789abcdef
+      NEXT_PUBLIC_SITE_URL: http://localhost:3100
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Database (migrations + seed)
+        run: pnpm exec prisma migrate deploy && pnpm db:seed
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - name: Unit + database checks
+        run: |
+          pnpm check:security
+          pnpm check:profile
+          pnpm exec tsx scripts/check-whatsapp-parse.ts
+      - run: pnpm build
+      - name: HTTP security checks against the production build
+        run: |
+          TRUSTED_IP_HEADER=x-test-client-ip pnpm exec next start -p 3100 > next.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3100/ && break; sleep 1; done
+          BASE_URL=http://localhost:3100 pnpm check:http || (tail -50 next.log; exit 1)
+      - name: No public source maps in the build
+        run: test -z "$(find .next/static -name '*.map' | head -1)"
+      - name: Dependency audit (runtime dependencies, high+)
+        run: pnpm audit --prod --audit-level=high
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

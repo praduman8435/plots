@@ -10,6 +10,7 @@ import { normalizePhoneNumber } from "@/lib/phone";
 import { listingInputSchema, sellerInputSchema } from "@/lib/validation/listing";
 import { changeListingStatus, createListing, findOrCreateSeller, runAvailabilityChecks, updateListing } from "@/server/listings/service";
 import { trackEvent } from "@/server/analytics";
+import { cleanContext, recordAudit } from "@/server/audit";
 import { isWhatsAppConfigured } from "@/server/whatsapp/config";
 import { isServiceWindowOpen } from "@/server/whatsapp/messaging";
 import { sendAvailabilityCheck } from "@/server/whatsapp/notify";
@@ -77,8 +78,9 @@ const STATUS_MESSAGES: Record<AdminStatusAction["type"], string> = {
   CONFIRM_AVAILABLE: "Marked available — confirmed today.",
 };
 
-export async function changeListingStatusAction(propertyId: string, action: AdminStatusAction): Promise<AdminActionResult> {
-  await requireAdmin();
+export async function changeListingStatusAction(propertyId: string, action: AdminStatusAction, context?: unknown): Promise<AdminActionResult> {
+  const admin = await requireAdmin();
+  const ctx = cleanContext(context);
   const id = idSchema.safeParse(propertyId);
   const parsed = statusActionSchema.safeParse(action);
   if (!id.success) return { ok: false, message: "Unknown listing." };
@@ -89,7 +91,7 @@ export async function changeListingStatusAction(propertyId: string, action: Admi
 
   const p = await db.property.findUnique({
     where: { id: id.data },
-    select: { id: true, status: true, hiddenReason: true, publishedAt: true },
+    select: { id: true, status: true, hiddenReason: true, publishedAt: true, sellerId: true },
   });
   if (!p) return { ok: false, message: "This listing no longer exists." };
 
@@ -114,6 +116,16 @@ export async function changeListingStatusAction(propertyId: string, action: Admi
     a.type === "REJECT" ? { type: "REJECT", reason: a.reason } : a.type === "HIDE" ? { type: "HIDE", by: "ADMIN" } : { type: a.type },
     { via: "admin" },
   );
+  await recordAudit(admin, {
+    action: `listing.${a.type}`,
+    targetType: "listing",
+    targetId: p.id,
+    propertyId: p.id,
+    sellerId: p.sellerId,
+    reportId: ctx.reportId,
+    note: a.type === "REJECT" ? a.reason : ctx.note,
+    meta: { from: p.status },
+  });
   await revalidateListing(p.id);
 
   let message = STATUS_MESSAGES[a.type];
@@ -128,8 +140,9 @@ export async function changeListingStatusAction(propertyId: string, action: Admi
  * Always records the attempt; the 24h reply timer starts ONLY if WhatsApp
  * accepted the message (same rule as the weekly job).
  */
-export async function sendAvailabilityCheckAction(propertyId: string): Promise<AdminActionResult> {
-  await requireAdmin();
+export async function sendAvailabilityCheckAction(propertyId: string, context?: unknown): Promise<AdminActionResult> {
+  const admin = await requireAdmin();
+  const ctx = cleanContext(context);
   const id = idSchema.safeParse(propertyId);
   if (!id.success) return { ok: false, message: "Unknown listing." };
   const p = await db.property.findUnique({
@@ -164,6 +177,7 @@ export async function sendAvailabilityCheckAction(propertyId: string): Promise<A
   if (p.status === "ACTIVE") {
     await db.property.updateMany({ where: { id: p.id, status: "ACTIVE" }, data: { availabilityCheckSentAt: now } });
   }
+  await recordAudit(admin, { action: "listing.AVAILABILITY_CHECK", targetType: "listing", targetId: p.id, propertyId: p.id, sellerId: p.sellerId, reportId: ctx.reportId, note: ctx.note });
   await trackEvent("availability_check_sent", { sellerId: p.sellerId, propertyId: p.id, props: { via: "admin" } });
   return {
     ok: true,
@@ -212,13 +226,13 @@ function parseListingPayload(payload: ListingFormPayload) {
 }
 
 export async function updateListingAction(propertyId: string, payload: ListingFormPayload): Promise<ListingFormResult> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const id = idSchema.safeParse(propertyId);
   if (!id.success) return { ok: false, message: "Unknown listing." };
   const parsed = parseListingPayload(payload);
   if (!parsed.ok) return parsed.result;
 
-  const existing = await db.property.findUnique({ where: { id: id.data }, select: { id: true } });
+  const existing = await db.property.findUnique({ where: { id: id.data }, select: { id: true, sellerId: true } });
   if (!existing) return { ok: false, message: "This listing no longer exists." };
   const city = await resolveCity({ ...parsed.listing });
   if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
@@ -239,6 +253,7 @@ export async function updateListingAction(propertyId: string, payload: ListingFo
   ]);
 
   await revalidateListing(existing.id);
+  await recordAudit(admin, { action: "listing.EDIT", targetType: "listing", targetId: existing.id, propertyId: existing.id, sellerId: existing.sellerId });
   return { ok: true, redirectTo: `/admin/listings/${existing.id}?saved=1` };
 }
 

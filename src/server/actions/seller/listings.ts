@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { hitRateLimit } from "@/lib/rate-limit";
 import { requireSeller } from "@/lib/seller/require";
 import type { ListingFormPayload, ListingFormResult } from "@/components/listing/types";
 import { listingInputSchema } from "@/lib/validation/listing";
@@ -63,6 +64,10 @@ export async function createSellerListing(payload: ListingFormPayload): Promise<
   if (isKycAvailable() && seller.identityStatus !== "VERIFIED") return { ok: false, message: "Please verify your identity first." };
   if (!seller.onboardedAt) return { ok: false, message: "Please finish setting up your seller account first." };
 
+  // Counted only for a valid submission, so fixing form errors never locks anyone out.
+  const limited = await hitRateLimit("listingCreatePerSeller", seller.id);
+  if (!limited.ok) return { ok: false, message: "You've added a lot of plots today. Please try again tomorrow or message us on WhatsApp." };
+
   const property = await createListing({ sellerId: seller.id, source: "WEB", input: parsed.data, images });
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin", "layout");
@@ -88,6 +93,9 @@ export async function updateSellerListing(propertyId: string, payload: ListingFo
   const city = await resolveCity({ ...parsed.data });
   if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
   const images = (payload.images ?? []).filter((i) => isOurImageUrl(i.url)).slice(0, 10);
+
+  const limited = await hitRateLimit("listingUpdatePerSeller", seller.id);
+  if (!limited.ok) return { ok: false, message: "Too many edits in a short time. Please try again in a little while." };
 
   await updateListing(p.id, parsed.data);
   await db.$transaction([

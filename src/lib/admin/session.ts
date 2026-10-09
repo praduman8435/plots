@@ -17,6 +17,9 @@ export async function createAdminSession(adminUserId: string): Promise<void> {
   await db.adminSession.create({ data: { tokenHash: hashToken(token), adminUserId, expiresAt } });
 
   const cookieStore = await cookies();
+  // Rotate: a token this browser held before signing in again stops working.
+  const previous = cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value;
+  if (previous) await db.adminSession.deleteMany({ where: { tokenHash: hashToken(previous) } }).catch(() => {});
   cookieStore.set(ADMIN_SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

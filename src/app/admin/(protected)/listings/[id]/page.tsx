@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpRight, CheckCircle2, ExternalLink, Eye, Inbox, MapPin, MessageCircle, PencilLine, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CheckCircle2, ExternalLink, Eye, Flag, Inbox, MapPin, MessageCircle, PencilLine, UserRound } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -73,12 +73,13 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
   });
   if (!p) notFound();
 
-  const [cities, duplicates] = await Promise.all([
+  const [cities, duplicates, reportCount] = await Promise.all([
     db.city.findMany({
       orderBy: [{ isLive: "desc" }, { sortOrder: "asc" }, { name: "asc" }],
       select: { id: true, name: true, state: true, bighaInSqft: true },
     }),
     findPossibleDuplicates(p.id),
+    db.report.count({ where: { propertyId: p.id } }),
   ]);
 
   const at = now();
@@ -120,6 +121,11 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
         }
         actions={
           <>
+            {reportCount > 0 && (
+              <ButtonLink href={`/admin/reports?listing=${p.id}`} variant="secondary" size="sm" className="text-amber-800">
+                <Flag /> {reportCount} report{reportCount === 1 ? "" : "s"}
+              </ButtonLink>
+            )}
             {p.status === "ACTIVE" && (
               <ButtonLink href={`/property/${p.slug}`} target="_blank" variant="secondary" size="sm">
                 <ExternalLink /> Public page

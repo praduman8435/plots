@@ -21,6 +21,12 @@ import sharp from "sharp";
 export const STORAGE_DIR = path.resolve(/*turbopackIgnore: true*/ process.env.STORAGE_DIR || "storage/uploads");
 export const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+/** What the bytes actually are (sharp sniffs the content) — the client's MIME type and file name are never trusted. */
+const ALLOWED_FORMATS = new Set(["jpeg", "png", "webp", "heif"]);
+/** Decompression-bomb guard: a 15 MB PNG can declare billions of pixels. 50 MP covers any phone camera. */
+export const MAX_INPUT_PIXELS = 50_000_000;
+
+export class UnsupportedImageError extends Error {}
 
 export type StoredImage = { url: string; width: number; height: number };
 
@@ -28,13 +34,31 @@ export function isAllowedImageType(mime: string): boolean {
   return ALLOWED.has(mime.toLowerCase());
 }
 
-export async function saveImage(bytes: Buffer): Promise<StoredImage> {
-  if (bytes.length > MAX_UPLOAD_BYTES) throw new Error("Image is too large");
-  const { data, info } = await sharp(bytes, { failOn: "error" })
+/**
+ * Decodes and re-encodes to a fresh WebP: only pixels survive — no EXIF/GPS,
+ * no embedded scripts, no polyglot payloads. SVG, GIF, TIFF, PDF and
+ * anything else sharp could read are refused by content, whatever their name.
+ */
+export async function processImage(bytes: Buffer): Promise<{ data: Buffer; width: number; height: number }> {
+  if (bytes.length > MAX_UPLOAD_BYTES) throw new UnsupportedImageError("Photo is too large (max 15 MB).");
+  const input = () => sharp(bytes, { failOn: "error", limitInputPixels: MAX_INPUT_PIXELS, pages: 1 });
+  let format: string | undefined;
+  try {
+    format = (await input().metadata()).format;
+  } catch {
+    throw new UnsupportedImageError("Couldn't read this photo. Use a JPG, PNG, WebP or HEIC photo.");
+  }
+  if (!format || !ALLOWED_FORMATS.has(format)) throw new UnsupportedImageError("Use a JPG, PNG, WebP or HEIC photo.");
+  const { data, info } = await input()
     .rotate()
     .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
     .webp({ quality: 76 })
     .toBuffer({ resolveWithObject: true });
+  return { data, width: info.width, height: info.height };
+}
+
+export async function saveImage(bytes: Buffer): Promise<StoredImage> {
+  const { data, ...info } = await processImage(bytes);
 
   const now = new Date();
   const dir = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}`;

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CLIENT_EVENTS } from "@/lib/analytics-events";
+import { hitIpRateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { trackEvent } from "@/server/analytics";
 
 const schema = z.object({
@@ -11,6 +12,8 @@ const schema = z.object({
 
 /** Browser analytics beacon. Only whitelisted event names; small, typed payloads. */
 export async function POST(req: Request) {
+  const limited = await hitIpRateLimit("eventsPerIp");
+  if (!limited.ok) return tooManyRequests(limited, null);
   const raw = await req.text();
   if (raw.length > 2000) return new Response(null, { status: 413 });
   let json: unknown;

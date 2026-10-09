@@ -6,7 +6,8 @@
  *   pnpm db:create-admin admin@plots.local "Plots Admin" plots-admin-123
  *
  * Re-running for an existing email updates the name and password and
- * re-activates the account. The password is never printed by this script
+ * re-activates the account. ADMIN_RESET_MFA=true also turns off two-step
+ * sign-in (for an admin who lost both their phone and recovery codes). The password is never printed by this script
  * (pnpm echoes the command line, so on shared machines pass it via the
  * ADMIN_PASSWORD environment variable and omit the third argument).
  */
@@ -15,7 +16,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { hashSecret } from "../src/lib/scrypt-hash";
 
-const MIN_PASSWORD_LENGTH = 8;
+const MIN_PASSWORD_LENGTH = 12;
 
 async function main() {
   const [rawEmail, rawName, argPassword] = process.argv.slice(2);
@@ -46,7 +47,12 @@ async function main() {
     await db.adminUser.upsert({
       where: { email },
       create: { email, name, passwordHash, isActive: true },
-      update: { name, passwordHash, isActive: true },
+      update: {
+        name,
+        passwordHash,
+        isActive: true,
+        ...(process.env.ADMIN_RESET_MFA === "true" ? { mfaSecret: null, mfaEnabledAt: null, mfaLastStep: null, mfaRecoveryCodes: [] } : {}),
+      },
     });
     if (existing) {
       // A password change signs the admin out everywhere.

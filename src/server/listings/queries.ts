@@ -58,9 +58,10 @@ export const PAGE_SIZE = 12;
 
 type RawParams = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)?.trim() || undefined;
+/** Positive number, capped well inside Postgres bigint so a "?minPrice=1e30" can't overflow the query. */
 const num = (v: string | string[] | undefined) => {
   const n = Number(one(v));
-  return Number.isFinite(n) && n > 0 ? n : undefined;
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 1e15) : undefined;
 };
 
 /** URL search params → validated filters. Unknown values are dropped, never trusted. */
@@ -71,14 +72,15 @@ export function parseSearchParams(sp: RawParams): SearchFilters {
   return {
     city: one(sp.city),
     q: one(sp.q)?.slice(0, 80),
-    type: type && type in LandType ? (type as LandType) : undefined,
+    type: type && Object.hasOwn(LandType, type) ? (type as LandType) : undefined,
     minPrice: num(sp.minPrice),
     maxPrice: num(sp.maxPrice),
     minArea: num(sp.minArea),
     maxArea: num(sp.maxArea),
-    areaUnit: unit && unit in AreaUnit ? (unit as AreaUnit) : "SQFT",
-    sort: sort && sort in SORTS ? (sort as SortKey) : "recommended",
-    page: Math.max(1, Math.floor(num(sp.page) ?? 1)),
+    areaUnit: unit && Object.hasOwn(AreaUnit, unit) ? (unit as AreaUnit) : "SQFT",
+    sort: sort && Object.hasOwn(SORTS, sort) ? (sort as SortKey) : "recommended",
+    // Bounded: a huge ?page= would make Postgres walk past millions of rows (OFFSET).
+    page: Math.min(500, Math.max(1, Math.floor(num(sp.page) ?? 1))),
   };
 }
 

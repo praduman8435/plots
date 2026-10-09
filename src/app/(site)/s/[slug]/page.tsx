@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContactActions } from "@/components/listing/contact-actions";
 import { PropertyCard } from "@/components/listing/property-card";
+import { ReportSheet } from "@/components/report/report-sheet";
 import { ShareProfile } from "@/components/seller/share-profile";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -190,6 +191,9 @@ export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
           Verification means we checked the seller&apos;s phone{profile.identityVerified ? " and identity" : ""} — not the land&apos;s legal papers. Visit the
           land and verify ownership and documents before paying anything.
         </p>
+        <div className="mt-4 flex justify-center">
+          <ReportSheet target="PROFILE" targetRef={profile.slug} />
+        </div>
       </div>
     </div>
   );

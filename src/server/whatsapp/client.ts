@@ -90,7 +90,9 @@ export async function sendWhatsAppMessage(to: string, message: OutgoingMessage, 
   if (!isWhatsAppConfigured()) {
     // Before Meta is connected (DEMO_MODE), messages live in the in-site chat (/sell/chat) instead.
     if (process.env.NODE_ENV === "production" && !isDemoMode()) throw new Error("WhatsApp is not configured");
-    console.log(`[DEV WHATSAPP OUTBOX] to=${maskPhoneForLogging(to)} label=${logLabel}\n${describe(message)}`);
+    // Message bodies can hold login codes and buyer numbers: print them only on a developer's machine.
+    if (process.env.NODE_ENV === "production") console.log(`[whatsapp outbox] to=${maskPhoneForLogging(to)} label=${logLabel}`);
+    else console.log(`[DEV WHATSAPP OUTBOX] to=${maskPhoneForLogging(to)} label=${logLabel}\n${describe(message)}`);
     return `dev-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
@@ -104,6 +106,7 @@ export async function sendWhatsAppMessage(to: string, message: OutgoingMessage, 
         method: "POST",
         headers: { Authorization: `Bearer ${config.apiToken}`, "Content-Type": "application/json" },
         body,
+        signal: AbortSignal.timeout(10_000),
       });
       if (response.ok) {
         const data = (await response.json().catch(() => ({}))) as { messages?: { id: string }[] };
@@ -130,17 +133,52 @@ export async function sendWhatsAppMessage(to: string, message: OutgoingMessage, 
   throw new Error("WhatsApp message delivery failed");
 }
 
-/** Downloads an inbound media object (e.g. a plot photo) from Meta. */
+/** Meta serves media from its own CDN hosts; the bearer token is never sent anywhere else. */
+export function isMetaMediaUrl(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && (u.hostname === "lookaside.fbsbx.com" || /\.(fbsbx|facebook|whatsapp)\.(com|net)$/.test(u.hostname));
+  } catch {
+    return false;
+  }
+}
+
+const MEDIA_MAX_BYTES = 16 * 1024 * 1024;
+
+/** Downloads an inbound media object (e.g. a plot photo) from Meta. Timeouts, a size cap and no redirects off Meta. */
 export async function downloadWhatsAppMedia(mediaId: string): Promise<{ bytes: Buffer; mimeType: string }> {
+  if (!/^\d{1,30}$/.test(mediaId)) throw new Error("Invalid WhatsApp media id");
   const config = getWhatsAppTransportConfig();
   const metaRes = await fetch(`https://graph.facebook.com/${config.apiVersion}/${mediaId}`, {
     headers: { Authorization: `Bearer ${config.apiToken}` },
+    signal: AbortSignal.timeout(8000),
   });
   if (!metaRes.ok) throw new Error("WhatsApp media lookup failed");
-  const meta = (await metaRes.json()) as { url: string; mime_type: string };
-  const fileRes = await fetch(meta.url, { headers: { Authorization: `Bearer ${config.apiToken}` } });
-  if (!fileRes.ok) throw new Error("WhatsApp media download failed");
-  return { bytes: Buffer.from(await fileRes.arrayBuffer()), mimeType: meta.mime_type };
+  const meta = (await metaRes.json()) as { url?: string; mime_type?: string; file_size?: number };
+  if (!isMetaMediaUrl(meta.url)) throw new Error("WhatsApp media URL is not a Meta host");
+  if (meta.file_size && meta.file_size > MEDIA_MAX_BYTES) throw new Error("WhatsApp media is too large");
+
+  // Follow redirects by hand so every hop is checked to be a Meta host before the token is sent.
+  let url = meta.url!;
+  let fileRes: Response | null = null;
+  for (let hop = 0; hop < 4; hop++) {
+    fileRes = await fetch(url, { headers: { Authorization: `Bearer ${config.apiToken}` }, redirect: "manual", signal: AbortSignal.timeout(15_000) });
+    const location = fileRes.status >= 300 && fileRes.status < 400 ? fileRes.headers.get("location") : null;
+    if (!location) break;
+    url = new URL(location, url).toString();
+    if (!isMetaMediaUrl(url)) throw new Error("WhatsApp media redirected off Meta");
+    fileRes = null;
+  }
+  if (!fileRes?.ok || !fileRes.body) throw new Error("WhatsApp media download failed");
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of fileRes.body as unknown as AsyncIterable<Uint8Array>) {
+    size += chunk.byteLength;
+    if (size > MEDIA_MAX_BYTES) throw new Error("WhatsApp media is too large");
+    chunks.push(Buffer.from(chunk));
+  }
+  return { bytes: Buffer.concat(chunks), mimeType: meta.mime_type ?? "" };
 }
 
 function describe(m: OutgoingMessage): string {

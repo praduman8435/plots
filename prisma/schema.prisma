@@ -116,10 +116,14 @@ model Seller {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  properties   Property[]
-  sessions     SellerSession[]
-  conversation WhatsAppConversation?
-  kycAttempts  KycAttempt[]
+  properties     Property[]
+  sessions       SellerSession[]
+  conversation   WhatsAppConversation?
+  kycAttempts    KycAttempt[]
+  /// Reports about this seller or their plots (never shown to the seller).
+  reportsAgainst Report[]              @relation("ReportedSeller")
+  /// Reports this seller filed while signed in.
+  reportsFiled   Report[]              @relation("ReportFiledBySeller")
 
   @@map("sellers")
 }
@@ -188,7 +192,18 @@ model AdminUser {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  sessions AdminSession[]
+  /// Authenticator-app (TOTP) two-step sign-in — see src/lib/admin/mfa.ts.
+  /// The secret is AES-256-GCM encrypted with a key derived from SESSION_SECRET.
+  mfaSecret        String?
+  mfaEnabledAt     DateTime?
+  /// Last accepted 30-second TOTP step, so one code can't be used twice.
+  mfaLastStep      Int?
+  /// scrypt hashes of single-use recovery codes.
+  mfaRecoveryCodes String[]  @default([])
+
+  sessions        AdminSession[]
+  assignedReports Report[]       @relation("ReportAssignee")
+  auditLogs       AuditLog[]
 
   @@map("admin_users")
 }
@@ -213,6 +228,18 @@ model AdminLoginAttempt {
 
   @@index([key, createdAt])
   @@map("admin_login_attempts")
+}
+
+/// Fixed-window rate-limit counters shared by every server instance — see src/lib/rate-limit.ts.
+/// key = "<policy>:<subject>", e.g. "enquiry-ip:203.0.113.7".
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limit_buckets")
 }
 
 // ───────────────────────────── Marketplace ─────────────────────────────
@@ -292,6 +319,7 @@ model Property {
   city      City            @relation(fields: [cityId], references: [id])
   images    PropertyImage[]
   enquiries Enquiry[]
+  reports   Report[]
 
   @@index([status, cityId, landType])
   @@index([status, price])
@@ -399,4 +427,130 @@ model AnalyticsEvent {
   @@index([name, createdAt])
   @@index([createdAt])
   @@map("analytics_events")
+}
+
+// ───────────────────────────── Moderation ─────────────────────────────
+
+enum ReportTarget {
+  LISTING
+  PROFILE
+}
+
+/// Structured reasons. Listing: PROPERTY_SOLD … WRONG_LOCATION; profile: FAKE_PROFILE … ABUSIVE; both: FRAUD, OTHER.
+enum ReportReason {
+  PROPERTY_SOLD
+  DUPLICATE_LISTING
+  FRAUD
+  INCORRECT_INFO
+  WRONG_LOCATION
+  FAKE_PROFILE
+  DUPLICATE_PROFILE
+  MISLEADING_LISTINGS
+  ABUSIVE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+/// What the admin concluded when closing a report.
+enum ReportOutcome {
+  NO_ACTION
+  LISTING_MARKED_SOLD
+  LISTING_HIDDEN
+  LISTING_REJECTED
+  SELLER_CONTACTED
+  SELLER_SUSPENDED
+  DETAILS_CORRECTED
+  OTHER
+}
+
+/// A buyer's report about a plot or a seller profile. Only admins ever see it.
+/// Targets use RESTRICT so moderation evidence can't vanish with a cascade;
+/// the label/code snapshots keep the report readable whatever happens later.
+model Report {
+  id          String       @id @default(cuid())
+  /// Short id for people: "R-7Q2M4K".
+  code        String       @unique
+  target      ReportTarget
+  reason      ReportReason
+  /// Reporter's own words (plain text, ≤ 1000 chars). Required for OTHER.
+  description String?
+
+  /// The reported plot (LISTING reports only).
+  propertyId  String?
+  property    Property? @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  /// The reported seller — for a LISTING report, the plot's seller at report time.
+  sellerId    String
+  seller      Seller    @relation("ReportedSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  /// "2 Bigha Agricultural land in Sathiyaon" / "Gurpreet Singh" at report time.
+  targetLabel String
+
+  /// Reporter: a signed-in seller, if any. Otherwise anonymous — identified only
+  /// by keyed hashes (never a raw IP or a phone number), used for de-duplication
+  /// and to spot one source filing many reports.
+  reporterSellerId String?
+  reporterSeller   Seller? @relation("ReportFiledBySeller", fields: [reporterSellerId], references: [id], onDelete: SetNull)
+  reporterKey      String /// HMAC of the reporter cookie (or the seller id)
+  reporterIpHash   String? /// HMAC of the client IP (trusted proxy only)
+
+  status    ReportStatus   @default(PENDING)
+  outcome   ReportOutcome?
+  /// Fraud reports jump the queue.
+  priority  Boolean        @default(false)
+  /// Set while the report is open; cleared when it's closed. One open report per reporter per target.
+  dedupeKey String?        @unique
+
+  assignedAdminId String?
+  assignedAdmin   AdminUser? @relation("ReportAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  /// The latest admin conclusion (full history is in audit_logs).
+  resolutionNote  String?
+  reviewedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@index([status, priority, createdAt])
+  @@index([target, reason, createdAt])
+  @@index([propertyId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([reporterKey, createdAt])
+  @@index([createdAt])
+  @@map("reports")
+}
+
+/// Append-only record of significant admin actions (moderation, status changes,
+/// blocking). target ids are plain strings — no foreign keys — so history is
+/// never lost or rewritten when the target changes.
+model AuditLog {
+  id          String     @id @default(cuid())
+  adminUserId String?
+  adminUser   AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  /// Admin email at the time (survives the admin account being removed).
+  actorLabel  String
+  /// e.g. "report.status", "report.note", "listing.MARK_SOLD", "seller.block".
+  action      String
+  targetType  String /// "report" | "listing" | "seller"
+  targetId    String
+  reportId    String?
+  report      Report?    @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  propertyId  String?
+  sellerId    String?
+  /// Why — the admin's note. Plain text.
+  note        String?
+  meta        Json?
+  createdAt   DateTime   @default(now())
+
+  @@index([targetType, targetId, createdAt])
+  @@index([reportId, createdAt])
+  @@index([propertyId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

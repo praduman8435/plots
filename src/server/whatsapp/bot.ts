@@ -1120,7 +1120,7 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
 
     case "ASK_LAND_TYPE": {
       const fromId = replyId?.startsWith("type:") ? replyId.slice(5) : null;
-      const landType = fromId && fromId in LAND_TYPES ? (fromId as LandType) : text ? parseLandType(text) : null;
+      const landType = fromId && Object.hasOwn(LAND_TYPES, fromId) ? (fromId as LandType) : text ? parseLandType(text) : null;
       if (!landType) return reprompt(t, "Please choose the land type from the list 👇");
       return advance(t, "ASK_LAND_TYPE", { ...d, landType }, `${landTypeLabel(landType)} ✓`);
     }

@@ -1,4 +1,4 @@
-import { ArrowLeft, Inbox, MapPinned, MessageCircle, Plus } from "lucide-react";
+import { ArrowLeft, Flag, Inbox, MapPinned, MessageCircle, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -46,7 +46,7 @@ export default async function AdminSellerPage({ params }: PageProps<"/admin/sell
   });
   if (!seller) notFound();
 
-  const [enquiries, enquiryTotal] = await Promise.all([
+  const [enquiries, enquiryTotal, reportCount] = await Promise.all([
     db.enquiry.findMany({
       where: { property: { sellerId: seller.id } },
       orderBy: { createdAt: "desc" },
@@ -54,6 +54,7 @@ export default async function AdminSellerPage({ params }: PageProps<"/admin/sell
       include: { property: { select: { id: true, title: true, code: true } } },
     }),
     db.enquiry.count({ where: { property: { sellerId: seller.id } } }),
+    db.report.count({ where: { sellerId: seller.id } }),
   ]);
   const enquiryRows = enquiries.map((e) => ({
     ...e,
@@ -83,9 +84,16 @@ export default async function AdminSellerPage({ params }: PageProps<"/admin/sell
           </span>
         }
         actions={
-          <ButtonLink href={addPlotHref} size="sm" className="h-11 sm:h-9">
-            <Plus /> Add plot for this seller
-          </ButtonLink>
+          <>
+            {reportCount > 0 && (
+              <ButtonLink href={`/admin/reports?seller=${seller.id}`} variant="secondary" size="sm" className="h-11 text-amber-800 sm:h-9">
+                <Flag /> {reportCount} report{reportCount === 1 ? "" : "s"}
+              </ButtonLink>
+            )}
+            <ButtonLink href={addPlotHref} size="sm" className="h-11 sm:h-9">
+              <Plus /> Add plot for this seller
+            </ButtonLink>
+          </>
         }
       />
 

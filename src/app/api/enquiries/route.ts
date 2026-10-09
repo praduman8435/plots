@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { normalizePhoneNumber } from "@/lib/phone";
+import { hitIpRateLimit, hitRateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { notifyEnquiry } from "@/server/whatsapp/notify";
 
 const schema = z.object({
@@ -13,6 +14,9 @@ const schema = z.object({
 
 /** Records a buyer's contact tap. Always fast; duplicates within 30 minutes are ignored. */
 export async function POST(req: Request) {
+  const byIp = await hitIpRateLimit("enquiryPerIp");
+  if (!byIp.ok) return tooManyRequests(byIp, { ok: false });
+
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ ok: false }, { status: 400 });
   const phone = normalizePhoneNumber(parsed.data.phone);
@@ -23,6 +27,10 @@ export async function POST(req: Request) {
     select: { id: true },
   });
   if (!property) return Response.json({ ok: false }, { status: 404 });
+
+  // Per plot, whatever the IP: one seller can't be flooded with fake buyer pings.
+  const byProperty = await hitRateLimit("enquiryPerProperty", property.id);
+  if (!byProperty.ok) return tooManyRequests(byProperty, { ok: false });
 
   const recent = await db.enquiry.findFirst({
     where: {

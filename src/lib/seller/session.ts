@@ -20,6 +20,9 @@ export async function createSellerSession(sellerId: string): Promise<void> {
   await db.sellerSession.create({ data: { tokenHash: hashToken(token), sellerId, expiresAt } });
 
   const cookieStore = await cookies();
+  // Rotate: a token this browser held before signing in again stops working.
+  const previous = cookieStore.get(SELLER_SESSION_COOKIE_NAME)?.value;
+  if (previous) await db.sellerSession.deleteMany({ where: { tokenHash: hashToken(previous) } }).catch(() => {});
   cookieStore.set(SELLER_SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

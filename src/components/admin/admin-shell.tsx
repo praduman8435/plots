@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   ChartColumn,
   ClipboardCheck,
+  Flag,
   LayoutDashboard,
   LogOut,
   Map,
@@ -12,6 +13,7 @@ import {
   MessageCircle,
   PhoneIncoming,
   Plus,
+  ShieldCheck,
   Users,
   X,
   type LucideIcon,
@@ -25,12 +27,12 @@ import { cn } from "@/lib/cn";
 import { adminLogout } from "@/server/actions/admin/auth";
 import { Toaster } from "./toast";
 
-type NavKey = "overview" | "review" | "listings" | "sellers" | "enquiries" | "whatsapp" | "availability" | "insights";
+type NavKey = "overview" | "review" | "listings" | "sellers" | "reports" | "enquiries" | "whatsapp" | "availability" | "insights";
 type NavItem = { key: NavKey; href: string; label: string; short: string; icon: LucideIcon; count?: number; tone?: "amber" | "brand" };
 
 export type AdminShellProps = {
   admin: { name: string; email: string };
-  counts: { pending: number; unreadChats: number; needsAttention: number };
+  counts: { pending: number; unreadChats: number; needsAttention: number; openReports: number };
   children: ReactNode;
 };
 
@@ -41,7 +43,7 @@ function useActiveKey(): NavKey | null {
   if (pathname.startsWith("/admin/listings")) {
     return pathname === "/admin/listings" && searchParams.get("status") === "PENDING" ? "review" : "listings";
   }
-  for (const key of ["sellers", "enquiries", "whatsapp", "availability", "insights"] as const) {
+  for (const key of ["sellers", "reports", "enquiries", "whatsapp", "availability", "insights"] as const) {
     if (pathname.startsWith(`/admin/${key}`)) return key;
   }
   return null;
@@ -74,6 +76,7 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
     { key: "review", href: "/admin/listings?status=PENDING", label: "Review", short: "Review", icon: ClipboardCheck, count: counts.pending, tone: "amber" },
     { key: "listings", href: "/admin/listings", label: "Listings", short: "Listings", icon: Map },
     { key: "sellers", href: "/admin/sellers", label: "Sellers", short: "Sellers", icon: Users },
+    { key: "reports", href: "/admin/reports", label: "Reports", short: "Reports", icon: Flag, count: counts.openReports, tone: "amber" },
     { key: "enquiries", href: "/admin/enquiries", label: "Enquiries", short: "Enquiries", icon: PhoneIncoming },
     { key: "whatsapp", href: "/admin/whatsapp", label: "WhatsApp", short: "Chats", icon: MessageCircle, count: counts.unreadChats },
     { key: "availability", href: "/admin/availability", label: "Availability", short: "Availability", icon: CalendarCheck, count: counts.needsAttention, tone: "amber" },
@@ -81,7 +84,7 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
   ];
   const byKey = Object.fromEntries(items.map((i) => [i.key, i])) as Record<NavKey, NavItem>;
   const tabs = [byKey.overview, byKey.review, byKey.listings, byKey.whatsapp];
-  const moreItems = [byKey.availability, byKey.sellers, byKey.enquiries, byKey.insights];
+  const moreItems = [byKey.reports, byKey.availability, byKey.sellers, byKey.enquiries, byKey.insights];
   const moreActive = moreItems.some((i) => i.key === active);
   const moreCount = moreItems.reduce((n, i) => n + (i.count ?? 0), 0);
 
@@ -91,15 +94,24 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
   }, [pathname]);
 
   const signOut = (
-    <form action={adminLogout}>
-      <button
-        type="submit"
-        className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] font-medium text-ink-soft transition hover:bg-red-50 hover:text-danger"
+    <>
+      <Link
+        href="/admin/security"
+        className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] font-medium text-ink-soft transition hover:bg-brand-50 hover:text-brand-800"
       >
-        <LogOut className="size-[18px]" aria-hidden />
-        Sign out
-      </button>
-    </form>
+        <ShieldCheck className="size-[18px]" aria-hidden />
+        Sign-in security
+      </Link>
+      <form action={adminLogout}>
+        <button
+          type="submit"
+          className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] font-medium text-ink-soft transition hover:bg-red-50 hover:text-danger"
+        >
+          <LogOut className="size-[18px]" aria-hidden />
+          Sign out
+        </button>
+      </form>
+    </>
   );
 
   return (

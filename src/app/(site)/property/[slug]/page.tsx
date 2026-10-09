@@ -7,10 +7,12 @@ import { ContactActions } from "@/components/listing/contact-actions";
 import { BackButton, ShareButton, ViewBeacon } from "@/components/listing/detail-client";
 import { Gallery } from "@/components/listing/gallery";
 import { PropertyCard } from "@/components/listing/property-card";
+import { ReportSheet } from "@/components/report/report-sheet";
 import { ButtonLink } from "@/components/ui/button";
 import { formatPrice, formatRelativeDate } from "@/lib/format";
 import { freshnessLabel } from "@/lib/freshness";
 import { LAND_TYPES, LAND_TYPE_SLUGS, formatPricePerUnit, placeName } from "@/lib/land";
+import { isPubliclyViewable } from "@/lib/listing-visibility";
 import { sellerLabel } from "@/lib/seller-label";
 import { sellerProfilePath } from "@/lib/seller-profile";
 import { site } from "@/lib/site";
@@ -19,12 +21,21 @@ import { getListingBySlug, getSimilarListings } from "@/server/listings/queries"
 
 export const revalidate = 60;
 
-const PUBLIC_STATUSES = new Set(["ACTIVE", "SOLD", "HIDDEN"]);
+/**
+ * No paths at build time; each plot page is rendered on its first visit and
+ * then served from cache (refreshed every 60s, and immediately via
+ * revalidatePath when its status changes). Without this the route rendered on
+ * every request. Nothing on the page is per-visitor (contact, report and view
+ * counting all happen in the browser), so a shared cache is safe.
+ */
+export async function generateStaticParams() {
+  return [];
+}
 
 export async function generateMetadata(props: PageProps<"/property/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
   const p = await getListingBySlug(slug);
-  if (!p || !PUBLIC_STATUSES.has(p.status)) return { title: "Property not found" };
+  if (!p || !isPubliclyViewable(p)) return { title: "Property not found" };
   const where = `${placeName(p)}, ${p.city.name}`;
   const description = `${formatArea(p.area, p.areaUnit)} ${LAND_TYPES[p.landType].label.toLowerCase()} for sale near ${where} — ${formatPrice(p.price)}. ${p.description.slice(0, 110)}`;
   return {
@@ -43,7 +54,7 @@ export async function generateMetadata(props: PageProps<"/property/[slug]">): Pr
 export default async function PropertyPage(props: PageProps<"/property/[slug]">) {
   const { slug } = await props.params;
   const p = await getListingBySlug(slug);
-  if (!p || !PUBLIC_STATUSES.has(p.status)) notFound();
+  if (!p || !isPubliclyViewable(p)) notFound();
 
   const available = p.status === "ACTIVE";
   const similar = await getSimilarListings(p);
@@ -209,6 +220,14 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
               <li>• Never send money only because you saw a listing online.</li>
               <li>• Confirm property details independently before making a transaction.</li>
             </ul>
+            <div className="mt-4 border-t border-line pt-3">
+              <ReportSheet
+                target="LISTING"
+                targetRef={p.id}
+                notice={p.status === "SOLD" ? "This property is already marked as sold." : !available ? "This property is already marked as not available." : undefined}
+                hideReasons={available ? [] : ["PROPERTY_SOLD"]}
+              />
+            </div>
           </section>
         </div>
 

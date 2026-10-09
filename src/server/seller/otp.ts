@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { OTP_CONFIG } from "@/lib/otp-config";
 import { hashSecret, verifySecretHash } from "@/lib/scrypt-hash";
 import { isDemoMode } from "@/lib/demo";
+import { hitIpRateLimit } from "@/lib/rate-limit";
 import { getTrustedClientIp } from "@/lib/request-ip";
 import { getOtpProvider, isWhatsAppOtpConfigured, type OtpProvider } from "@/server/otp/provider";
 
@@ -110,6 +111,10 @@ export type VerifyOtpResult =
   | { success: false; error: { type: "INVALID" | "TOO_MANY_ATTEMPTS" | "WRONG_CODE"; message: string } };
 
 export async function verifyOtp(phoneNormalized: string, rawCode: string): Promise<VerifyOtpResult> {
+  // Each code allows 5 tries; this caps one IP spraying guesses across many numbers.
+  const limited = await hitIpRateLimit("otpVerifyPerIp");
+  if (!limited.ok) return { success: false, error: { type: "TOO_MANY_ATTEMPTS", message: "Too many attempts. Please wait a few minutes and try again." } };
+
   const challenge = await db.otpChallenge.findFirst({
     where: { phoneNormalized, purpose: PURPOSE, consumedAt: null },
     orderBy: { createdAt: "desc" },

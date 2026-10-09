@@ -396,6 +396,9 @@ const buyerNames = ["Amit Kumar", "Simran Kaur", "Vikas Pandey", "Neha Gupta", "
 
 async function main() {
   // Wipe marketplace data (cascades to images, enquiries, messages, sessions, KYC attempts).
+  // Reports restrict deletes of their plot/seller (moderation evidence), so they go first.
+  await db.auditLog.deleteMany();
+  await db.report.deleteMany();
   await db.whatsAppConversation.deleteMany();
   await db.property.deleteMany();
   await db.seller.deleteMany();

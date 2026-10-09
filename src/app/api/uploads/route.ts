@@ -1,6 +1,7 @@
 import { getAdminSession } from "@/lib/admin/session";
+import { hitRateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { getSellerSession } from "@/lib/seller/session";
-import { MAX_UPLOAD_BYTES, isAllowedImageType, saveImage } from "@/server/storage";
+import { MAX_UPLOAD_BYTES, UnsupportedImageError, isAllowedImageType, saveImage } from "@/server/storage";
 
 /**
  * Photo upload for the listing form (admin and seller portal). Multipart
@@ -13,6 +14,13 @@ export async function POST(request: Request) {
 
   const [admin, seller] = await Promise.all([getAdminSession(), getSellerSession()]);
   if (!admin && !seller) return Response.json({ error: "Sign in to upload photos." }, { status: 401 });
+
+  // Per account (not IP): every upload is decoded, re-encoded and stored.
+  const uploader = admin ? `admin:${admin.id}` : `seller:${seller!.id}`;
+  for (const policy of ["uploadsPerUserHour", "uploadsPerUserDay"] as const) {
+    const limited = await hitRateLimit(policy, uploader);
+    if (!limited.ok) return tooManyRequests(limited, { error: "Too many photos uploaded. Please try again later." });
+  }
 
   const declared = Number(request.headers.get("content-length") ?? 0);
   if (declared > MAX_UPLOAD_BYTES + 64 * 1024) {
@@ -40,6 +48,7 @@ export async function POST(request: Request) {
     const image = await saveImage(Buffer.from(await file.arrayBuffer()));
     return Response.json(image, { status: 201 });
   } catch (err) {
+    if (err instanceof UnsupportedImageError) return Response.json({ error: err.message }, { status: 415 });
     console.error("upload failed", { by: admin ? "admin" : "seller", err: err instanceof Error ? err.message : String(err) });
     return Response.json({ error: "Couldn't read this photo. Try another one." }, { status: 400 });
   }
