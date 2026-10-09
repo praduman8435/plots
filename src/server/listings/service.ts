@@ -4,6 +4,7 @@ import type { ListingSource, SellerType } from "@/generated/prisma/enums";
 import { createWithUniqueCode, generatePropertyCode, generateSellerCode } from "@/lib/codes";
 import { db } from "@/lib/db";
 import { buildTitle } from "@/lib/land";
+import { sellerProfileSlug } from "@/lib/seller-profile";
 import { slugify } from "@/lib/slug";
 import { resolveCity } from "@/server/cities";
 import { toSqft } from "@/lib/units";
@@ -35,6 +36,7 @@ export async function findOrCreateSeller(input: {
     db.seller.create({
       data: {
         code,
+        profileSlug: sellerProfileSlug(input.name, code),
         phone: input.phone,
         name: input.name,
         sellerType: input.sellerType,

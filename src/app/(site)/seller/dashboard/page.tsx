@@ -18,7 +18,10 @@ import { formatArea } from "@/lib/units";
 import { site } from "@/lib/site";
 import { isWhatsAppConnected, sellOnWhatsAppProps, waLink } from "@/lib/whatsapp-links";
 import { sellerSignOut } from "@/server/actions/seller/auth";
+import { ShareProfile } from "@/components/seller/share-profile";
+import { sellerProfileUrl } from "@/lib/seller-profile";
 import { isKycAvailable } from "@/server/kyc/provider";
+import { ensureProfileSlug } from "@/server/seller/profile";
 
 export const metadata: Metadata = { title: "My properties", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -46,6 +49,7 @@ function when(d: Date) {
 
 export default async function SellerDashboard() {
   const seller = await requireSeller();
+  const profileUrl = sellerProfileUrl(await ensureProfileSlug(seller));
   const [plots, enquiries] = await Promise.all([
     db.property.findMany({
       where: { sellerId: seller.id },
@@ -115,6 +119,10 @@ export default async function SellerDashboard() {
             <strong>Still available?</strong> Please confirm {needsAnswer === 1 ? "your property" : `${needsAnswer} properties`} below — otherwise {needsAnswer === 1 ? "it is" : "they are"} hidden from buyers after 24 hours.
           </p>
         )}
+
+        <div className="mt-3">
+          <ShareProfile url={profileUrl} name={seller.name} />
+        </div>
 
         {/* Properties */}
         <section className="mt-8">

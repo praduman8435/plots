@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "vercel-build": "if [ \"$VERCEL_ENV\" = production ]; then prisma migrate deploy; fi && next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -14,7 +15,8 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "db:create-admin": "tsx prisma/create-admin.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "check:profile": "tsx --conditions=react-server scripts/check-seller-profile.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

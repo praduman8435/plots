@@ -12,6 +12,7 @@ import { formatPrice, formatRelativeDate } from "@/lib/format";
 import { freshnessLabel } from "@/lib/freshness";
 import { LAND_TYPES, LAND_TYPE_SLUGS, formatPricePerUnit, placeName } from "@/lib/land";
 import { sellerLabel } from "@/lib/seller-label";
+import { sellerProfilePath } from "@/lib/seller-profile";
 import { site } from "@/lib/site";
 import { formatArea, formatSqftHint } from "@/lib/units";
 import { getListingBySlug, getSimilarListings } from "@/server/listings/queries";
@@ -271,7 +272,7 @@ function SellerCard({
   className,
   compact = false,
 }: {
-  seller: { name: string; sellerType: "OWNER" | "BROKER"; phoneVerifiedAt: Date | null; createdAt: Date; _count: { properties: number } };
+  seller: { name: string; sellerType: "OWNER" | "BROKER"; phoneVerifiedAt: Date | null; createdAt: Date; profileSlug: string | null; isBlocked: boolean; _count: { properties: number } };
   identityVerified: boolean;
   className?: string;
   compact?: boolean;
@@ -287,6 +288,11 @@ function SellerCard({
           </p>
         </div>
       </div>
+      {seller.profileSlug && !seller.isBlocked && seller._count.properties > 1 && (
+        <Link href={sellerProfilePath(seller.profileSlug)} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-800">
+          See all {seller._count.properties} properties by {seller.name.split(" ")[0]} →
+        </Link>
+      )}
       {(seller.phoneVerifiedAt || identityVerified) && (
         <ul className="mt-3 flex flex-wrap gap-2">
           {seller.phoneVerifiedAt && (

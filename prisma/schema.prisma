@@ -91,6 +91,11 @@ model Seller {
   /// needs the WhatsApp/SMS code sent to the registered number.
   code String @unique
 
+  /// Permanent public profile URL: /s/<profileSlug> (e.g. "praduman-rp44qh").
+  /// Set once (name + Seller ID suffix, so always unique) and never changed,
+  /// so links shared on WhatsApp keep working even if the seller renames.
+  profileSlug String? @unique
+
   name            String
   /// E.164 (+91XXXXXXXXXX) — see src/lib/phone.ts. Also the WhatsApp number.
   phone           String     @unique
@@ -223,7 +228,7 @@ model City {
   latitude    Float
   longitude   Float
   bighaInSqft Float /// regional bigha size, e.g. ~27,000 sq ft in eastern UP
-  marlaInSqft Float @default(272.25) /// 272.25 sq ft (revenue) — some urban sectors use 225
+  marlaInSqft Float    @default(272.25) /// 272.25 sq ft (revenue) — some urban sectors use 225
   headline    String? /// SEO/landing copy override
   intro       String? /// short paragraph for the city page
   isLive      Boolean  @default(false)
@@ -294,7 +299,7 @@ model Property {
   @@index([status, publishedAt])
   @@index([status, freshnessAt])
   @@index([status, availabilityCheckSentAt])
-  @@index([sellerId])
+  @@index([sellerId, status])
   @@map("properties")
 }
 

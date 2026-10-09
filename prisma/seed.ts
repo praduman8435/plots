@@ -19,6 +19,7 @@ import type { AreaUnit, IdentityStatus, LandType, ListingSource, ListingStatus, 
 import { generatePropertyCode } from "../src/lib/codes";
 import { buildTitle } from "../src/lib/land";
 import { hashSecret } from "../src/lib/scrypt-hash";
+import { sellerProfileSlug } from "../src/lib/seller-profile";
 import { slugify } from "../src/lib/slug";
 import { toSqft } from "../src/lib/units";
 
@@ -416,6 +417,7 @@ async function main() {
     const seller = await db.seller.create({
       data: {
         code: s.code,
+        profileSlug: sellerProfileSlug(s.name, s.code),
         name: s.name,
         phone: s.phone,
         sellerType: s.sellerType,

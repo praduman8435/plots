@@ -176,7 +176,7 @@ export async function getListingBySlug(slug: string) {
       city: true,
       seller: {
         select: {
-          id: true, name: true, sellerType: true, phone: true, phoneVerifiedAt: true, identityStatus: true, createdAt: true,
+          id: true, name: true, sellerType: true, phone: true, phoneVerifiedAt: true, identityStatus: true, createdAt: true, profileSlug: true, isBlocked: true,
           _count: { select: { properties: { where: { status: "ACTIVE" } } } },
         },
       },
