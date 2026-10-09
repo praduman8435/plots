@@ -27,25 +27,25 @@ export default async function SellPage() {
   return (
     <>
       <section className="relative isolate overflow-hidden bg-brand-950">
-        <Image src="/demo/land-097.webp" alt="" fill priority sizes="100vw" className="-z-10 object-cover opacity-45" />
+        <Image src="/demo/land-097.webp" alt="" fill preload fetchPriority="high" quality={50} sizes="100vw" className="-z-10 object-cover opacity-45" />
         <div className="absolute inset-0 -z-10 bg-linear-to-b from-brand-950/80 to-brand-950/90" />
-        <div className="container-page py-12 sm:py-20">
-          <h1 className="max-w-3xl text-[2.3rem] leading-[1.05] font-extrabold text-white sm:text-6xl">Sell your land in a few minutes.</h1>
+        <div className="container-page py-12 sm:py-16 lg:py-20">
+          <h1 className="max-w-3xl text-[2.3rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">Sell your land in a few minutes.</h1>
           <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
             Just a few basic details and your listing is ready. Buyers contact you directly — no documents needed to list.
           </p>
 
-          <div className="mt-8 grid max-w-3xl gap-3 sm:grid-cols-2">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {seller?.onboardedAt ? (
-              <ButtonLink href="/seller/plots/new" variant="white" size="xl" className="w-full">
+              <ButtonLink href="/seller/plots/new" variant="white" size="xl" className="w-full sm:w-auto">
                 Add another property <ArrowRight />
               </ButtonLink>
             ) : (
-              <ButtonLink href="/sell/start" variant="white" size="xl" className="w-full">
+              <ButtonLink href="/sell/start" variant="white" size="xl" className="w-full sm:w-auto">
                 Start selling <ArrowRight />
               </ButtonLink>
             )}
-            <ButtonA {...sellOnWhatsAppProps()} size="xl" className="w-full bg-white/10 shadow-none ring-1 ring-white/25 hover:bg-white/15">
+            <ButtonA {...sellOnWhatsAppProps()} size="xl" className="w-full bg-white/10 shadow-none ring-1 ring-white/25 hover:bg-white/15 sm:w-auto">
               <WhatsAppIcon /> List on WhatsApp instead
             </ButtonA>
           </div>

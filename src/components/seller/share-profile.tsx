@@ -74,7 +74,7 @@ export function ShareProfile({ url, name, variant = "dashboard", total }: { url:
   return (
     <>
       {variant === "dashboard" ? (
-        <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-line sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-line @lg:flex-row @lg:items-center">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
             <Store className="size-5" aria-hidden />
           </span>
@@ -82,7 +82,7 @@ export function ShareProfile({ url, name, variant = "dashboard", total }: { url:
             <p className="font-semibold text-ink">Share all your properties</p>
             <p className="text-sm text-muted">One link to showcase all your active properties to buyers.</p>
           </div>
-          <Button type="button" size="md" onClick={open} className="h-10 shrink-0">
+          <Button type="button" size="md" onClick={open} className="h-10 shrink-0 @max-lg:w-full">
             <Share2 /> Share My Properties
           </Button>
         </div>

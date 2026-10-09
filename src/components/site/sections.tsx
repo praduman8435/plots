@@ -25,7 +25,7 @@ export function SectionHeading({
     <div className="mb-6 flex items-end justify-between gap-4 sm:mb-8">
       <div>
         {eyebrow && <p className="mb-2 text-xs font-bold tracking-[0.14em] text-brand-600 uppercase">{eyebrow}</p>}
-        <h2 className="text-[1.6rem] leading-tight font-extrabold text-ink sm:text-[2rem]">{title}</h2>
+        <h2 className="text-[1.6rem] leading-tight font-extrabold text-ink sm:text-[1.75rem]">{title}</h2>
         {description && <p className="mt-2 max-w-2xl text-[15px] text-muted sm:text-base">{description}</p>}
       </div>
       {action}
@@ -111,7 +111,7 @@ export function SellOnWhatsAppBand() {
           <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
             <WhatsAppIcon className="size-3.5" /> For owners &amp; brokers
           </p>
-          <h2 className="mt-4 text-[1.9rem] leading-[1.1] font-extrabold sm:text-[2.6rem]">
+          <h2 className="mt-4 text-[1.9rem] leading-[1.1] font-extrabold sm:text-[2.25rem]">
             List your land in 3 minutes — right from WhatsApp.
           </h2>
           <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-white/80 sm:text-base">

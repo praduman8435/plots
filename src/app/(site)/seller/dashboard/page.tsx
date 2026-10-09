@@ -68,21 +68,23 @@ export default async function SellerDashboard() {
 
   return (
     <div className="bg-mist pb-28 md:pb-16">
-      <div className="container-page max-w-4xl pt-6 sm:pt-10">
+      <div className="container-page max-w-4xl pt-6 sm:pt-10 lg:grid lg:max-w-[78rem] lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start lg:gap-8">
+        {/* Left on desktop: who you are + your share link (stays in view). Phones: stacked as before. */}
+        <aside className="lg:sticky lg:top-24">
         {/* Welcome + Seller ID */}
         <section className="relative isolate overflow-hidden rounded-[1.75rem] bg-linear-to-br from-brand-700 via-brand-800 to-brand-950 p-5 text-white shadow-lift sm:p-7">
           <div className="bg-contours absolute inset-0 -z-10 opacity-70" aria-hidden />
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-extrabold sm:text-3xl">Welcome, {seller.name.split(" ")[0]}</h1>
+              <h1 className="truncate text-2xl font-extrabold sm:text-3xl lg:text-2xl">Welcome, {seller.name.split(" ")[0]}</h1>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/75">
                 <span className="inline-flex items-center gap-1"><BadgeCheck className="size-4 text-brand-200" aria-hidden /> Phone verified</span>
                 {seller.identityStatus === "VERIFIED" && <span className="inline-flex items-center gap-1"><Fingerprint className="size-4 text-brand-200" aria-hidden /> Identity verified</span>}
               </p>
             </div>
             <form action={sellerSignOut}>
-              <button className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-white/80 ring-1 ring-white/20 hover:bg-white/10">
-                <LogOut className="size-4" aria-hidden /> <span className="hidden sm:inline">Sign out</span>
+              <button aria-label="Sign out" className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-white/80 ring-1 ring-white/20 hover:bg-white/10">
+                <LogOut className="size-4" aria-hidden /> <span className="hidden sm:inline lg:hidden">Sign out</span>
               </button>
             </form>
           </div>
@@ -120,12 +122,14 @@ export default async function SellerDashboard() {
           </p>
         )}
 
-        <div className="mt-3">
+        <div className="@container mt-3">
           <ShareProfile url={profileUrl} name={seller.name} />
         </div>
+        </aside>
 
+        <div className="min-w-0">
         {/* Properties */}
-        <section className="mt-8">
+        <section className="mt-8 lg:mt-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-extrabold">My properties</h2>
             <div className="flex gap-2">
@@ -148,7 +152,7 @@ export default async function SellerDashboard() {
               </ButtonLink>
             </div>
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2">
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               {plots.map((p) => {
                 const st = statusOf(p.status, p.hiddenReason);
                 const fresh = p.status === "ACTIVE" ? freshnessLabel(p) : null;
@@ -219,6 +223,7 @@ export default async function SellerDashboard() {
             </ul>
           )}
         </section>
+        </div>
       </div>
     </div>
   );

@@ -28,12 +28,12 @@ export default async function HomePage() {
         {/* The LCP on phones. Dimmed to 60% behind text, so a lighter encode (q50) is visually identical. */}
         <Image src="/demo/land-066.webp" alt="" fill preload fetchPriority="high" quality={50} sizes="100vw" className="-z-10 object-cover object-[50%_60%] opacity-60" />
         <div className="absolute inset-0 -z-10 bg-linear-to-b from-brand-950/70 via-brand-950/40 to-brand-950/80" />
-        <div className="container-page pt-12 pb-10 sm:pt-24 sm:pb-20">
-          <h1 className="max-w-2xl text-[2.4rem] leading-[1.05] font-extrabold text-white sm:text-6xl">Find the right land for you.</h1>
+        <div className="container-page pt-12 pb-10 sm:pt-16 sm:pb-14 lg:pt-20 lg:pb-16">
+          <h1 className="max-w-2xl text-[2.4rem] leading-[1.05] font-extrabold text-white sm:text-5xl lg:text-[3.25rem]">Find the right land for you.</h1>
           <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
             Farmland, house plots and commercial land — with real photos and prices. Talk directly to the seller.
           </p>
-          <div className="mt-7 max-w-4xl sm:mt-9">
+          <div className="mt-7 max-w-4xl sm:mt-8 lg:max-w-[52rem]">
             <HeroSearch />
           </div>
         </div>

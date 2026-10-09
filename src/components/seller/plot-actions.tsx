@@ -27,7 +27,7 @@ export function PlotActions({ id, status, hiddenReason, awaitingReply }: Props) 
   const reactivatable = status === "SOLD" || (status === "HIDDEN" && hiddenReason !== "BY_ADMIN");
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-1.5">
       {status === "ACTIVE" && (
         <Button size="sm" variant={awaitingReply ? "primary" : "soft"} disabled={pending} onClick={() => run("CONFIRM_AVAILABLE")}>
           <CheckCircle2 /> Still available
@@ -44,12 +44,12 @@ export function PlotActions({ id, status, hiddenReason, awaitingReply }: Props) 
         </Button>
       )}
       {status !== "SOLD" && (
-        <Link href={`/seller/plots/${id}/edit`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+        <Link href={`/seller/plots/${id}/edit`} className={buttonVariants({ variant: "ghost", size: "sm", className: "px-2.5" })}>
           <Pencil /> Edit
         </Link>
       )}
       {status === "ACTIVE" && (
-        <Button size="sm" variant="ghost" disabled={pending} onClick={() => run("HIDE")}>
+        <Button size="sm" variant="ghost" className="px-2.5" disabled={pending} onClick={() => run("HIDE")}>
           <EyeOff /> Hide
         </Button>
       )}

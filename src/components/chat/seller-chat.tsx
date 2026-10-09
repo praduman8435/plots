@@ -184,10 +184,10 @@ function VerifyNumber({ onVerified }: { onVerified: (state: ChatState) => void }
   }
 
   return (
-    <ChatFrame variant="seller" subtitle="online" backHref="/sell">
+    <ChatFrame variant="seller" subtitle="Listing assistant · replies instantly" backHref="/sell">
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3" style={CHAT_WALLPAPER}>
         <span className="mx-auto mb-3 block w-fit rounded-lg bg-white/90 px-3 py-1 text-[12px] font-medium text-[#54656f] shadow-sm">Today</span>
-        <div className="max-w-[86%] rounded-xl rounded-tl-none bg-white px-3 pt-1.5 pb-2 text-[15px] leading-snug text-[#111b21] shadow-[0_1px_0.5px_rgb(11_20_26/0.13)]">
+        <div className="max-w-[86%] rounded-xl rounded-tl-none bg-white px-3 md:max-w-[34rem] pt-1.5 pb-2 text-[15px] leading-snug text-[#111b21] shadow-[0_1px_0.5px_rgb(11_20_26/0.13)]">
           <WaRichText
             text={
               step === "phone"

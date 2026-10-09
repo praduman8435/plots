@@ -6,9 +6,9 @@
 export default function SearchLoading() {
   return (
     <div className="pb-24 md:pb-16" aria-busy="true" aria-label="Loading results">
-      <div className="sticky top-16 z-30 border-b border-line bg-white/95 lg:top-[72px]">
+      <div className="sticky top-16 z-30 border-b border-line bg-white/95">
         <div className="container-page flex items-center gap-2.5 py-3">
-          <div className="h-11 flex-1 rounded-full bg-mist ring-1 ring-line" />
+          <div className="h-11 flex-1 rounded-full bg-mist ring-1 ring-line md:h-10 lg:max-w-xl" />
           <div className="size-11 rounded-full bg-mist ring-1 ring-line lg:hidden" />
         </div>
         <div className="container-page flex gap-1.5 overflow-hidden pb-3 lg:hidden">
@@ -17,8 +17,8 @@ export default function SearchLoading() {
           ))}
         </div>
       </div>
-      <div className="container-page mt-6 grid gap-8 lg:mt-8 lg:grid-cols-[18rem_1fr]">
-        <div className="hidden h-96 rounded-3xl border border-line bg-white lg:block" />
+      <div className="container-page mt-6 grid gap-8 lg:mt-8 lg:grid-cols-[16.5rem_1fr]">
+        <div className="hidden h-96 rounded-2xl border border-line bg-white lg:block" />
         <div>
           <div className="h-7 w-48 animate-pulse rounded-lg bg-mist" />
           <div className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">

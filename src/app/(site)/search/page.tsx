@@ -75,9 +75,9 @@ export default async function SearchPage(props: PageProps<"/search">) {
     <div className="pb-24 md:pb-16">
       <SearchTracker query={queryKey} filtered={filtered} results={total} />
       {/* Search bar */}
-      <div className="sticky top-16 z-30 border-b border-line bg-white/95 lg:top-[72px]">
+      <div className="sticky top-16 z-30 border-b border-line bg-white/95">
         <div className="container-page flex items-center gap-2.5 py-3">
-          <form action="/search" method="get" role="search" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full bg-mist px-4 ring-1 ring-line focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-400">
+          <form action="/search" method="get" role="search" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full bg-mist px-4 ring-1 ring-line lg:max-w-xl focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-400">
             {f.city && <input type="hidden" name="city" value={f.city} />}
             {f.type && <input type="hidden" name="type" value={f.type} />}
             <Search className="size-[18px] shrink-0 text-muted" aria-hidden />
@@ -87,7 +87,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
               placeholder="Search village or area"
               aria-label="Search by village, area or plot ID"
               enterKeyHint="search"
-              className="h-11 w-full min-w-0 bg-transparent text-[16px] placeholder:text-muted focus:outline-none"
+              className="h-11 w-full min-w-0 bg-transparent text-[16px] placeholder:text-muted focus:outline-none md:h-10 md:text-[15px]"
             />
           </form>
           <div className="lg:hidden">
@@ -116,14 +116,14 @@ export default async function SearchPage(props: PageProps<"/search">) {
         </nav>
       </div>
 
-      <div className="container-page mt-6 grid gap-8 lg:mt-8 lg:grid-cols-[18rem_1fr]">
+      <div className="container-page mt-6 grid gap-8 lg:mt-8 lg:grid-cols-[16.5rem_1fr]">
         {/* Desktop filters */}
         <aside className="hidden lg:block">
-          <form action="/search" method="get" className="sticky top-40 rounded-3xl border border-line bg-white p-6 shadow-soft">
-            <h2 className="mb-6 text-lg font-bold">Filters</h2>
+          <form action="/search" method="get" className="sticky top-36 rounded-2xl border border-line bg-white p-5 shadow-soft">
+            <h2 className="mb-5 text-base font-bold">Filters</h2>
             <FilterFields f={f} cities={cities} idPrefix="d" />
             <div className="mt-8 flex gap-2">
-              <Link href={resetHref} className="flex h-11 flex-1 items-center justify-center rounded-full text-sm font-semibold text-ink-soft hover:bg-mist">
+              <Link href={resetHref} className="flex h-11 flex-1 items-center justify-center rounded-full text-sm font-semibold text-ink-soft hover:bg-mist md:h-10">
                 Reset
               </Link>
               <Button type="submit" className="flex-[2]">

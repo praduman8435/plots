@@ -13,9 +13,9 @@ const BUDGETS = [
 /** Plain GET form → /search. Works before JavaScript loads (slow 3G). */
 export function HeroSearch({ citySlug, compact = false }: { citySlug?: string; compact?: boolean }) {
   return (
-    <form action="/search" method="get" role="search" className="rounded-3xl bg-white p-2 shadow-lift ring-1 ring-black/5">
+    <form action="/search" method="get" role="search" className="rounded-3xl bg-white p-2 shadow-lift ring-1 ring-black/5 md:rounded-2xl md:p-1.5">
       {citySlug && <input type="hidden" name="city" value={citySlug} />}
-      <div className={compact ? "grid gap-1 sm:grid-cols-[1.5fr_1fr_auto]" : "grid gap-1 md:grid-cols-[1.6fr_1fr_1fr_auto]"}>
+      <div className={compact ? "grid gap-1 sm:grid-cols-[1.5fr_1fr_auto]" : "grid gap-1 md:grid-cols-[1.5fr_1.1fr_1fr_auto]"}>
         <SearchField icon={<MapPin className="size-5 text-brand-600" aria-hidden />} label="Where do you want land?" htmlFor="hs-q">
           <input
             id="hs-q"
@@ -50,7 +50,7 @@ export function HeroSearch({ citySlug, compact = false }: { citySlug?: string; c
             </select>
           </SearchField>
         )}
-        <Button type="submit" size="xl" className="mt-1 h-14 w-full rounded-2xl md:mt-0 md:h-auto md:min-h-16 md:w-auto md:px-7">
+        <Button type="submit" size="xl" className="mt-1 h-14 w-full rounded-2xl md:mt-0 md:h-auto md:min-h-14 md:w-auto md:rounded-xl md:px-6">
           <Search /> Search land
         </Button>
       </div>
@@ -60,10 +60,10 @@ export function HeroSearch({ citySlug, compact = false }: { citySlug?: string; c
 
 function SearchField({ icon, label, htmlFor, children }: { icon: React.ReactNode; label: string; htmlFor: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-16 items-center gap-3 rounded-2xl px-4 py-2 transition focus-within:bg-mist hover:bg-mist/70">
+    <div className="flex min-h-16 items-center gap-3 rounded-2xl px-4 py-2 transition focus-within:bg-mist hover:bg-mist/70 md:min-h-14 md:rounded-xl md:px-3.5">
       {icon}
       <div className="min-w-0 flex-1">
-        <label htmlFor={htmlFor} className="block text-xs font-semibold text-muted">
+        <label htmlFor={htmlFor} className="block truncate text-xs font-semibold text-muted">
           {label}
         </label>
         {children}

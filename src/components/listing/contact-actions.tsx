@@ -86,10 +86,10 @@ export function ContactActions({
         </button>
       ) : variant === "bar" ? (
         <div className="flex gap-2">
-          <Button size="lg" onClick={() => start("WHATSAPP")} className="h-12 flex-1 px-4">
+          <Button size="lg" onClick={() => start("WHATSAPP")} className="h-12 flex-1 px-4 md:h-10 md:text-sm">
             <WhatsAppIcon /> WhatsApp Seller
           </Button>
-          <Button size="lg" variant="secondary" onClick={() => start("CALL")} className="h-12 px-5" aria-label={`Call ${sellerName}`}>
+          <Button size="lg" variant="secondary" onClick={() => start("CALL")} className="h-12 px-5 md:h-10 md:px-4 md:text-sm" aria-label={`Call ${sellerName}`}>
             <Phone /> Call
           </Button>
         </div>

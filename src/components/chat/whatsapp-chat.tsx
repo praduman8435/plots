@@ -296,9 +296,11 @@ export function sellerSuggestions(state: ChatState): string[] {
 // ───────────────────────────── Frame + header ─────────────────────────────
 
 /**
- * The phone screen: green header, beige chat background. Admin: always a
- * phone frame. Seller: a full-height app screen on phones, a phone frame
- * from md up.
+ * Green header, beige chat background. Admin (the WhatsApp simulator): a
+ * phone frame on purpose — it previews what the seller sees in WhatsApp.
+ * Seller: a full-height app screen on phones; from md up a messaging panel
+ * that fills its container (messages scroll inside, composer pinned at the
+ * bottom of the panel) — no fake phone chrome.
  */
 export function ChatFrame({
   variant,
@@ -317,15 +319,13 @@ export function ChatFrame({
   return (
     <div
       className={cn(
-        seller
-          ? "flex h-full w-full flex-col md:mx-auto md:w-[410px] md:justify-center md:py-6"
-          : "",
+        seller ? "flex h-full w-full flex-col" : "",
       )}
     >
       <div
         className={cn(
           seller
-            ? "flex min-h-0 flex-1 flex-col md:flex-none md:rounded-[2.9rem] md:bg-gradient-to-b md:from-brand-950 md:to-[#021710] md:p-[11px] md:shadow-lift md:ring-1 md:ring-black/20"
+            ? "flex min-h-0 flex-1 flex-col md:overflow-hidden md:rounded-2xl md:shadow-card md:ring-1 md:ring-line"
             : "rounded-[2.9rem] bg-gradient-to-b from-brand-950 to-[#021710] p-[11px] shadow-lift ring-1 ring-black/20",
         )}
       >
@@ -333,13 +333,13 @@ export function ChatFrame({
           className={cn(
             "relative flex flex-col overflow-hidden bg-[#efeae2]",
             seller
-              ? "min-h-0 flex-1 md:h-[min(780px,calc(100dvh-9rem))] md:min-h-[520px] md:flex-none md:rounded-[2.3rem]"
+              ? "min-h-0 flex-1"
               : "h-[min(780px,calc(100dvh-7rem))] min-h-[560px] rounded-[2.3rem]",
           )}
         >
           <div className="shrink-0 bg-brand-700 text-white">
-            <StatusBar className={seller ? "hidden md:flex" : "flex"} />
-            <div className={cn("flex items-center gap-2.5 px-3 pb-2.5", seller ? "pt-2.5 md:pt-1.5" : "pt-1.5")}>
+            {!seller && <StatusBar className="flex" />}
+            <div className={cn("flex items-center gap-2.5 px-3 pb-2.5", seller ? "pt-2.5 md:px-4 md:py-3" : "pt-1.5")}>
               {backHref ? (
                 <Link href={backHref} className="-ml-1 grid size-8 shrink-0 place-items-center rounded-full transition hover:bg-white/10" aria-label="Back">
                   <ArrowLeft className="size-5" aria-hidden />
@@ -457,7 +457,7 @@ export function ChatWindow({
     (which === "camera" ? cameraRef : galleryRef).current?.click();
   }
 
-  const subtitle = isPending ? "typing…" : seller ? "online" : "Listing assistant · usually replies instantly";
+  const subtitle = isPending ? "typing…" : "Listing assistant · replies instantly";
   const headerRight = seller ? (
     <div className="relative">
       <button
@@ -523,7 +523,7 @@ export function ChatWindow({
       {/* thread */}
       <div ref={scrollRef} className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3" style={CHAT_WALLPAPER}>
         {notice && (
-          <div className="mx-auto mb-3 max-w-[88%] rounded-lg bg-[#fff6c6] px-3 py-2 text-center text-[12px] leading-snug text-[#54513b] shadow-sm">
+          <div className="mx-auto mb-3 max-w-[88%] rounded-lg bg-[#fff6c6] md:max-w-md px-3 py-2 text-center text-[12px] leading-snug text-[#54513b] shadow-sm">
             {notice}
           </div>
         )}
@@ -857,7 +857,7 @@ function Bubble({
   return (
     <div
       className={cn(
-        "relative max-w-[86%] px-2 pt-1.5 pb-1 text-[15px] leading-snug text-[#111b21] shadow-[0_1px_0.5px_rgb(11_20_26/0.13)]",
+        "relative max-w-[86%] md:max-w-[34rem] px-2 pt-1.5 pb-1 text-[15px] leading-snug text-[#111b21] shadow-[0_1px_0.5px_rgb(11_20_26/0.13)]",
         mine ? "bg-[#d9fdd3]" : "bg-white",
         "rounded-xl",
         tail && (mine ? "rounded-tr-none" : "rounded-tl-none"),
@@ -911,7 +911,7 @@ function InteractiveActions({
     "flex w-full items-center justify-center gap-1.5 bg-white px-3 py-2.5 text-[15px] font-medium text-[#027eb5] transition hover:bg-[#f5f6f6] active:bg-[#eceeee] disabled:opacity-60";
   if (interactive.kind === "list") {
     return (
-      <div className="w-full max-w-[86%] overflow-hidden rounded-b-xl border-t border-[#e9edef] shadow-[0_1px_0.5px_rgb(11_20_26/0.13)]">
+      <div className="w-full max-w-[86%] overflow-hidden rounded-b-xl md:max-w-[34rem] border-t border-[#e9edef] shadow-[0_1px_0.5px_rgb(11_20_26/0.13)]">
         <button type="button" className={base} disabled={disabled} onClick={onOpenList}>
           <ListIcon className="size-4" aria-hidden />
           {interactive.buttonLabel ?? "Choose"}
@@ -920,7 +920,7 @@ function InteractiveActions({
     );
   }
   return (
-    <div className="flex w-full max-w-[86%] flex-col gap-px overflow-hidden rounded-b-xl bg-[#e9edef] pt-px shadow-[0_1px_0.5px_rgb(11_20_26/0.13)]">
+    <div className="flex w-full max-w-[86%] flex-col gap-px md:max-w-[34rem] overflow-hidden rounded-b-xl bg-[#e9edef] pt-px shadow-[0_1px_0.5px_rgb(11_20_26/0.13)]">
       {interactive.options.map((o) => (
         <button key={o.id ?? o.title} type="button" className={base} disabled={disabled} onClick={() => onTap(o)}>
           <Undo2 className="size-4" aria-hidden />

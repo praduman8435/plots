@@ -19,11 +19,12 @@ export const buttonVariants = cva(
         link: "rounded-none px-0 text-brand-700 underline-offset-4 hover:underline",
       },
       size: {
+        // Phones keep generous touch targets; from md (tablet/desktop, pointer) sizes step down one notch.
         sm: "h-9 px-3.5 text-sm [&_svg]:size-4",
-        md: "h-11 px-5 text-[15px] [&_svg]:size-[18px]",
-        lg: "h-12 px-6 text-base [&_svg]:size-5",
-        xl: "h-14 px-7 text-base [&_svg]:size-5",
-        icon: "size-11 [&_svg]:size-5",
+        md: "h-11 px-5 text-[15px] md:h-10 md:px-4 md:text-sm [&_svg]:size-[18px] md:[&_svg]:size-4",
+        lg: "h-12 px-6 text-base md:h-11 md:px-5 md:text-[15px] [&_svg]:size-5 md:[&_svg]:size-[18px]",
+        xl: "h-14 px-7 text-base md:h-12 md:px-6 [&_svg]:size-5",
+        icon: "size-11 md:size-10 [&_svg]:size-5",
         "icon-sm": "size-9 [&_svg]:size-4",
       },
     },
