@@ -695,7 +695,7 @@ function DetailPanel({ detail, state, onClose, onRetry }: { detail: Detail | nul
   return (
     <aside
       aria-label="Parcel details"
-      className="absolute inset-x-0 bottom-0 z-[600] flex max-h-[58vh] flex-col rounded-t-3xl bg-white shadow-lift ring-1 ring-line md:inset-y-4 md:right-4 md:left-auto md:max-h-none md:w-96 md:rounded-3xl"
+      className="absolute inset-x-0 bottom-0 z-[600] flex max-h-[58vh] flex-col rounded-t-3xl bg-white shadow-lift ring-1 ring-line md:top-4 md:right-4 md:bottom-28 md:left-auto md:max-h-none md:w-96 md:rounded-3xl"
     >
       <div className="flex items-start justify-between gap-3 border-b border-line px-5 pt-4 pb-3">
         <div className="min-w-0">
@@ -787,7 +787,7 @@ function VillagePanel({ village, attribution, onClose, onZoom }: { village: Vill
   return (
     <aside
       aria-label="Village details"
-      className="absolute inset-x-0 bottom-0 z-[600] flex max-h-[58vh] flex-col rounded-t-3xl bg-white shadow-lift ring-1 ring-line md:inset-y-auto md:top-4 md:right-4 md:bottom-auto md:left-auto md:max-h-[calc(100%-2rem)] md:w-96 md:rounded-3xl"
+      className="absolute inset-x-0 bottom-0 z-[600] flex max-h-[58vh] flex-col rounded-t-3xl bg-white shadow-lift ring-1 ring-line md:inset-y-auto md:top-4 md:right-4 md:bottom-auto md:left-auto md:max-h-[calc(100%-7rem)] md:w-96 md:rounded-3xl"
     >
       <div className="flex items-start justify-between gap-3 border-b border-line px-5 pt-4 pb-3">
         <div className="min-w-0">
