@@ -43,6 +43,7 @@ function flatten(replies: { message: { type: string; text?: string; body?: strin
 
 async function main() {
   const { processInbound } = await import("../src/server/whatsapp/inbound");
+  const { copy } = await import("../src/server/whatsapp/copy");
   const send = async (from: string, m: Partial<InboundMessage>) => {
     const r = await processInbound({ from, kind: "text", ...m } as InboundMessage, { simulate: true });
     return flatten(r.replies as never);
@@ -159,12 +160,15 @@ async function main() {
   const sent: string[] = [];
   let mode: "ok" | "fail" = "ok";
   // The mock "understands" a few messages; anything else is unclear with no reply.
-  const said = (prompt: string) => /Seller's latest message: "([\s\S]*)"$/.exec(prompt)?.[1] ?? "";
+  const said = (prompt: string) => /Their latest message: "([\s\S]*)"$/.exec(prompt)?.[1] ?? "";
   const understand = (msg: string): Record<string, unknown> => {
     if (/2 bigha khet in Sathiyaon/.test(msg))
       return { intent: "sell", fields: { landType: "AGRICULTURAL", area: 2, unit: "BIGHA", priceRupees: 1800000, city: city.name, state: city.state, locality: "Sathiyaon" }, reply: "Bahut badhiya ji!" };
     if (/^kya bhai$/.test(msg)) return { intent: "chat", reply: "Haan ji, boliye! Main aapki zameen list karne mein madad karta hoon." };
-    if (/^who are you\??$/.test(msg)) return { intent: "question", reply: "I'm the InstaPlots assistant, here to help you list your land." };
+    if (/^who are you\?$/.test(msg))
+      return { intent: "question", reply: "I'm the InstaPlots assistant, here to help you list your land.", ask: "Got a few photos of the land to share?" };
+    if (/^who are you$/.test(msg)) return { intent: "question", reply: "I'm the InstaPlots assistant, here to help you list your land." };
+    if (/^thanks a lot$/.test(msg)) return { intent: "chat", reply: "Always happy to help, ji." };
     if (/^Suresh Kumar$/.test(msg)) return { intent: "answer", fields: { name: "Suresh Kumar" } };
     if (/price 20 lakh kar do/.test(msg)) return { intent: "correction", fields: { priceRupees: 2000000 }, reply: "Theek hai ji." };
     if (/abhi photo nahi hai mere paas/.test(msg)) return { intent: "no" };
@@ -199,6 +203,7 @@ async function main() {
     check("Agent: extracted values validated into the draft", d1?.landType === "AGRICULTURAL" && d1?.area === 2 && d1?.price === 1800000 && d1?.cityId === city.id && d1?.name === "Suresh Kumar", d1);
     r = await text(ai, "who are you?");
     check("Agent: a question is answered, then the open question again", /InstaPlots assistant/.test(r.body) && /photos/i.test(r.body) && (await step(ai)) === "ASK_PHOTOS", r.body.slice(0, 200));
+    check("Agent: the open question is re-asked in fresh words, buttons kept", r.body.includes("Got a few photos of the land to share?") && !r.body.includes(copy("en").askPhotosFirst({ max: 10 })) && r.ids.includes("photos:done"), r);
     r = await text(ai, "price 20 lakh kar do please, galti ho gayi");
     check("Agent: a correction updates an earlier answer", (await draftOf(ai))?.price === 2000000 && /Noted/.test(r.body) && (await step(ai)) === "ASK_PHOTOS", r.body.slice(0, 200));
     r = await text(ai, "abhi photo nahi hai mere paas");
@@ -210,6 +215,16 @@ async function main() {
     await tap(buyer, "lang:en");
     r = await text(buyer, `mujhe ${city.name} mein khet chahiye`);
     check("Agent: a buyer gets the right page", r.body.includes(`/${city.slug}/agricultural-land`) && /Ji zaroor/.test(r.body), r.body.slice(0, 200));
+    const request = await db.buyerRequest.findFirst({ where: { phone: buyer } });
+    check("Agent: a WhatsApp buyer's request is saved for our team", request?.cityId === city.id && request.landType === "AGRICULTURAL" && /message you here/.test(r.body), { request, body: r.body.slice(0, 200) });
+    await db.buyerRequest.deleteMany({ where: { phone: buyer } });
+
+    const chatty = newPhone();
+    await tap(chatty, "lang:en");
+    r = await text(chatty, "thanks a lot");
+    const firstHasMenu = r.ids.includes("menu:list");
+    r = await text(chatty, "thanks a lot");
+    check("Agent: idle small talk doesn't resend the menu every time", firstHasMenu === false || (r.ids.length === 0 && /happy to help/.test(r.body)), r);
 
     const ai2 = newPhone();
     await tap(ai2, "lang:en");

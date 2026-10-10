@@ -398,6 +398,10 @@ function catalog(lang: Lang) {
     btnStop: en ? "Yes, stop" : "हाँ, रोकें",
     btnKeepGoing: en ? "Continue" : "जारी रखें",
     browseLand: (v: Vars) => (en ? `👉 See land for sale here: ${v.url}` : `👉 बिकाऊ ज़मीन यहाँ देखें: ${v.url}`),
+    buyerAlertSaved: (v: Vars) =>
+      en
+        ? `🔔 Noted. We'll message you here as soon as matching land in ${v.place} is listed.`
+        : `🔔 नोट कर लिया। ${v.place} में आपकी पसंद की ज़मीन लिस्ट होते ही हम आपको यहीं मैसेज करेंगे।`,
     needsFixing: (v: Vars) => (en ? `⚠️ One thing needs fixing: ${v.issue}.` : `⚠️ एक चीज़ ठीक करनी है: ${v.issue}।`),
     submitted: (v: Vars) =>
       en

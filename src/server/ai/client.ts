@@ -13,18 +13,19 @@ export type AiMessage = { role: "user" | "assistant"; content: string };
  */
 export async function complete(
   cfg: AiConfig,
-  input: { system: string; messages: AiMessage[]; maxTokens?: number; json?: boolean },
+  input: { system: string; messages: AiMessage[]; maxTokens?: number; json?: boolean; temperature?: number },
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | null> {
   const started = Date.now();
   const maxTokens = input.maxTokens ?? 300;
+  const temperature = input.temperature ?? 0.3;
   try {
     let res: Response;
     if (cfg.provider === "anthropic") {
       res = await fetchImpl(`${cfg.baseUrl}/messages`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": cfg.apiKey, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: cfg.model, max_tokens: maxTokens, temperature: 0.3, system: input.system, messages: input.messages }),
+        body: JSON.stringify({ model: cfg.model, max_tokens: maxTokens, temperature, system: input.system, messages: input.messages }),
         signal: AbortSignal.timeout(cfg.timeoutMs),
       });
     } else {
@@ -37,7 +38,7 @@ export async function complete(
           // keep the thinking short and leave room for it, or the answer comes back empty.
           max_tokens: cfg.provider === "gemini" ? maxTokens + GEMINI_THINKING_TOKENS : maxTokens,
           ...(cfg.provider === "gemini" ? { reasoning_effort: "low" } : {}),
-          temperature: 0.3,
+          temperature,
           messages: [{ role: "system", content: input.system }, ...input.messages],
           ...(input.json ? { response_format: { type: "json_object" } } : {}),
         }),

@@ -9,9 +9,11 @@ import { maskPhoneForLogging } from "@/lib/phone";
 import { site } from "@/lib/site";
 import { formatArea, formatSqftHint, toSqft } from "@/lib/units";
 import { listingInputSchema, type ListingInput } from "@/lib/validation/listing";
+import { hitRateLimit } from "@/lib/rate-limit";
 import { trackEvent } from "@/server/analytics";
 import { understandMessage, type ExtractedListing } from "@/server/ai/assistant";
 import { isAiEnabled } from "@/server/ai/config";
+import { buyerRequestSchema, saveBuyerRequest } from "@/server/buyer-requests";
 import { CITY_NAME_PATTERN, englishPlaceName, isDevanagari, resolveCity } from "@/server/cities";
 import { isKycAvailable } from "@/server/kyc/provider";
 import { changeListingStatus, createListing, findOrCreateSeller, plotsAwaitingAvailability } from "@/server/listings/service";
@@ -918,11 +920,39 @@ async function goTo(t: Turn, step: BotStep, draft: BotDraft, lead?: string): Pro
   await t.reply(await promptFor(t, step, lead));
 }
 
-/** Repeats the current question (after help, a stray message, or a stale button tap). */
-async function reprompt(t: Turn, lead?: string) {
+/** Repeats the current question (after help, a stray message, or a stale button tap), in the AI's fresh words when given. */
+async function reprompt(t: Turn, lead?: string, ask?: string) {
   if (t.step === "ASK_SOLD_WHICH") return t.reply(await promptFor(t, t.step, lead));
   if (!isInFlow(t.step) || t.step === "SUBMITTING") return sendMenu(t, lead);
-  await t.reply(await promptFor(t, t.step, lead));
+  await t.reply(await promptFor(t, t.step, lead, ask));
+}
+
+/** True when the main menu went out in the last few messages: chatting on then shouldn't resend it every time. */
+async function menuShownRecently(t: Turn): Promise<boolean> {
+  const recent = await db.whatsAppMessage.findMany({
+    where: { conversationId: t.conv.id, direction: "OUTBOUND" },
+    orderBy: { createdAt: "desc" },
+    take: 4,
+    select: { body: true },
+  });
+  return recent.some((m) => m.body?.includes(`▸ ${t.c.btnList}`) && m.body.includes(`▸ ${t.c.btnTalk}`));
+}
+
+/**
+ * A buyer on WhatsApp told us where they want land: save it as a request (like the website's
+ * "Tell us what you need"), so our team can message them when it's listed. Returns the place, or null.
+ */
+async function saveBuyerAlert(t: Turn, f: ExtractedListing): Promise<string | null> {
+  if (!f.city) return null;
+  const limited = await hitRateLimit("buyerRequestPerPhone", t.conv.phone);
+  if (!limited.ok) return null;
+  const named = t.seller?.name ?? (t.conv.profileName ? parseName(t.conv.profileName) : null);
+  const base = { phone: t.conv.phone, place: f.city, landType: f.landType, budgetMax: f.priceRupees };
+  const parsed = buyerRequestSchema.safeParse({ ...base, name: named ?? "WhatsApp buyer" });
+  const valid = parsed.success ? parsed : buyerRequestSchema.safeParse({ ...base, name: "WhatsApp buyer" });
+  if (!valid.success) return null;
+  await saveBuyerRequest({ ...valid.data, phone: t.conv.phone });
+  return valid.data.place;
 }
 
 /** States that already have listings, most active first (shown as quick picks; any state can be typed). */
@@ -938,8 +968,11 @@ function citiesInState(state: string) {
   return db.city.findMany({ where: { isLive: true, state }, orderBy: [{ properties: { _count: "desc" } }, { name: "asc" }], take: 9 });
 }
 
-async function promptFor(t: Turn, step: BotStep, lead?: string): Promise<OutgoingMessage> {
+async function promptFor(t: Turn, step: BotStep, lead?: string, ask?: string): Promise<OutgoingMessage> {
   const pre = lead ? `${lead}\n\n` : "";
+  // When the AI re-asks the open question in its own words, that replaces our fixed wording
+  // (buttons and lists stay the same), so the chat doesn't repeat itself.
+  const q = (fixed: string) => ask || fixed;
   const d = t.draft;
   const c = t.c;
   switch (step) {
@@ -948,47 +981,47 @@ async function promptFor(t: Turn, step: BotStep, lead?: string): Promise<Outgoin
       if (suggested && suggested.length <= 40) {
         return { type: "buttons", body: `${pre}${c.askNameSuggested({ name: suggested })}`, buttons: [{ id: "name:profile", title: c.btnUseName({ name: suggested }).slice(0, 20) }] };
       }
-      return { type: "text", text: `${pre}${c.askName}` };
+      return { type: "text", text: `${pre}${q(c.askName)}` };
     }
     case "ASK_LAND_TYPE":
       return {
         type: "list",
-        body: `${pre}${c.askLandType}`,
+        body: `${pre}${q(c.askLandType)}`,
         buttonLabel: c.chooseLandType,
         rows: LAND_TYPE_ORDER.map((lt) => ({ id: `type:${lt}`, title: landLabel(t.lang, lt), description: landHint(t.lang, lt) })),
       };
     case "ASK_STATE": {
       const states = await popularStates();
-      return { type: "list", body: `${pre}${c.askState}`, buttonLabel: c.chooseState, rows: states.map((st) => ({ id: `state:${st}`, title: st })) };
+      return { type: "list", body: `${pre}${q(c.askState)}`, buttonLabel: c.chooseState, rows: states.map((st) => ({ id: `state:${st}`, title: st })) };
     }
     case "ASK_CITY": {
       const cities = d.cityState ? await citiesInState(d.cityState) : [];
-      if (cities.length === 0) return { type: "text", text: `${pre}${c.askCityTyped({ state: d.cityState ?? "" })}` };
+      if (cities.length === 0) return { type: "text", text: `${pre}${q(c.askCityTyped({ state: d.cityState ?? "" }))}` };
       return {
         type: "list",
-        body: `${pre}${c.askCityList({ state: d.cityState ?? "" })}`,
+        body: `${pre}${q(c.askCityList({ state: d.cityState ?? "" }))}`,
         buttonLabel: c.chooseCity,
         rows: cities.map((city) => ({ id: `city:${city.id}`, title: city.name, description: city.state })),
       };
     }
     case "ASK_LOCALITY":
-      return { type: "text", text: `${pre}${c.askLocality}` };
+      return { type: "text", text: `${pre}${q(c.askLocality)}` };
     case "ASK_AREA":
-      return { type: "text", text: `${pre}${c.askArea}` };
+      return { type: "text", text: `${pre}${q(c.askArea)}` };
     case "ASK_AREA_UNIT":
       return {
         type: "list",
-        body: `${pre}${c.askUnit({ n: formatNumberPlain(d.pendingArea ?? 0) })}`,
+        body: `${pre}${q(c.askUnit({ n: formatNumberPlain(d.pendingArea ?? 0) }))}`,
         buttonLabel: c.chooseUnit,
         rows: UNIT_ROWS[t.lang].map((u) => ({ id: `unit:${u.unit}`, title: u.title, description: u.description })),
       };
     case "ASK_PRICE":
-      return { type: "text", text: `${pre}${c.askPrice}` };
+      return { type: "text", text: `${pre}${q(c.askPrice)}` };
     case "ASK_PHOTOS": {
       const count = d.photos?.length ?? 0;
       return {
         type: "buttons",
-        body: `${pre}${count > 0 ? c.askPhotosMore({ n: count, max: MAX_PHOTOS }) : c.askPhotosFirst({ max: MAX_PHOTOS })}`,
+        body: `${pre}${q(count > 0 ? c.askPhotosMore({ n: count, max: MAX_PHOTOS }) : c.askPhotosFirst({ max: MAX_PHOTOS }))}`,
         buttons: [
           { id: "photos:done", title: c.btnDone },
           { id: "photos:skip", title: c.btnSkipPhotos },
@@ -996,9 +1029,9 @@ async function promptFor(t: Turn, step: BotStep, lead?: string): Promise<Outgoin
       };
     }
     case "ASK_LOCATION":
-      return { type: "buttons", body: `${pre}${c.askLocation}`, buttons: [{ id: "loc:skip", title: c.btnSkip }] };
+      return { type: "buttons", body: `${pre}${q(c.askLocation)}`, buttons: [{ id: "loc:skip", title: c.btnSkip }] };
     case "ASK_DESCRIPTION":
-      return { type: "buttons", body: `${pre}${c.askDescription}`, buttons: [{ id: "desc:skip", title: c.btnSkip }] };
+      return { type: "buttons", body: `${pre}${q(c.askDescription)}`, buttons: [{ id: "desc:skip", title: c.btnSkip }] };
     case "ASK_SOLD_WHICH": {
       const ids = d.soldChoices ?? [];
       const found = await db.property.findMany({ where: { id: { in: ids } }, select: { id: true, title: true, code: true, price: true } });
@@ -1220,6 +1253,7 @@ async function aiAgent(t: Turn, text: string): Promise<boolean> {
     sellerName: t.seller?.name ?? null,
     history: await recentHistory(t),
     chatKey: t.conv.id,
+    identityCheckAvailable: isKycAvailable(),
   });
   if (!u) return false;
   const c = t.c;
@@ -1246,10 +1280,12 @@ async function aiAgent(t: Turn, text: string): Promise<boolean> {
         ],
       });
       return true;
-    case "buy":
-      await t.text(joinLead(u.reply, c.browseLand({ url: await browseUrl(u.fields) }))!);
+    case "buy": {
+      const place = await saveBuyerAlert(t, u.fields);
+      await t.text(joinLead(u.reply, place ? c.buyerAlertSaved({ place }) : undefined, c.browseLand({ url: await browseUrl(u.fields) }))!);
       if (inFlow) await reprompt(t, c.continueListing);
       return true;
+    }
     case "yes":
     case "no": {
       const replyId = inFlow ? shortcutFor(t, u.intent) : null;
@@ -1273,7 +1309,8 @@ async function aiAgent(t: Turn, text: string): Promise<boolean> {
       return true;
     }
     if (!u.reply) return false;
-    await sendMenu(t, u.reply);
+    if (await menuShownRecently(t)) await t.text(u.reply);
+    else await sendMenu(t, u.reply);
     return true;
   }
 
@@ -1300,11 +1337,11 @@ async function aiAgent(t: Turn, text: string): Promise<boolean> {
   }
   if (noted) {
     await t.save(t.step, draft);
-    await reprompt(t, joinLead(u.reply, noted));
+    await reprompt(t, joinLead(u.reply, noted), u.ask);
     return true;
   }
   if (!u.reply) return false;
-  await reprompt(t, u.reply);
+  await reprompt(t, u.reply, u.ask);
   return true;
 }
 
