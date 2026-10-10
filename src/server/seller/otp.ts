@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { OTP_CONFIG } from "@/lib/otp-config";
 import { hashSecret, verifySecretHash } from "@/lib/scrypt-hash";
 import { isDemoMode } from "@/lib/demo";
-import { hitIpRateLimit } from "@/lib/rate-limit";
+import { hitIpRateLimit, hitRateLimit } from "@/lib/rate-limit";
 import { getTrustedClientIp } from "@/lib/request-ip";
 import { getOtpProvider, isWhatsAppOtpConfigured, type OtpProvider } from "@/server/otp/provider";
 
@@ -64,15 +64,21 @@ export async function requestOtp(phoneNormalized: string, provider?: OtpProvider
     return { success: false, error: { type: "RATE_LIMITED", message: "Too many codes requested. Please try again later." } };
   }
 
-  // SMS/WhatsApp-pumping protection that doesn't depend on the phone number:
-  // per trusted client IP, plus a global ceiling across all numbers.
+  // The checks above give friendly messages; these reserve the send atomically, so a burst of parallel
+  // requests can't all pass a count read. Per number, per trusted client IP (SMS/WhatsApp pumping), and a
+  // global ceiling — with a separate, larger pool for numbers that already belong to a seller.
   const ip = await getTrustedClientIp();
-  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const [byIp, global] = await Promise.all([
-    ip ? db.otpChallenge.count({ where: { ip, createdAt: { gte: hourAgo } } }) : 0,
-    db.otpChallenge.count({ where: { createdAt: { gte: hourAgo } } }),
+  const isSeller = Boolean(await db.seller.findUnique({ where: { phone: phoneNormalized }, select: { id: true } }));
+  const reserved = await Promise.all([
+    hitRateLimit("otpSendCooldown", phoneNormalized),
+    hitRateLimit("otpSendPerPhone", phoneNormalized, Date.now(), { limit: OTP_CONFIG.maxRequestsPerWindow }),
+    ...(ip ? [hitRateLimit("otpSendPerIp", ip, Date.now(), { limit: OTP_CONFIG.maxRequestsPerIpPerHour })] : []),
+    isSeller ? hitRateLimit("otpSendGlobalSellers", "all") : hitRateLimit("otpSendGlobal", "all", Date.now(), { limit: OTP_CONFIG.maxRequestsGlobalPerHour }),
   ]);
-  if (byIp >= OTP_CONFIG.maxRequestsPerIpPerHour || global >= OTP_CONFIG.maxRequestsGlobalPerHour) {
+  if (!reserved[0].ok) {
+    return { success: false, error: { type: "COOLDOWN", message: "A code was sent recently. Please wait before requesting another.", retryAfterSeconds: reserved[0].retryAfterSeconds } };
+  }
+  if (reserved.some((r) => !r.ok)) {
     return { success: false, error: { type: "RATE_LIMITED", message: "Too many codes requested. Please try again later." } };
   }
 
@@ -122,13 +128,21 @@ export async function verifyOtp(phoneNormalized: string, rawCode: string): Promi
   if (!challenge || challenge.expiresAt.getTime() <= Date.now()) {
     return { success: false, error: { type: "INVALID", message: GENERIC_INVALID } };
   }
-  if (challenge.attemptCount >= OTP_CONFIG.maxAttempts) {
+  // Take the attempt atomically *before* checking the code: parallel guesses can't all read a count
+  // under the limit (each one needs its own increment to succeed). Plus a per-number cap across IPs.
+  const [claimed, perPhone] = await Promise.all([
+    db.otpChallenge.updateMany({
+      where: { id: challenge.id, consumedAt: null, attemptCount: { lt: OTP_CONFIG.maxAttempts } },
+      data: { attemptCount: { increment: 1 } },
+    }),
+    hitRateLimit("otpVerifyPerPhone", phoneNormalized),
+  ]);
+  if (claimed.count === 0 || !perPhone.ok) {
     return { success: false, error: { type: "TOO_MANY_ATTEMPTS", message: "Too many incorrect attempts. Please request a new code." } };
   }
 
   const correct = await verifySecretHash({ plainSecret: rawCode.trim(), storedHash: challenge.codeHash });
   if (!correct) {
-    await db.otpChallenge.update({ where: { id: challenge.id }, data: { attemptCount: { increment: 1 } } });
     return { success: false, error: { type: "WRONG_CODE", message: "That code doesn't match. Please check and try again." } };
   }
 

@@ -58,8 +58,10 @@ export type CityRef = { cityId?: string | null; cityName?: string | null; state?
 
 /**
  * Anyone can list land in any city or town. This finds the City row for what the
- * seller chose or typed, and creates it the first time that place is used:
- * its own page (/mohali), search filter and map centre appear automatically.
+ * seller chose or typed, and creates it the first time that place is used.
+ * A new city starts hidden (isLive: false) and goes live — its own page
+ * (/mohali), search filter and menus — when the first listing there is
+ * approved, so typed junk never becomes a public page.
  * Returns null if the reference is unusable.
  */
 export async function resolveCity(ref: CityRef): Promise<City | null> {
@@ -99,7 +101,7 @@ export async function resolveCity(ref: CityRef): Promise<City | null> {
         longitude: place.lng,
         bighaInSqft: state === "Punjab" || state === "Haryana" || state === "Chandigarh" ? 9_070 : 27_225,
         marlaInSqft: 272.25,
-        isLive: true,
+        isLive: false,
         sortOrder: 100,
       },
     });

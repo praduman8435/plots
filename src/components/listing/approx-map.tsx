@@ -5,14 +5,14 @@ import { useEffect, useRef } from "react";
 
 /**
  * Shows an approximate area (≈500 m circle), never an exact pin: sellers
- * keep control of the exact plot until they've talked to a buyer.
- * The circle centre is shifted by a stable, per-plot offset so the real
- * point can't be read from the circle's middle.
+ * keep control of the exact plot until they've talked to a buyer. The page
+ * passes an already-approximated centre (src/lib/approximate-location.ts);
+ * the real point never reaches the browser.
  *
  * Leaflet (~60 KB) and the map tiles load only when the map comes near the
  * screen, so they never compete with the photos at the top of the page.
  */
-export function ApproxMap({ lat, lng, seed, label }: { lat: number; lng: number; seed: string; label: string }) {
+export function ApproxMap({ lat, lng, label }: { lat: number; lng: number; label: string }) {
   const el = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,8 +22,7 @@ export function ApproxMap({ lat, lng, seed, label }: { lat: number; lng: number;
     if (!node) return;
     const load = () => import("leaflet").then((L) => {
       if (cancelled || !el.current) return;
-      const [dLat, dLng] = offset(seed);
-      const center: [number, number] = [lat + dLat, lng + dLng];
+      const center: [number, number] = [lat, lng];
       map = L.map(el.current, {
         center,
         zoom: 14,
@@ -55,16 +54,7 @@ export function ApproxMap({ lat, lng, seed, label }: { lat: number; lng: number;
       observer.disconnect();
       map?.remove();
     };
-  }, [lat, lng, seed]);
+  }, [lat, lng]);
 
   return <div ref={el} role="img" aria-label={`Approximate location: ${label}`} className="h-full w-full" />;
-}
-
-/** Deterministic ±~250 m offset from a string seed. */
-function offset(seed: string): [number, number] {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
-  const a = ((h >>> 0) % 1000) / 1000 - 0.5;
-  const b = (((h >>> 10) >>> 0) % 1000) / 1000 - 0.5;
-  return [a * 0.0045, b * 0.0045];
 }

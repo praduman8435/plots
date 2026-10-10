@@ -47,6 +47,21 @@ export const LIMITS = {
   // Optional AI in the WhatsApp assistant (limits overridable by AI_MAX_CALLS_*): per chat, and all chats.
   aiPerChat: { limit: 25, windowSeconds: 86_400 },
   aiGlobal: { limit: 500, windowSeconds: 86_400 },
+  // Admin password step: per email+IP (the real brute-force cap), per email (high, so nobody can lock an
+  // admin out from elsewhere), per IP (trusted proxy only). Counted atomically before any scrypt work.
+  adminLoginPerEmailIp: { limit: 8, windowSeconds: 900 },
+  adminLoginPerEmail: { limit: 40, windowSeconds: 900 },
+  adminLoginPerIp: { limit: 20, windowSeconds: 900 },
+  // OTP sending, reserved atomically before a message goes out (limits overridable via OTP_* env).
+  otpSendCooldown: { limit: 1, windowSeconds: 45 },
+  otpSendPerPhone: { limit: 5, windowSeconds: 3600 },
+  otpSendPerIp: { limit: 15, windowSeconds: 3600 },
+  // Everyone else shares this; numbers that already belong to a seller have their own, larger pool,
+  // so a flood of sign-up codes can't stop real sellers from logging in.
+  otpSendGlobal: { limit: 500, windowSeconds: 3600 },
+  otpSendGlobalSellers: { limit: 2000, windowSeconds: 3600 },
+  // Guesses against one number's codes, whatever the IP.
+  otpVerifyPerPhone: { limit: 15, windowSeconds: 600 },
   // Admin second step (authenticator code), per admin account.
   adminMfaPerAdmin: { limit: 6, windowSeconds: 900 },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;

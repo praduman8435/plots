@@ -140,6 +140,37 @@ async function main() {
     check("seller A can't open seller B's edit page", editOther.status === 404 && !editOther.text.includes(plotB.title), editOther.status);
     check("seller A can open own edit page", (await get(`/seller/plots/${plotA.id}/edit`, A.cookie)).status === 200);
     check("seller dashboard shows only own plots", dash.text.includes(plotA.title) && !dash.text.includes(plotB.title));
+    // Admin password guesses fired in parallel: only the first 8 (per email + IP) reach a password check.
+    const raceEmail = `race-${stamp}@example.invalid`;
+    const raceIp = `198.18.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250) + 1}`;
+    const races = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => callAction("/admin/login", "src/server/actions/admin/auth.ts", "adminLogin", [{ email: raceEmail, password: `wrong-password-${i}` }], "", { "x-test-client-ip": raceIp })),
+    );
+    const raceBlocked = races.filter((r) => /Too many sign-in attempts/.test(r.text)).length;
+    check("admin login: 20 parallel guesses → 12 refused before any password check", raceBlocked === 12, { raceBlocked, statuses: races.map((r) => r.status).slice(0, 5) });
+    // Hostile payloads at the public server actions: never a 500, never a stack trace.
+    const hostile: unknown[] = [null, 42, "x", [], { __proto__: { admin: true } }, { identifier: { contains: "" } }, { name: ["a"], phone: { not: null } }, { phone: "9".repeat(5000) }, { name: "a".repeat(100_000), phone: "9876543210" }, { target: "LISTING", ref: { in: ["a"] }, reason: "FRAUD" }, { target: "PROFILE", ref: "x", reason: "OTHER", description: "d".repeat(50_000) }];
+    const actions: [string, string][] = [
+      ["src/server/actions/seller/auth.ts", "requestSellerCode"],
+      ["src/server/actions/seller/auth.ts", "verifySellerCode"],
+      ["src/server/actions/seller/auth.ts", "signInWithoutCode"],
+      ["src/server/actions/seller/signup.ts", "startSignup"],
+      ["src/server/actions/seller/signup.ts", "verifySignup"],
+      ["src/server/actions/seller/chat.ts", "chatStartVerification"],
+      ["src/server/actions/seller/chat.ts", "chatVerify"],
+      ["src/server/actions/report.ts", "reportAction"],
+    ];
+    const crashes: string[] = [];
+    for (const [file, name] of actions) {
+      for (const payload of hostile) {
+        const r = await callAction("/seller", file, name, [payload], "", { "x-test-client-ip": `192.0.2.${Math.floor(Math.random() * 250) + 1}` });
+        if (r.status >= 500 || /at \w+ \(|PrismaClient|Invalid `prisma/.test(r.text)) crashes.push(`${name}(${JSON.stringify(payload)?.slice(0, 40)}) → ${r.status}`);
+      }
+    }
+    check("public server actions survive hostile payloads (no 500s, no internals)", crashes.length === 0, crashes.slice(0, 8));
+
+    const bogusAction = await callAction("/seller/dashboard", "src/server/actions/seller/listings.ts", "sellerListingAction", [plotA.id, "constructor"], A.cookie);
+    check("seller action: unknown action name refused", !okPayload(bogusAction), bogusAction.text.slice(0, 120));
     const actionOnOther = await callAction("/seller/dashboard", "src/server/actions/seller/listings.ts", "sellerListingAction", [plotB.id, "MARK_SOLD"], A.cookie);
     check("seller A can't mark seller B's plot sold (Server Action)", (await db.property.findUniqueOrThrow({ where: { id: plotB.id } })).status === "ACTIVE" && !okPayload(actionOnOther), actionOnOther.text.slice(0, 200));
     check("hidden-by-seller plot page → 404", (await get(`/property/${hiddenA.slug}`)).status === 404);
@@ -205,6 +236,22 @@ async function main() {
     const pub = await get(`/property/${plotA.slug}`);
     const has = (html: string, words: string) => new RegExp(words.split(" ").join("(?:\\s|<!-- -->)*")).test(html);
     check("public plot page has the report button", has(pub.text, "Report this listing"));
+    check("public plot page never contains the seller's number", !pub.text.includes(A.phone.slice(3)) && !pub.text.includes(A.phone.slice(1)));
+    const searchPage = await get(`/search`);
+    check("search page never contains a seller's number", !searchPage.text.includes(A.phone.slice(3)));
+    const contact = await fetch(`${BASE}/api/enquiries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-client-ip": `203.0.113.${Math.floor(Math.random() * 200) + 1}` },
+      body: JSON.stringify({ propertyId: plotA.id, name: "Asha Devi", phone: `97${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`, channel: "CALL" }),
+    });
+    const contactBody = (await contact.json().catch(() => ({}))) as { whatsapp?: string; call?: string };
+    check("enquiry hands out the seller's contact only after it is recorded", contact.status === 200 && contactBody.call === `tel:${A.phone}` && Boolean(contactBody.whatsapp?.includes(A.phone.slice(1))), contactBody);
+    const phishy = await fetch(`${BASE}/api/enquiries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-client-ip": `203.0.113.${Math.floor(Math.random() * 200) + 1}` },
+      body: JSON.stringify({ propertyId: plotA.id, name: "KYC due, pay at bit.ly/x", phone: "9876543210", channel: "CALL" }),
+    });
+    check("enquiry: a name with a link or digits is refused (it is relayed to the seller)", phishy.status === 400);
     check("public plot page never shows report contents", !pub.text.includes(stamp) || !pub.text.includes("onerror=alert"));
     const dashA = await get("/seller/dashboard", A.cookie);
     const codes = (await db.report.findMany({ where: { sellerId: A.id }, select: { code: true } })).map((r) => r.code);
@@ -268,6 +315,7 @@ async function main() {
     await db.seller.deleteMany({ where: { id: { in: sellers } } });
     await db.adminUser.deleteMany({ where: { id: { in: [admin.id, mfaAdmin.id] } } });
     await db.adminLoginAttempt.deleteMany({ where: { key: { contains: stamp } } });
+    await db.rateLimitBucket.deleteMany({ where: { key: { contains: stamp } } });
     for (const u of uploaded) fs.rmSync(path.join("storage/uploads", u.replace(/^\/media\//, "")), { force: true });
   }
 }

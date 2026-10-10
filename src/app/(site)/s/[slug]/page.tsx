@@ -151,7 +151,7 @@ export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
                       variant="row"
                       source="card"
                       plot={{ id: p.id, code: p.code, slug: p.slug, title: p.title }}
-                      sellerPhone={p.seller.phone}
+                     
                       sellerName={p.seller.name}
                     />
                   </div>

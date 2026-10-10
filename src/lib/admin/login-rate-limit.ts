@@ -1,31 +1,31 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { hitRateLimit } from "@/lib/rate-limit";
 
-const WINDOW_MS = 15 * 60 * 1000;
-const MAX_PER_EMAIL = 8; // per 15 min — can't be bypassed by spoofing headers
-const MAX_PER_IP = 20; // per 15 min — only when a trusted IP header is configured
-
-function keys(input: { ip: string | null; email: string | null }) {
-  return [input.email ? `email:${input.email}` : null, input.ip ? `ip:${input.ip}` : null].filter(Boolean) as string[];
-}
-
-/** Rate limit for /admin/login, keyed per email (always) and per IP (trusted proxy only). */
-export async function isAdminLoginRateLimited(input: { ip: string | null; email: string | null }): Promise<boolean> {
-  const since = new Date(Date.now() - WINDOW_MS);
-  const [byEmail, byIp] = await Promise.all([
-    input.email ? db.adminLoginAttempt.count({ where: { key: `email:${input.email}`, createdAt: { gte: since } } }) : 0,
-    input.ip ? db.adminLoginAttempt.count({ where: { key: `ip:${input.ip}`, createdAt: { gte: since } } }) : 0,
+/**
+ * Admin password attempts. Each call takes one attempt atomically (Postgres
+ * upsert counters, src/lib/rate-limit.ts) *before* the password is checked,
+ * so parallel guesses can't slip past a count read. Keys:
+ *   email + IP — the real brute-force cap (8 / 15 min)
+ *   email      — high (40 / 15 min): someone elsewhere can't lock an admin out
+ *   IP         — 20 / 15 min, only with a trusted proxy header
+ * Attempts are also recorded for the audit trail.
+ */
+export async function takeAdminLoginAttempt(input: { ip: string | null; email: string }): Promise<boolean> {
+  const hits = await Promise.all([
+    hitRateLimit("adminLoginPerEmailIp", `${input.email}|${input.ip ?? "-"}`),
+    hitRateLimit("adminLoginPerEmail", input.email),
+    ...(input.ip ? [hitRateLimit("adminLoginPerIp", input.ip)] : []),
   ]);
-  return byEmail >= MAX_PER_EMAIL || byIp >= MAX_PER_IP;
+  const keys = [`email:${input.email}`, ...(input.ip ? [`ip:${input.ip}`] : [])];
+  await db.adminLoginAttempt.createMany({ data: keys.map((key) => ({ key })) });
+  return hits.every((h) => h.ok);
 }
 
-export async function recordAdminLoginAttempt(input: { ip: string | null; email: string | null }): Promise<void> {
-  const ks = keys(input);
-  if (ks.length) await db.adminLoginAttempt.createMany({ data: ks.map((key) => ({ key })) });
-  db.adminLoginAttempt.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } } }).catch(() => {});
-}
-
-/** Successful login clears the email's failed-attempt counter. */
+/** Successful login clears the email's failed-attempt counters. */
 export async function clearAdminLoginAttempts(email: string): Promise<void> {
-  await db.adminLoginAttempt.deleteMany({ where: { key: `email:${email}` } });
+  await Promise.all([
+    db.adminLoginAttempt.deleteMany({ where: { key: `email:${email}` } }),
+    db.rateLimitBucket.deleteMany({ where: { OR: [{ key: { startsWith: `adminLoginPerEmailIp:${email}|` } }, { key: `adminLoginPerEmail:${email}` }] } }),
+  ]);
 }

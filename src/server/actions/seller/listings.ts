@@ -8,14 +8,18 @@ import type { ListingFormPayload, ListingFormResult } from "@/components/listing
 import { listingInputSchema } from "@/lib/validation/listing";
 import { isKycAvailable } from "@/server/kyc/provider";
 import { resolveCity } from "@/server/cities";
-import { isOurImageUrl } from "@/server/storage";
+import { listingImagesSchema } from "@/server/listings/images";
 import { changeListingStatus, createListing, updateListing, type StatusAction } from "@/server/listings/service";
 
 type SellerAction = "MARK_SOLD" | "CONFIRM_AVAILABLE" | "HIDE" | "UNHIDE" | "REMOVE";
 
 /** A seller can only act on their own plots, and only through these actions. */
+const SELLER_ACTIONS: readonly SellerAction[] = ["MARK_SOLD", "CONFIRM_AVAILABLE", "HIDE", "UNHIDE", "REMOVE"];
+
 export async function sellerListingAction(propertyId: string, action: SellerAction): Promise<{ ok: boolean; message?: string }> {
   const seller = await requireSeller();
+  // Server actions take any JSON: only the five known actions and a plain id get through.
+  if (!SELLER_ACTIONS.includes(action) || typeof propertyId !== "string" || propertyId.length > 64) return { ok: false, message: "That action isn't available for this plot." };
   const p = await db.property.findFirst({ where: { id: propertyId, sellerId: seller.id }, select: { id: true, slug: true, status: true, hiddenReason: true, removedAt: true } });
   if (!p || p.removedAt) return { ok: false, message: "Plot not found." };
 
@@ -58,19 +62,22 @@ export async function createSellerListing(payload: ListingFormPayload): Promise<
     for (const issue of parsed.error.issues) fieldErrors[String(issue.path[0])] ??= issue.message;
     return { ok: false, message: "Please fix the highlighted fields.", fieldErrors };
   }
-  const city = await resolveCity({ ...parsed.data });
-  if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
-
-  // Only accept images our own upload endpoint produced.
-  const images = (payload.images ?? []).filter((i) => isOurImageUrl(i.url)).slice(0, 10);
+  // Only photos our own storage produced, with sane fields (nothing else reaches the database).
+  const photos = listingImagesSchema.safeParse(payload.images ?? []);
+  if (!photos.success) return { ok: false, message: "One of the photos couldn't be used. Please upload it again." };
 
   // Web listings need identity verification once, when a KYC provider is configured.
   if (isKycAvailable() && seller.identityStatus !== "VERIFIED") return { ok: false, message: "Please verify your identity first." };
   if (!seller.onboardedAt) return { ok: false, message: "Please finish setting up your seller account first." };
 
   // Counted only for a valid submission, so fixing form errors never locks anyone out.
+  // Before resolveCity: a new city row (and a geocoder call) only happens for a real, allowed submission.
   const limited = await hitRateLimit("listingCreatePerSeller", seller.id);
   if (!limited.ok) return { ok: false, message: "You've added a lot of plots today. Please try again tomorrow or message us on WhatsApp." };
+
+  const city = await resolveCity({ ...parsed.data });
+  if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
+  const images = photos.data;
 
   const property = await createListing({ sellerId: seller.id, source: "WEB", input: parsed.data, images });
   revalidatePath("/seller/dashboard");
@@ -94,12 +101,15 @@ export async function updateSellerListing(propertyId: string, payload: ListingFo
     for (const issue of parsed.error.issues) fieldErrors[String(issue.path[0])] ??= issue.message;
     return { ok: false, message: "Please fix the highlighted fields.", fieldErrors };
   }
-  const city = await resolveCity({ ...parsed.data });
-  if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
-  const images = (payload.images ?? []).filter((i) => isOurImageUrl(i.url)).slice(0, 10);
+  const photos = listingImagesSchema.safeParse(payload.images ?? []);
+  if (!photos.success) return { ok: false, message: "One of the photos couldn't be used. Please upload it again." };
 
   const limited = await hitRateLimit("listingUpdatePerSeller", seller.id);
   if (!limited.ok) return { ok: false, message: "Too many edits in a short time. Please try again in a little while." };
+
+  const city = await resolveCity({ ...parsed.data });
+  if (!city) return { ok: false, fieldErrors: { cityName: "Enter the city or district" } };
+  const images = photos.data;
 
   // Fields, photos and the move back to review land together (one transaction).
   await updateListing(p.id, parsed.data, { city, images, backToReview: true });

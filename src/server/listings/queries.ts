@@ -1,4 +1,5 @@
 import "server-only";
+import { isSlug } from "@/lib/slug";
 import type { Prisma } from "@/generated/prisma/client";
 import { AreaUnit, LandType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
@@ -24,7 +25,7 @@ export const cardSelect = {
   createdAt: true,
   status: true,
   city: { select: { name: true, slug: true } },
-  seller: { select: { name: true, sellerType: true, phone: true, phoneVerifiedAt: true } },
+  seller: { select: { name: true, sellerType: true, phoneVerifiedAt: true } },
   images: { select: { url: true, width: true, height: true }, orderBy: { position: "asc" }, take: 1 },
 } satisfies Prisma.PropertySelect;
 
@@ -84,7 +85,7 @@ export function parseSearchParams(sp: RawParams): SearchFilters {
 }
 
 export async function searchListings(f: SearchFilters) {
-  const city = f.city ? await db.city.findUnique({ where: { slug: f.city } }) : null;
+  const city = f.city && isSlug(f.city, 80) ? await db.city.findUnique({ where: { slug: f.city } }) : null;
   const bigha = city?.bighaInSqft ?? 27_225;
   const marla = city?.marlaInSqft ?? 272.25;
 
@@ -171,13 +172,14 @@ export async function getMarketStats(cityId?: string) {
 }
 
 export async function getListingBySlug(slug: string) {
+  if (!isSlug(slug)) return null;
   return db.property.findUnique({
     where: { slug },
     include: {
       city: true,
       seller: {
         select: {
-          id: true, name: true, sellerType: true, phone: true, phoneVerifiedAt: true, identityStatus: true, createdAt: true, profileSlug: true, isBlocked: true,
+          id: true, name: true, sellerType: true, phoneVerifiedAt: true, identityStatus: true, createdAt: true, profileSlug: true, isBlocked: true,
           _count: { select: { properties: { where: { status: "ACTIVE" } } } },
         },
       },

@@ -1,3 +1,4 @@
+import { isSlug } from "@/lib/slug";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -18,7 +19,8 @@ async function load(params: Promise<{ city: string; type: string }>) {
   const { city: citySlug, type: typeSlug } = await params;
   const type = landTypeFromSlug(typeSlug);
   if (!type || type === "OTHER" || RESERVED_SLUGS.has(citySlug) || !/^[a-z0-9-]+$/.test(citySlug)) return null;
-  const city = await db.city.findUnique({ where: { slug: citySlug } });
+  const found = isSlug(citySlug, 80) ? await db.city.findUnique({ where: { slug: citySlug } }) : null;
+  const city = found?.isLive ? found : null; // hidden until its first listing is approved
   if (!city) return null;
   return { city, type };
 }

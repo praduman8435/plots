@@ -57,7 +57,17 @@ async function pure() {
   for (const bad of ["javascript:alert(1)", "data:image/svg+xml,<svg>", "/media/../../etc/passwd", "https://evil.com/plots/a.webp", "//evil.com/x.webp", "/media/a b.webp"]) {
     check(`image url rejected: ${bad}`, !isOurImageUrl(bad));
   }
+  const savedBlob = { host: process.env.BLOB_PUBLIC_HOST, token: process.env.BLOB_READ_WRITE_TOKEN };
+  process.env.BLOB_PUBLIC_HOST = "abc123.public.blob.vercel-storage.com";
   check("image url accepted: our blob", isOurImageUrl("https://abc123.public.blob.vercel-storage.com/plots/2026/10/x.webp"));
+  check("image url rejected: another Vercel customer's blob store", !isOurImageUrl("https://evil999.public.blob.vercel-storage.com/plots/2026/10/x.webp"));
+  delete process.env.BLOB_PUBLIC_HOST;
+  process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_AbC123_secretpart";
+  check("blob host derived from the store token", isOurImageUrl("https://abc123.public.blob.vercel-storage.com/plots/x.webp") && !isOurImageUrl("https://other1.public.blob.vercel-storage.com/plots/x.webp"));
+  delete process.env.BLOB_READ_WRITE_TOKEN;
+  check("no blob store configured → blob URLs rejected", !isOurImageUrl("https://abc123.public.blob.vercel-storage.com/plots/x.webp"));
+  if (savedBlob.host !== undefined) process.env.BLOB_PUBLIC_HOST = savedBlob.host;
+  if (savedBlob.token !== undefined) process.env.BLOB_READ_WRITE_TOKEN = savedBlob.token;
 
   const { safeNext } = await import("../src/server/seller/onboarding");
   for (const bad of ["//evil.com", "https://evil.com", "/\\evil.com", "/admin", "javascript:alert(1)", "/sellerx"]) {

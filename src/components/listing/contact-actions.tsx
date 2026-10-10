@@ -7,7 +7,6 @@ import { Field, Input } from "@/components/ui/field";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { track } from "@/lib/analytics-client";
 import { normalizePhoneNumber } from "@/lib/phone";
-import { buyerToSellerLink } from "@/lib/whatsapp-links";
 
 type Channel = "WHATSAPP" | "CALL";
 type Buyer = { name: string; phone: string };
@@ -32,43 +31,70 @@ function readBuyer(): Buyer | null {
  */
 export function ContactActions({
   plot,
-  sellerPhone,
   sellerName,
   variant,
   source,
 }: {
   plot: PlotRef;
-  sellerPhone: string;
   sellerName: string;
   variant: "bar" | "dock" | "row" | "panel" | "icon";
   source: "detail" | "card";
 }) {
   const [pending, setPending] = useState<Channel | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  function connect(channel: Channel, buyer: Buyer) {
-    // Fire-and-forget so WhatsApp opens instantly; keepalive survives the navigation.
-    fetch("/api/enquiries", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ propertyId: plot.id, name: buyer.name, phone: buyer.phone, channel, source }),
-      keepalive: true,
-    }).catch(() => {});
-
-    if (channel === "WHATSAPP") {
-      const link = buyerToSellerLink(sellerPhone, plot, buyer.name);
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (isMobile) window.location.href = link;
-      else window.open(link, "_blank", "noopener");
-    } else {
-      window.location.href = `tel:${sellerPhone}`;
+  async function connect(channel: Channel, buyer: Buyer) {
+    if (busy) return;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    // Desktop WhatsApp opens in a new tab: open it inside the tap (popup blockers allow that) and
+    // point it at the chat once the server hands out the link.
+    const tab = channel === "WHATSAPP" && !isMobile ? window.open("", "_blank") : null;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/enquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ propertyId: plot.id, name: buyer.name, phone: buyer.phone, channel, source }),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; whatsapp?: string; call?: string } | null;
+      const link = channel === "WHATSAPP" ? data?.whatsapp : data?.call;
+      if (res.status === 400) {
+        // The saved name/number no longer passes the checks: ask again.
+        tab?.close();
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch {}
+        setPending(channel);
+        dialogRef.current?.showModal();
+        return;
+      }
+      if (!res.ok || !link) throw new Error(res.status === 429 ? "busy" : res.status === 404 ? "gone" : "failed");
+      if (tab) {
+        tab.opener = null;
+        tab.location.href = link;
+      } else window.location.href = link;
+    } catch (err) {
+      tab?.close();
+      const kind = (err as Error).message;
+      setError(
+        kind === "busy"
+          ? "Too many requests right now. Please try again in a few minutes."
+          : kind === "gone"
+            ? "This property isn't available any more."
+            : "Couldn't connect. Please check your internet and try again.",
+      );
+    } finally {
+      setBusy(false);
     }
   }
 
   function start(channel: Channel) {
     track(channel === "WHATSAPP" ? "whatsapp_click" : "call_click", { propertyId: plot.id, props: { source } });
     const buyer = readBuyer();
-    if (buyer) return connect(channel, buyer);
+    if (buyer) return void connect(channel, buyer);
     setPending(channel);
     dialogRef.current?.showModal();
   }
@@ -78,7 +104,7 @@ export function ContactActions({
       {variant === "icon" ? (
         <button
           type="button"
-          onClick={() => start("WHATSAPP")}
+          disabled={busy} onClick={() => start("WHATSAPP")}
           aria-label={`Chat with ${sellerName} on WhatsApp about ${plot.title}`}
           className="relative z-10 flex size-10 items-center justify-center rounded-full bg-brand-600 text-white shadow-brand transition hover:bg-brand-700 active:scale-95"
         >
@@ -86,40 +112,46 @@ export function ContactActions({
         </button>
       ) : variant === "row" ? (
         <div className="flex gap-2">
-          <Button size="md" onClick={() => start("WHATSAPP")} className="h-10 flex-1 px-3 text-sm md:h-10">
+          <Button size="md" disabled={busy} onClick={() => start("WHATSAPP")} className="h-10 flex-1 px-3 text-sm md:h-10">
             <WhatsAppIcon /> WhatsApp
           </Button>
-          <Button size="md" variant="secondary" onClick={() => start("CALL")} className="h-10 flex-1 px-3 text-sm md:h-10" aria-label={`Call ${sellerName}`}>
+          <Button size="md" variant="secondary" disabled={busy} onClick={() => start("CALL")} className="h-10 flex-1 px-3 text-sm md:h-10" aria-label={`Call ${sellerName}`}>
             <Phone /> Call
           </Button>
         </div>
       ) : variant === "dock" ? (
         <div className="flex shrink-0 gap-2">
-          <Button size="lg" variant="secondary" onClick={() => start("CALL")} className="size-12 px-0" aria-label={`Call ${sellerName}`}>
+          <Button size="lg" variant="secondary" disabled={busy} onClick={() => start("CALL")} className="size-12 px-0" aria-label={`Call ${sellerName}`}>
             <Phone />
           </Button>
-          <Button size="lg" onClick={() => start("WHATSAPP")} className="h-12 px-5">
+          <Button size="lg" disabled={busy} onClick={() => start("WHATSAPP")} className="h-12 px-5">
             <WhatsAppIcon /> WhatsApp
           </Button>
         </div>
       ) : variant === "bar" ? (
         <div className="flex gap-2">
-          <Button size="lg" onClick={() => start("WHATSAPP")} className="h-12 flex-1 px-4 md:h-10 md:text-sm">
+          <Button size="lg" disabled={busy} onClick={() => start("WHATSAPP")} className="h-12 flex-1 px-4 md:h-10 md:text-sm">
             <WhatsAppIcon /> WhatsApp Seller
           </Button>
-          <Button size="lg" variant="secondary" onClick={() => start("CALL")} className="h-12 px-5 md:h-10 md:px-4 md:text-sm" aria-label={`Call ${sellerName}`}>
+          <Button size="lg" variant="secondary" disabled={busy} onClick={() => start("CALL")} className="h-12 px-5 md:h-10 md:px-4 md:text-sm" aria-label={`Call ${sellerName}`}>
             <Phone /> Call
           </Button>
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
-          <Button size="xl" onClick={() => start("WHATSAPP")} className="w-full">
+          <Button size="xl" disabled={busy} onClick={() => start("WHATSAPP")} className="w-full">
             <WhatsAppIcon /> WhatsApp Seller
           </Button>
-          <Button size="xl" variant="secondary" onClick={() => start("CALL")} className="w-full">
+          <Button size="xl" variant="secondary" disabled={busy} onClick={() => start("CALL")} className="w-full">
             <Phone /> Call seller
           </Button>
         </div>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-2 text-center text-[13px] text-danger">
+          {error}
+        </p>
       )}
 
       <BuyerDetailsDialog
@@ -131,7 +163,7 @@ export function ContactActions({
             localStorage.setItem(STORAGE_KEY, JSON.stringify(buyer));
           } catch {}
           dialogRef.current?.close();
-          if (pending) connect(pending, buyer);
+          if (pending) void connect(pending, buyer);
         }}
       />
     </>
@@ -159,6 +191,7 @@ function BuyerDetailsDialog({
     e.preventDefault();
     const next: typeof errors = {};
     if (name.trim().length < 2) next.name = "Please enter your name";
+    else if (!/^[\p{L}\p{M} .'-]+$/u.test(name.trim())) next.name = "Please use letters only";
     const normalized = normalizePhoneNumber(phone);
     if (!normalized.valid) next.phone = "Enter a valid 10-digit mobile number";
     setErrors(next);

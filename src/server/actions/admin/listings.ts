@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { listingImagesSchema } from "@/server/listings/images";
 import type { ListingFormPayload, ListingFormResult } from "@/components/listing/types";
 import { requireAdmin } from "@/lib/admin/require";
 import { db } from "@/lib/db";
@@ -19,20 +20,7 @@ export type AdminActionResult = { ok: true; message?: string } | { ok: false; me
 
 const idSchema = z.string().min(1).max(64);
 
-/** Uploaded (/media/…) or bundled demo (/demo/…) images only — never arbitrary URLs. */
-const imagesSchema = z
-  .array(
-    z.object({
-      url: z
-        .string()
-        .max(300)
-        .regex(/^\/(media|demo)\/[\w./-]+$/, "Invalid image")
-        .refine((u) => !u.includes(".."), "Invalid image"),
-      width: z.number().int().min(0).max(20_000),
-      height: z.number().int().min(0).max(20_000),
-    }),
-  )
-  .max(10, "Up to 10 photos");
+const imagesSchema = listingImagesSchema;
 
 const titleSchema = z.string().trim().max(140, "Keep the title under 140 characters").optional();
 

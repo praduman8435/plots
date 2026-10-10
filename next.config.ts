@@ -1,3 +1,4 @@
+import { ourBlobHost } from "./src/lib/blob-host";
 import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
@@ -54,7 +55,8 @@ const nextConfig: NextConfig = {
     // 75 for photos; 50 only for the dimmed hero background.
     qualities: [50, 75],
     // Photos uploaded on Vercel live in Vercel Blob (see src/server/storage.ts).
-    remotePatterns: [{ protocol: "https", hostname: "*.public.blob.vercel-storage.com", pathname: "/plots/**" }],
+    // Only our own Blob store (anyone can create a *.public.blob store); wildcard only when it is unknown (local).
+    remotePatterns: [{ protocol: "https", hostname: ourBlobHost() ?? "*.public.blob.vercel-storage.com", pathname: "/plots/**" }],
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

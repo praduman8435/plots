@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApproxMap } from "@/components/listing/approx-map";
+import { approximateLocation } from "@/lib/approximate-location";
 import { ContactActions } from "@/components/listing/contact-actions";
 import { BackButton, ShareButton, ViewBeacon } from "@/components/listing/detail-client";
 import { Gallery } from "@/components/listing/gallery";
@@ -65,6 +66,7 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
   const where = `${placeName(p)}, ${p.city.name}`;
   const sqftHint = formatSqftHint(p.areaSqft, p.areaUnit);
   const identityVerified = p.seller.identityStatus === "VERIFIED";
+  const approx = p.latitude != null && p.longitude != null ? approximateLocation(p.latitude, p.longitude, p.id) : null;
 
   const perUnitPrice = p.area ? formatPrice(Math.round(Number(p.price) / p.area)) : null;
   const unitShort = AREA_UNITS[p.areaUnit].short;
@@ -88,7 +90,7 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
     description: p.description,
     url: `${site.url}/property/${p.slug}`,
     datePosted: listed.toISOString(),
-    image: p.images.map((i) => `${site.url}${i.url}`),
+    image: p.images.map((i) => (/^https?:\/\//.test(i.url) ? i.url : `${site.url}${i.url}`)),
     offers: { "@type": "Offer", price: Number(p.price), priceCurrency: "INR", availability: available ? "https://schema.org/InStock" : "https://schema.org/SoldOut" },
     contentLocation: { "@type": "Place", name: where, address: { "@type": "PostalAddress", addressLocality: placeName(p), addressRegion: p.city.state, addressCountry: "IN" } },
   };
@@ -204,9 +206,9 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
           <Section title="Location">
             <p className="-mt-1 mb-3 text-sm text-muted">{nearBy}</p>
             <div className="overflow-hidden rounded-2xl ring-1 ring-line">
-              {p.latitude != null && p.longitude != null ? (
+              {approx ? (
                 <div className="relative z-0 h-60 sm:h-80">
-                  <ApproxMap lat={p.latitude} lng={p.longitude} seed={p.id} label={where} />
+                  <ApproxMap lat={approx.lat} lng={approx.lng} label={where} />
                 </div>
               ) : (
                 <div className="flex h-36 flex-col items-center justify-center gap-2 bg-mist text-center">
@@ -262,7 +264,7 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
               </div>
               <div className="mt-5">
                 {available ? (
-                  <ContactActions variant="panel" source="detail" plot={plotRef} sellerPhone={p.seller.phone} sellerName={p.seller.name} />
+                  <ContactActions variant="panel" source="detail" plot={plotRef} sellerName={p.seller.name} />
                 ) : (
                   <ButtonLink href={`/${p.city.slug}/${LAND_TYPE_SLUGS[p.landType]}`} size="lg" className="w-full">
                     See similar land
@@ -301,7 +303,7 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
                 {formatArea(p.area, p.areaUnit)} · {priceTerms}
               </p>
             </div>
-            <ContactActions variant="dock" source="detail" plot={plotRef} sellerPhone={p.seller.phone} sellerName={p.seller.name} />
+            <ContactActions variant="dock" source="detail" plot={plotRef} sellerName={p.seller.name} />
           </div>
         ) : (
           <ButtonLink href={`/${p.city.slug}/${LAND_TYPE_SLUGS[p.landType]}`} size="lg" className="w-full">

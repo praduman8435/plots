@@ -108,6 +108,41 @@ async function main() {
     const sr = await db.property.findUniqueOrThrow({ where: { id: soldThenRemoved.id }, include: { seller: true } });
     check("remove: a sold plot stays 'sold' for history, but isn't shown", sr.status === "SOLD" && sr.removedAt !== null && !isPubliclyViewable(sr));
 
+    // ── Login codes: parallel requests and guesses can't beat the limits ──
+    const { requestOtp, verifyOtp } = await import("../src/server/seller/otp");
+    const otpPhone = `+9196${String(Date.now()).slice(-8)}`;
+    let sentCode = "";
+    const capture = { async sendOtp({ code }: { code: string }) { sentCode = code; } };
+    const sends = await Promise.all(Array.from({ length: 10 }, () => requestOtp(otpPhone, capture)));
+    check("otp: 10 parallel requests → exactly one code sent", sends.filter((r) => r.success).length === 1, sends.map((r) => (r.success ? "ok" : r.error.type)));
+    const wrong = Array.from({ length: 20 }, (_, i) => String(100000 + i)).filter((c) => c !== sentCode);
+    const guesses = await Promise.all(wrong.map((c) => verifyOtp(otpPhone, c)));
+    const checked = guesses.filter((g) => !g.success && g.error.type === "WRONG_CODE").length;
+    check("otp: 20 parallel guesses → at most 5 are actually checked", checked <= 5 && guesses.every((g) => !g.success), { checked });
+    const late = await verifyOtp(otpPhone, sentCode);
+    check("otp: after the attempts are used up even the right code is refused", !late.success && late.error.type === "TOO_MANY_ATTEMPTS");
+
+    // ── New cities stay hidden until a listing there is approved ──
+    const { resolveCity } = await import("../src/server/cities");
+    const newCity = await resolveCity({ cityName: `Zzcheck ${stamp.replace(/[^a-z]/g, "") || "x"}`, state: "Punjab", latitude: 30.7, longitude: 76.7 });
+    check("city: a newly typed city is created hidden", newCity !== null && newCity.isLive === false, newCity);
+    if (newCity) {
+      const inNew = await db.property.create({
+        data: { code: `P-Z${stamp.slice(-5).toUpperCase()}`.slice(0, 9), slug: `check-city-${stamp}`, sellerId: seller.id, cityId: newCity.id, title: "City check", description: "Temporary", landType: "AGRICULTURAL", locality: "Test", area: 1, areaUnit: "ACRE", areaSqft: 43560, price: BigInt(1_000_000), status: "PENDING" },
+      });
+      await changeListingStatus(inNew.id, { type: "APPROVE" }, { notify: false });
+      check("city: goes live with its first approved listing", (await db.city.findUniqueOrThrow({ where: { id: newCity.id } })).isLive === true);
+      await db.property.delete({ where: { id: inNew.id } });
+      await db.city.delete({ where: { id: newCity.id } });
+    }
+
+    // ── Approximate location never equals the real point ──
+    const { approximateLocation } = await import("../src/lib/approximate-location");
+    const real = { lat: 28.570612, lng: 77.325534 };
+    const approx = approximateLocation(real.lat, real.lng, "plot-id-1");
+    check("location: shifted and rounded, but within the 550 m circle", (approx.lat !== real.lat || approx.lng !== real.lng) && Math.abs(approx.lat - real.lat) < 0.003 && Math.abs(approx.lng - real.lng) < 0.003, approx);
+    check("location: stable per plot, different across plots", JSON.stringify(approximateLocation(real.lat, real.lng, "plot-id-1")) === JSON.stringify(approx));
+
     // ── Atomic edits ──
     const edited = await plot("ACTIVE");
     const input = {
@@ -161,6 +196,9 @@ async function main() {
     check("log: structured JSON with event", parsed.event === "test.event" && parsed.count === 3 && parsed.policy === "x");
     check("log: sensitive fields dropped", !lines[0].includes("9999999999") && !lines[0].includes("123456") && !("token" in parsed) && !("password" in parsed));
   } finally {
+    await db.otpChallenge.deleteMany({ where: { phoneNormalized: { startsWith: "+9196" }, createdAt: { gte: new Date(Date.now() - 3_600_000) } } });
+    await db.rateLimitBucket.deleteMany({ where: { OR: [{ key: { contains: "+9196" } }, { key: { contains: `check-${stamp}` } }] } });
+    await db.adminLoginAttempt.deleteMany({ where: { key: { contains: `check-${stamp}` } } });
     await db.analyticsEvent.deleteMany({ where: { sellerId: seller.id } });
     await db.propertyImage.deleteMany({ where: { property: { sellerId: seller.id } } });
     await db.property.deleteMany({ where: { sellerId: seller.id } });

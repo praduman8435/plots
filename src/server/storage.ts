@@ -1,4 +1,5 @@
 import "server-only";
+import { ourBlobHost } from "@/lib/blob-host";
 import { put } from "@vercel/blob";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
@@ -90,5 +91,8 @@ export async function readMedia(key: string[]): Promise<Buffer | null> {
 export function isOurImageUrl(url: unknown): url is string {
   if (typeof url !== "string" || url.length > 300) return false;
   if (/^\/(media|demo)\/[\w./-]+$/.test(url) && !url.includes("..")) return true;
-  return /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\/plots\/[\w./-]+$/i.test(url);
+  const host = ourBlobHost();
+  if (!host) return false;
+  const m = /^https:\/\/([a-z0-9.-]+)\/plots\/[\w./-]+$/i.exec(url);
+  return Boolean(m && m[1].toLowerCase() === host && !url.includes(".."));
 }

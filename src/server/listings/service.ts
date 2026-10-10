@@ -93,12 +93,13 @@ export async function createListing(params: {
         publishedAt: params.publishNow ? now : null,
         freshnessAt: params.publishNow ? now : null,
         images: {
-          create: params.images.map((img, position) => ({ ...img, position })),
+          create: params.images.map((img, position) => ({ url: img.url, width: img.width, height: img.height, position })),
         },
       },
     }),
   );
 
+  if (params.publishNow) await db.city.updateMany({ where: { id: city.id, isLive: false }, data: { isLive: true } });
   await trackEvent("listing_submitted", { sellerId: params.sellerId, propertyId: property.id, props: { source: params.source } });
   if (params.notify !== false) {
     await notifySeller(property.id, params.publishNow ? "LISTING_LIVE" : "LISTING_RECEIVED");
@@ -246,6 +247,8 @@ async function applyStatusChange(propertyId: string, action: StatusAction, opts:
         availabilityCheckSentAt: null,
       });
       if (!ok) return "conflict";
+      // The first approved listing in a new city puts that city live (cities.ts creates them hidden).
+      await db.city.updateMany({ where: { id: p.cityId, isLive: false }, data: { isLive: true } });
       // Approval also confirms the seller's phone (we've spoken to them / WhatsApp proved it).
       await db.seller.updateMany({ where: { id: p.sellerId, phoneVerifiedAt: null }, data: { phoneVerifiedAt: now } });
       await trackEvent("listing_approved", ev);

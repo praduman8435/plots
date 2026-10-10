@@ -1,3 +1,4 @@
+import { isSlug } from "@/lib/slug";
 import { ArrowRight, MapPin } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -21,6 +22,7 @@ export async function generateStaticParams() {
 
 async function getCity(slug: string) {
   if (RESERVED_SLUGS.has(slug) || !/^[a-z0-9-]+$/.test(slug)) return null;
+  if (!isSlug(slug, 80)) return null;
   return db.city.findUnique({ where: { slug } });
 }
 
@@ -52,7 +54,7 @@ async function agriPricePerAcre(cityId: string) {
 
 export default async function CityPage(props: PageProps<"/[city]">) {
   const city = await getCity((await props.params).city);
-  if (!city) notFound();
+  if (!city || !city.isLive) notFound(); // a new city appears once its first listing is approved
 
   const [stats, latest, pricing] = await Promise.all([
     getMarketStats(city.id),

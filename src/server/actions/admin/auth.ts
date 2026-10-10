@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { clearAdminLoginAttempts, isAdminLoginRateLimited, recordAdminLoginAttempt } from "@/lib/admin/login-rate-limit";
+import { clearAdminLoginAttempts, takeAdminLoginAttempt } from "@/lib/admin/login-rate-limit";
 import { clearMfaPending, decryptMfaSecret, normalizeRecoveryCode, readMfaPending, setMfaPending, verifyTotp } from "@/lib/admin/mfa";
 import { createAdminSession, destroyAdminSession } from "@/lib/admin/session";
 import { db } from "@/lib/db";
@@ -35,13 +35,10 @@ export async function adminLogin(input: unknown): Promise<AdminLoginResult> {
   if (!parsed.success) return { ok: false, message: "Enter your email and password." };
   const { email, password } = parsed.data;
 
-  // Checked before any scrypt work. Keyed per email (can't be spoofed) and per
-  // IP only when a trusted proxy header is configured — see request-ip.ts.
-  const limitKey = { ip: await getTrustedClientIp(), email };
-  if (await isAdminLoginRateLimited(limitKey)) {
+  // One attempt is taken atomically before any scrypt work (login-rate-limit.ts).
+  if (!(await takeAdminLoginAttempt({ ip: await getTrustedClientIp(), email }))) {
     return { ok: false, message: "Too many sign-in attempts. Please wait 15 minutes and try again." };
   }
-  await recordAdminLoginAttempt(limitKey);
 
   const user = await db.adminUser.findUnique({ where: { email } });
   if (!user || !user.isActive) {
