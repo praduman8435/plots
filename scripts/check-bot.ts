@@ -159,6 +159,22 @@ async function main() {
   }) as typeof fetch);
   const fb = flashBody as Record<string, unknown> | null;
   check("Gemini full Flash: short thinking, room for it", fb?.reasoning_effort === "low" && Number(fb?.max_tokens) > 200, JSON.stringify(fb));
+  const quick = { ...gemini!, timeoutMs: 5000 };
+  let tries = 0;
+  const stalledOnce = (async (_u: RequestInfo | URL, init?: RequestInit) => {
+    tries++;
+    if (tries === 1) return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("timeout", "TimeoutError"))));
+    return new Response(JSON.stringify({ choices: [{ message: { content: "second try" } }] }), { status: 200 });
+  }) as typeof fetch;
+  const t0 = Date.now();
+  const retried = await complete(quick, { system: "s", messages: [{ role: "user", content: "x" }] }, stalledOnce);
+  check("AI: a stalled call is retried once, inside the time budget", retried === "second try" && tries === 2 && Date.now() - t0 < 5000, { retried, tries, ms: Date.now() - t0 });
+  let authTries = 0;
+  await complete(quick, { system: "s", messages: [{ role: "user", content: "x" }] }, (async () => {
+    authTries++;
+    return new Response("bad key", { status: 401 });
+  }) as typeof fetch);
+  check("AI: a bad key is not retried", authTries === 1, authTries);
   check("AI: HTTP error → null", (await complete(claude!, { system: "s", messages: [{ role: "user", content: "x" }] }, (async () => new Response("no", { status: 500 })) as typeof fetch)) === null);
   check("AI: JSON found inside prose/code fences", JSON.stringify(firstJsonObject('Sure! ```json\n{"area": 2}\n```')) === '{"area":2}');
   check("AI: Aadhaar-like and phone numbers redacted", !/1234|98765/.test(redact("aadhaar 1234 5678 9012, phone +91 98765 43210")));
