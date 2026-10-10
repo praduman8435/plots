@@ -46,9 +46,7 @@ export function LandTypeTiles({ counts, citySlug }: { counts: Partial<Record<Lan
               <LandTypeIcon type={type} className="size-5 sm:size-6" />
             </span>
             <p className="mt-4 text-[15px] leading-snug font-bold text-ink sm:text-lg">{LAND_TYPES[type].label}</p>
-            <p className="mt-0.5 text-sm text-muted">
-              {count} {count === 1 ? "plot" : "plots"} available
-            </p>
+            <p className="mt-0.5 text-sm text-muted">{count > 0 ? `${count} ${count === 1 ? "plot" : "plots"} available` : "New listings soon"}</p>
             <ArrowRight className="absolute top-5 right-5 size-4 text-faint transition group-hover:translate-x-0.5 group-hover:text-brand-600" aria-hidden />
           </IntentLink>
         );

@@ -98,20 +98,37 @@ export default async function HomePage() {
       </section>
       )}
 
-      {/* ───── Latest land ───── */}
+      {/* ───── Latest land (or, before the first listing, an invitation to sellers) ───── */}
       <section className="container-page py-12 sm:py-20">
-        <SectionHeading
-          title="Latest land"
-          action={
-            <Link href="/search" className="hidden shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-700 sm:inline-flex">
-              View all {totalLive} <ArrowRight className="size-4" aria-hidden />
-            </Link>
-          }
-        />
-        <ListingRail items={latest} />
-        <ButtonLink href="/search" variant="secondary" size="lg" className="mt-6 w-full sm:hidden">
-          View all {totalLive} plots <ArrowRight />
-        </ButtonLink>
+        {latest.length > 0 ? (
+          <>
+            <SectionHeading
+              title="Latest land"
+              action={
+                <Link href="/search" className="hidden shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-700 sm:inline-flex">
+                  View all {totalLive} <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              }
+            />
+            <ListingRail items={latest} />
+            <ButtonLink href="/search" variant="secondary" size="lg" className="mt-6 w-full sm:hidden">
+              View all {totalLive} plots <ArrowRight />
+            </ButtonLink>
+          </>
+        ) : (
+          <div className="rounded-[2rem] border border-brand-100 bg-brand-50 p-7 sm:flex sm:items-center sm:justify-between sm:gap-8 sm:p-10">
+            <div className="max-w-xl">
+              <p className="text-sm font-bold tracking-wide text-brand-700">JUST OPENED</p>
+              <h2 className="mt-1.5 text-2xl font-extrabold text-ink sm:text-3xl">Fresh land is on its way.</h2>
+              <p className="mt-2 text-muted">
+                Sellers are adding their land now. Have land to sell? List it free, and be one of the first that buyers see.
+              </p>
+            </div>
+            <ButtonLink href="/sell" size="lg" className="mt-5 w-full shrink-0 sm:mt-0 sm:w-auto">
+              List your land free <ArrowRight />
+            </ButtonLink>
+          </div>
+        )}
       </section>
 
       {/* ───── Browse by type ───── */}
@@ -142,7 +159,8 @@ export default async function HomePage() {
           <div>
             <h2 className="text-2xl font-extrabold sm:text-3xl">Buying or selling land? Start here.</h2>
             <p className="mt-1.5 flex items-center gap-1.5 text-white/80">
-              <MapPin className="size-4" aria-hidden /> {totalLive} plots waiting for the right buyer right now.
+              <MapPin className="size-4" aria-hidden />{" "}
+              {totalLive > 0 ? `${totalLive} ${totalLive === 1 ? "plot" : "plots"} waiting for the right buyer right now.` : "New land is being added. List yours free."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2.5">

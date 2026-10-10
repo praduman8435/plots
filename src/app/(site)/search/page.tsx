@@ -65,6 +65,8 @@ export default async function SearchPage(props: PageProps<"/search">) {
   const activeCount = pills.length - (f.q ? 1 : 0);
   const resetHref = f.city ? `/search?city=${f.city}` : "/search";
   const place = city?.name ?? "all cities";
+  /** Any filter or search text beyond the city: "nothing matches" rather than "nothing listed yet". */
+  const narrowed = pills.length > 0;
 
   const typeTabs: { label: string; type?: string }[] = [{ label: "All" }, ...Object.entries(LAND_TYPES).map(([type, t]) => ({ label: t.short, type }))];
 
@@ -141,7 +143,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
               </h1>
               <p className="mt-0.5 flex items-center gap-1 text-sm text-muted">
                 <MapPin className="size-3.5" aria-hidden />
-                {total} {total === 1 ? "plot" : "plots"} available
+                {total > 0 ? `${total} ${total === 1 ? "plot" : "plots"} available` : narrowed ? "No plots match yet" : "New land coming soon"}
               </p>
             </div>
             <SortSelect value={f.sort} />
@@ -195,7 +197,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
               <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-white text-brand-600 shadow-soft ring-1 ring-line">
                 <SearchX className="size-6" aria-hidden />
               </span>
-              <h2 className="mt-5 text-xl font-bold">No land found in this area yet</h2>
+              <h2 className="mt-5 text-xl font-bold">{narrowed ? "No land found in this area yet" : "No land listed here yet"}</h2>
               <ul className="mx-auto mt-4 max-w-xs space-y-2 text-left text-[15px] text-ink-soft">
                 {(f.maxPrice || f.minPrice) && (
                   <li>
@@ -212,9 +214,11 @@ export default async function SearchPage(props: PageProps<"/search">) {
                     • <Link href={hrefWith(f, { type: undefined, minArea: undefined, maxArea: undefined, unit: undefined, page: undefined })} className="font-semibold text-brand-700 underline-offset-2 hover:underline">Try other land types or sizes</Link>
                   </li>
                 )}
-                <li>
-                  • <Link href={resetHref} className="font-semibold text-brand-700 underline-offset-2 hover:underline">Browse all listings</Link>
-                </li>
+                {narrowed && (
+                  <li>
+                    • <Link href={resetHref} className="font-semibold text-brand-700 underline-offset-2 hover:underline">Browse all listings</Link>
+                  </li>
+                )}
               </ul>
               <div className="mx-auto mt-8 max-w-sm rounded-2xl bg-white p-5 ring-1 ring-line">
                 <p className="font-semibold">Can&apos;t find what you&apos;re looking for?</p>

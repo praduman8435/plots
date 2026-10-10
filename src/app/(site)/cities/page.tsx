@@ -21,7 +21,7 @@ export default async function CitiesPage() {
       <div className="lg:sticky lg:top-24 lg:self-start">
         <h1 className="text-3xl font-extrabold sm:text-[2rem] lg:text-[1.75rem]">Land for sale by city</h1>
         <p className="mt-2 text-muted">
-          {cities.length} {cities.length === 1 ? "city" : "cities"} with land available right now.
+          {cities.length > 0 ? `${cities.length} ${cities.length === 1 ? "city" : "cities"} with land available right now.` : "Land is being added city by city."}
         </p>
         <div className="mt-4 hidden flex-col gap-2 text-sm font-semibold lg:flex">
           <Link href="/search" className="text-brand-700 hover:text-brand-800">
