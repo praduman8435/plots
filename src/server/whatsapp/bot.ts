@@ -366,8 +366,16 @@ async function handle(t: Turn, input: BotInput) {
       t.step === "ASK_SOLD_WHICH" ||
       Boolean(replyId && !replyId.startsWith("menu:")) ||
       (command !== null && command !== "GREETING" && command !== "MENU" && command !== "START");
-    if (!carryOn) return askLanguage(t, command === "START" || replyId === "menu:list" ? "START" : "MENU");
-    await t.setLanguage("en");
+    if (!carryOn) {
+      // Asked once already and they typed instead of tapping: don't ask again. Pick from how they
+      // write (Hindi script → Hindi; English or Hinglish → English, which the AI mirrors) and answer them.
+      const askedBefore = Boolean(t.draft.afterLanguage);
+      if (!askedBefore || input.kind !== "text" || !text) return askLanguage(t, command === "START" || replyId === "menu:list" ? "START" : "MENU");
+      const { afterLanguage, ...rest } = t.draft;
+      void afterLanguage;
+      await t.save(t.step, rest);
+      await t.setLanguage(isDevanagari(text) ? "hi" : "en");
+    } else await t.setLanguage("en");
   }
 
   // ── A person from our team is handling this chat: stay silent unless asked back.
@@ -553,6 +561,20 @@ async function sendMenu(t: Turn, lead?: string) {
   await t.reply({
     type: "buttons",
     body: `${lead ? `${lead}\n\n` : ""}${intro}`,
+    buttons: [
+      { id: "menu:list", title: t.c.btnList },
+      { id: "menu:status", title: t.c.btnMine },
+      { id: "menu:human", title: t.c.btnTalk },
+    ],
+  });
+}
+
+/** The menu, or, when it went out moments ago, a one-line nudge with the same buttons (never the full welcome twice). */
+async function sendMenuOrNudge(t: Turn) {
+  if (!(await menuShownRecently(t))) return sendMenu(t);
+  await t.reply({
+    type: "buttons",
+    body: t.c.menuNudge({ list: t.c.btnList }),
     buttons: [
       { id: "menu:list", title: t.c.btnList },
       { id: "menu:status", title: t.c.btnMine },
@@ -1367,7 +1389,7 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
     case "SUBMITTING":
       if (input.kind === "location") return sendMenu(t, c.thanksLocationIdle);
       if (t.step === "IDLE" && input.kind === "text" && (await aiAssist(t, text))) return;
-      return sendMenu(t);
+      return sendMenuOrNudge(t);
 
     case "ASK_NAME": {
       let name: string | null = null;

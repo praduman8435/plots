@@ -398,6 +398,10 @@ function catalog(lang: Lang) {
     btnStop: en ? "Yes, stop" : "हाँ, रोकें",
     btnKeepGoing: en ? "Continue" : "जारी रखें",
     browseLand: (v: Vars) => (en ? `👉 See land for sale here: ${v.url}` : `👉 बिकाऊ ज़मीन यहाँ देखें: ${v.url}`),
+    menuNudge: (v: Vars) =>
+      en
+        ? `I'm here 🙂 Tap *${v.list}* to start, or just type your question.`
+        : `मैं यहीं हूँ 🙂 शुरू करने के लिए *${v.list}* दबाइए, या अपना सवाल लिख दीजिए।`,
     buyerAlertSaved: (v: Vars) =>
       en
         ? `🔔 Noted. We'll message you here as soon as matching land in ${v.place} is listed.`

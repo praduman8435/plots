@@ -150,7 +150,15 @@ async function main() {
     return new Response(JSON.stringify({ choices: [{ message: { content: '{"area":2}' } }] }), { status: 200 });
   }) as typeof fetch);
   const gb = geminiBody as Record<string, unknown> | null;
-  check("Gemini: OpenAI-compatible endpoint, short thinking, room for it", geminiOut === '{"area":2}' && gb?.model === "gemini-flash-latest" && gb?.reasoning_effort === "low" && Number(gb?.max_tokens) > 200, JSON.stringify(gb));
+  check("Gemini default: fast Flash-Lite, no thinking", geminiOut === '{"area":2}' && gb?.model === "gemini-flash-lite-latest" && gb?.reasoning_effort === undefined && Number(gb?.max_tokens) === 200, JSON.stringify(gb));
+  const flash = getAiConfig({ AI_ENABLED: "true", AI_PROVIDER: "gemini", AI_API_KEY: "k".repeat(30), AI_MODEL: "gemini-flash-latest" });
+  let flashBody: Record<string, unknown> | null = null;
+  await complete(flash!, { system: "s", messages: [{ role: "user", content: "x" }], maxTokens: 200 }, (async (_u: RequestInfo | URL, init?: RequestInit) => {
+    flashBody = JSON.parse(String(init?.body));
+    return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), { status: 200 });
+  }) as typeof fetch);
+  const fb = flashBody as Record<string, unknown> | null;
+  check("Gemini full Flash: short thinking, room for it", fb?.reasoning_effort === "low" && Number(fb?.max_tokens) > 200, JSON.stringify(fb));
   check("AI: HTTP error → null", (await complete(claude!, { system: "s", messages: [{ role: "user", content: "x" }] }, (async () => new Response("no", { status: 500 })) as typeof fetch)) === null);
   check("AI: JSON found inside prose/code fences", JSON.stringify(firstJsonObject('Sure! ```json\n{"area": 2}\n```')) === '{"area":2}');
   check("AI: Aadhaar-like and phone numbers redacted", !/1234|98765/.test(redact("aadhaar 1234 5678 9012, phone +91 98765 43210")));
@@ -250,7 +258,14 @@ async function main() {
     sent.length = 0;
     r = await text(ai2, "hmm not sure");
     check("AI off → no provider call, fixed reply", sent.length === 0 && /didn't get the price/i.test(r.body));
-    const plain = newPhone();
+    const fresh = newPhone();
+  r = await text(fresh, "Hi");
+  check("New chat: first message picks a language", r.ids.includes("lang:en"), r.ids);
+  r = await text(fresh, "Kon ho tum");
+  check("New chat: typing again instead of tapping isn't asked the language again", !r.ids.includes("lang:en") && r.ids.includes("menu:list"), r);
+  r = await text(fresh, "hmm ok");
+  check("Idle: the full welcome isn't sent twice in a row", r.ids.includes("menu:list") && /I'm here/.test(r.body), r.body.slice(0, 160));
+  const plain = newPhone();
     await tap(plain, "lang:en");
     await text(plain, "SELL");
     r = await text(plain, "kya bhai");

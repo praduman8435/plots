@@ -19,6 +19,8 @@ export async function complete(
   const started = Date.now();
   const maxTokens = input.maxTokens ?? 300;
   const temperature = input.temperature ?? 0.3;
+  // Gemini's full models think before answering; Flash-Lite answers straight away unless asked to think.
+  const thinks = cfg.provider === "gemini" && !/lite/i.test(cfg.model);
   try {
     let res: Response;
     if (cfg.provider === "anthropic") {
@@ -36,8 +38,8 @@ export async function complete(
           model: cfg.model,
           // Gemini's models think before answering and count that against max_tokens:
           // keep the thinking short and leave room for it, or the answer comes back empty.
-          max_tokens: cfg.provider === "gemini" ? maxTokens + GEMINI_THINKING_TOKENS : maxTokens,
-          ...(cfg.provider === "gemini" ? { reasoning_effort: "low" } : {}),
+          max_tokens: thinks ? maxTokens + GEMINI_THINKING_TOKENS : maxTokens,
+          ...(thinks ? { reasoning_effort: "low" } : {}),
           temperature,
           messages: [{ role: "system", content: input.system }, ...input.messages],
           ...(input.json ? { response_format: { type: "json_object" } } : {}),
