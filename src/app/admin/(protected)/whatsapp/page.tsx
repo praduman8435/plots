@@ -1,11 +1,4 @@
-import {
-  FlaskConical,
-  Hand,
-  ImageIcon,
-  MapPin,
-  MessageCircle,
-  Smartphone,
-} from "lucide-react";
+import { FlaskConical, Hand, ImageIcon, MapPin, MessageCircle, Smartphone } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { EmptyState } from "@/components/admin/empty-state";
@@ -48,14 +41,10 @@ const LISTING_STEPS = [
   "CONFIRM",
 ];
 
-export default async function WhatsAppInboxPage({
-  searchParams,
-}: PageProps<"/admin/whatsapp">) {
+export default async function WhatsAppInboxPage({ searchParams }: PageProps<"/admin/whatsapp">) {
   await requireAdmin();
   const sp = await searchParams;
-  const filter: FilterKey = FILTERS.some((f) => f.key === sp.filter)
-    ? (sp.filter as FilterKey)
-    : "all";
+  const filter: FilterKey = FILTERS.some((f) => f.key === sp.filter) ? (sp.filter as FilterKey) : "all";
 
   const where =
     filter === "human"
@@ -84,12 +73,7 @@ export default async function WhatsAppInboxPage({
     ]),
   ]);
   const [total, human, unread, listing] = counts;
-  const countFor: Record<FilterKey, number> = {
-    all: total,
-    human,
-    unread,
-    listing,
-  };
+  const countFor: Record<FilterKey, number> = { all: total, human, unread, listing };
   const now = new Date();
 
   return (
@@ -100,49 +84,29 @@ export default async function WhatsAppInboxPage({
         actions={
           <>
             <AiStatus />
-            <ButtonLink
-              href="/admin/whatsapp/simulator"
-              variant="soft"
-              size="sm"
-            >
+            <ButtonLink href="/admin/whatsapp/simulator" variant="soft" size="sm">
               <FlaskConical aria-hidden /> Open simulator
             </ButtonLink>
           </>
         }
       />
 
-      <nav
-        aria-label="Filter chats"
-        className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0"
-      >
+      <nav aria-label="Filter chats" className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         {FILTERS.map((f) => {
           const active = f.key === filter;
           return (
             <Link
               key={f.key}
-              href={
-                f.key === "all"
-                  ? "/admin/whatsapp"
-                  : `/admin/whatsapp?filter=${f.key}`
-              }
+              href={f.key === "all" ? "/admin/whatsapp" : `/admin/whatsapp?filter=${f.key}`}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-semibold transition",
-                active
-                  ? "border-brand-600 bg-brand-600 text-white shadow-brand"
-                  : "border-line bg-white text-ink-soft hover:border-brand-200 hover:bg-brand-50/50",
+                active ? "border-brand-600 bg-brand-600 text-white shadow-brand" : "border-line bg-white text-ink-soft hover:border-brand-200 hover:bg-brand-50/50",
               )}
             >
               {f.key === "human" && <Hand className="size-4" aria-hidden />}
               {f.label}
-              <span
-                className={cn(
-                  "tabular rounded-full px-1.5 text-xs",
-                  active ? "bg-white/20" : "bg-mist text-muted",
-                )}
-              >
-                {countFor[f.key]}
-              </span>
+              <span className={cn("tabular rounded-full px-1.5 text-xs", active ? "bg-white/20" : "bg-mist text-muted")}>{countFor[f.key]}</span>
             </Link>
           );
         })}
@@ -152,10 +116,8 @@ export default async function WhatsAppInboxPage({
         filter === "all" ? (
           <EmptyState icon={MessageCircle} title="No WhatsApp chats yet">
             <p>
-              Sellers reach the assistant by tapping <b>Sell on WhatsApp</b> on
-              the website (it opens a chat with “SELL” typed in), or by
-              messaging <b>+{site.whatsappNumber}</b> directly. Every chat
-              appears here the moment it starts.
+              Sellers reach the assistant by tapping <b>Sell on WhatsApp</b> on the website (it opens a chat with “SELL” typed in), or by
+              messaging <b>+{site.whatsappNumber}</b> directly. Every chat appears here the moment it starts.
             </p>
             <div className="mt-5 flex justify-center">
               <ButtonLink href="/admin/whatsapp/simulator" size="sm">
@@ -171,8 +133,7 @@ export default async function WhatsAppInboxPage({
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white shadow-soft">
           {conversations.map((c) => {
-            const name =
-              c.seller?.name || c.profileName || formatPhone(c.phone);
+            const name = c.seller?.name || c.profileName || formatPhone(c.phone);
             const last = c.messages[0];
             const step = toBotStep(c.step);
             const isUnread = c.unreadCount > 0;
@@ -180,28 +141,14 @@ export default async function WhatsAppInboxPage({
               <li key={c.id}>
                 <Link
                   href={`/admin/whatsapp/${c.id}`}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3.5 transition hover:bg-mist sm:gap-4 sm:px-5",
-                    isUnread && "bg-brand-50/40",
-                  )}
+                  className={cn("flex items-center gap-3 px-4 py-3.5 transition hover:bg-mist sm:gap-4 sm:px-5", isUnread && "bg-brand-50/40")}
                 >
                   <Avatar name={name} highlight={step === "HUMAN"} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p
-                        className={cn(
-                          "truncate text-[15px] text-ink",
-                          isUnread ? "font-bold" : "font-semibold",
-                        )}
-                      >
-                        {name}
-                      </p>
+                      <p className={cn("truncate text-[15px] text-ink", isUnread ? "font-bold" : "font-semibold")}>{name}</p>
                       {c.seller && (
-                        <Badge
-                          size="sm"
-                          tone="brand"
-                          className="hidden font-mono sm:inline-flex"
-                        >
+                        <Badge size="sm" tone="brand" className="hidden font-mono sm:inline-flex">
                           {c.seller.code}
                         </Badge>
                       )}
@@ -210,29 +157,13 @@ export default async function WhatsAppInboxPage({
                           <Hand aria-hidden /> Needs a person
                         </Badge>
                       )}
-                      <span
-                        className={cn(
-                          "ml-auto shrink-0 text-xs tabular",
-                          isUnread
-                            ? "font-semibold text-brand-700"
-                            : "text-faint",
-                        )}
-                      >
+                      <span className={cn("ml-auto shrink-0 text-xs tabular", isUnread ? "font-semibold text-brand-700" : "text-faint")}>
                         {timeAgo(last?.createdAt ?? c.updatedAt, now)}
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
-                      <p
-                        className={cn(
-                          "min-w-0 flex-1 truncate text-sm",
-                          isUnread ? "text-ink-soft" : "text-muted",
-                        )}
-                      >
-                        {last ? (
-                          <Preview message={last} />
-                        ) : (
-                          <span className="italic">No messages</span>
-                        )}
+                      <p className={cn("min-w-0 flex-1 truncate text-sm", isUnread ? "text-ink-soft" : "text-muted")}>
+                        {last ? <Preview message={last} /> : <span className="italic">No messages</span>}
                       </p>
                       {isUnread && (
                         <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-brand-600 px-1.5 text-[11px] font-bold text-white tabular">
@@ -245,9 +176,7 @@ export default async function WhatsAppInboxPage({
                       {step !== "IDLE" && step !== "HUMAN" && (
                         <>
                           <span aria-hidden>·</span>
-                          <span className="text-brand-700">
-                            {describeStep(step)}
-                          </span>
+                          <span className="text-brand-700">{describeStep(step)}</span>
                         </>
                       )}
                     </p>
@@ -262,33 +191,13 @@ export default async function WhatsAppInboxPage({
   );
 }
 
-function Preview({
-  message,
-}: {
-  message: {
-    direction: string;
-    type: string;
-    body: string | null;
-    sentBy: string | null;
-    mediaUrl: string | null;
-  };
-}) {
-  const who =
-    message.direction === "OUTBOUND"
-      ? message.sentBy === "admin"
-        ? "You: "
-        : message.sentBy === "system"
-          ? "Update: "
-          : "Bot: "
-      : "";
+function Preview({ message }: { message: { direction: string; type: string; body: string | null; sentBy: string | null; mediaUrl: string | null } }) {
+  const who = message.direction === "OUTBOUND" ? (message.sentBy === "admin" ? "You: " : message.sentBy === "system" ? "Update: " : "Bot: ") : "";
   if (message.type === "image") {
     return (
       <>
         {who}
-        <ImageIcon
-          className="mr-1 inline size-3.5 -translate-y-px"
-          aria-hidden
-        />
+        <ImageIcon className="mr-1 inline size-3.5 -translate-y-px" aria-hidden />
         {message.body || "Photo"}
       </>
     );
@@ -302,10 +211,7 @@ function Preview({
       </>
     );
   }
-  const text = (message.body ?? "")
-    .split("\n\n▸ ")[0]
-    .replace(/[*_~]/g, "")
-    .replace(/\s+/g, " ");
+  const text = (message.body ?? "").split("\n\n▸ ")[0].replace(/[*_~]/g, "").replace(/\s+/g, " ");
   return (
     <>
       {who}
@@ -328,9 +234,7 @@ function Avatar({ name, highlight }: { name: string; highlight?: boolean }) {
     <span
       className={cn(
         "relative grid size-11 shrink-0 place-items-center rounded-full text-sm font-bold",
-        highlight
-          ? "bg-amber-100 text-amber-800 ring-2 ring-amber-300"
-          : "bg-gradient-to-br from-brand-100 to-brand-200 text-brand-800",
+        highlight ? "bg-amber-100 text-amber-800 ring-2 ring-amber-300" : "bg-gradient-to-br from-brand-100 to-brand-200 text-brand-800",
       )}
       aria-hidden
     >
@@ -347,11 +251,7 @@ function AiStatus() {
       AI assistant on · {ai.provider}
     </Badge>
   ) : (
-    <Badge
-      tone="neutral"
-      size="sm"
-      title="Set AI_ENABLED=true, AI_PROVIDER and AI_API_KEY in Vercel, then redeploy"
-    >
+    <Badge tone="neutral" size="sm" title="Set AI_ENABLED=true, AI_PROVIDER and AI_API_KEY in Vercel, then redeploy">
       AI assistant off · fixed replies
     </Badge>
   );
