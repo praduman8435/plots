@@ -210,7 +210,7 @@ export default async function AdminSellerPage({ params }: PageProps<"/admin/sell
                       <ListingThumb url={p.images[0]?.url} alt="" sizes="96px" className="size-20 shrink-0 rounded-xl sm:h-20 sm:w-28" />
                       <div className="flex min-w-0 flex-1 flex-col gap-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <StatusBadge status={p.status} hiddenReason={p.hiddenReason} size="sm" />
+                          <StatusBadge status={p.status} hiddenReason={p.hiddenReason} removedAt={p.removedAt} size="sm" />
                           {p.status === "PENDING" && p.publishedAt && <EditedBadge short />}
                           <span className="tabular ml-auto text-[11px] font-medium text-faint">{p.code}</span>
                         </div>

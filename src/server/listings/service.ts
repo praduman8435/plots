@@ -160,7 +160,8 @@ export type StatusAction =
   | { type: "HIDE_UNCONFIRMED" }
   | { type: "UNHIDE" }
   | { type: "MARK_SOLD" }
-  | { type: "CONFIRM_AVAILABLE" };
+  | { type: "CONFIRM_AVAILABLE" }
+  | { type: "REMOVE" };
 
 type StatusOpts = {
   /** false = don't message the seller (e.g. WhatsApp simulator, or the bot replies itself). */
@@ -174,6 +175,8 @@ type StatusOpts = {
  *   PENDING → (approve) ACTIVE "Live" → (NO / SOLD) SOLD
  *   ACTIVE → (no reply to weekly check in 24h) HIDDEN "Unavailable" → (YES) ACTIVE
  * Nothing is ever deleted; SOLD and HIDDEN plots stay for history and can be relisted.
+ * A seller's "Remove listing" (REMOVE) hides the plot for good: removedAt is set and
+ * no action changes it again (it stays in the admin for history).
  */
 /** What a status change did. "conflict": the plot changed meanwhile, nothing was written. */
 export type StatusChangeResult = "applied" | "noop" | "conflict" | "seller_blocked";
@@ -218,6 +221,7 @@ async function applyStatusChange(propertyId: string, action: StatusAction, opts:
   const ev = { sellerId: p.sellerId, propertyId: p.id, props: { via: opts.via ?? null } };
   const awaitingReply = p.availabilityCheckSentAt !== null;
   const goesLive = action.type === "APPROVE" || action.type === "UNHIDE" || action.type === "CONFIRM_AVAILABLE";
+  if (p.removedAt) return "noop";
   if (goesLive && p.seller.isBlocked) return "seller_blocked";
 
   /** Compare-and-set on the fields the state machine depends on. */
@@ -286,6 +290,13 @@ async function applyStatusChange(propertyId: string, action: StatusAction, opts:
       await trackEvent(reactivating ? "property_reactivated" : "availability_yes", ev);
       if (reactivating && awaitingReply === false && p.hiddenReason === "AVAILABILITY_UNCONFIRMED") await trackEvent("availability_yes", ev);
       if (reactivating) await notify("LISTING_REACTIVATED");
+      return "applied";
+    }
+    case "REMOVE": {
+      // Sold plots stay "sold" for history; anything else is hidden by the seller.
+      const ok = await write({ removedAt: now, availabilityCheckSentAt: null, ...(p.status === "SOLD" ? {} : { status: "HIDDEN", hiddenReason: "BY_SELLER" }) });
+      if (!ok) return "conflict";
+      await trackEvent("listing_removed", ev);
       return "applied";
     }
     case "MARK_SOLD": {

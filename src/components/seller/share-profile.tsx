@@ -75,16 +75,16 @@ export function ShareProfile({ url, name, variant = "dashboard", total }: { url:
   return (
     <>
       {variant === "dashboard" ? (
-        <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-line @lg:flex-row @lg:items-center">
+        <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-line">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
             <Store className="size-5" aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-ink">Share all your properties</p>
-            <p className="text-sm text-muted">One link to showcase all your active properties to buyers.</p>
+            <p className="text-[15px] font-semibold text-ink">Your seller page</p>
+            <p className="text-[13px] leading-snug text-muted">One link with all your live properties.</p>
           </div>
-          <Button type="button" size="md" onClick={open} className="h-10 shrink-0 @max-lg:w-full">
-            <Share2 /> Share My Properties
+          <Button type="button" size="sm" onClick={open} className="shrink-0">
+            <Share2 /> Share
           </Button>
         </div>
       ) : variant === "icon" ? (

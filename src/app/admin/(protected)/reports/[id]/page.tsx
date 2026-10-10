@@ -127,7 +127,7 @@ export default async function AdminReportPage({ params }: PageProps<"/admin/repo
                 <ListingThumb url={p.images[0]?.url} alt={p.title} sizes="12rem" count={p.images.length} className="aspect-[4/3] w-full shrink-0 rounded-xl sm:w-48" />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <StatusBadge status={p.status} hiddenReason={p.hiddenReason} />
+                    <StatusBadge status={p.status} hiddenReason={p.hiddenReason} removedAt={p.removedAt} />
                     <span className="tabular text-xs text-muted">{p.code}</span>
                   </div>
                   <p className="mt-1.5 font-semibold text-ink">{p.title}</p>

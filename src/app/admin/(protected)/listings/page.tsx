@@ -172,7 +172,7 @@ export default async function AdminListingsPage({ searchParams }: PageProps<"/ad
                     <ListingThumb url={p.images[0]?.url} alt="" sizes="96px" className="size-24 shrink-0 rounded-xl" />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <StatusBadge status={p.status} hiddenReason={p.hiddenReason} size="sm" />
+                        <StatusBadge status={p.status} hiddenReason={p.hiddenReason} removedAt={p.removedAt} size="sm" />
                         {p.status === "PENDING" && p.publishedAt && <EditedBadge short />}
                         <span className="tabular ml-auto text-[11px] font-medium text-faint">{p.code}</span>
                       </div>
@@ -229,7 +229,7 @@ export default async function AdminListingsPage({ searchParams }: PageProps<"/ad
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex flex-col items-start gap-1">
-                          <StatusBadge status={p.status} hiddenReason={p.hiddenReason} size="sm" />
+                          <StatusBadge status={p.status} hiddenReason={p.hiddenReason} removedAt={p.removedAt} size="sm" />
                           {p.status === "PENDING" && p.publishedAt && <EditedBadge short />}
                           <SourceBadge source={p.source} />
                         </div>

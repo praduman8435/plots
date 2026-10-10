@@ -18,6 +18,7 @@ export const SERVER_EVENTS = [
   "availability_no",
   "availability_no_response",
   "property_reactivated",
+  "listing_removed",
 ] as const;
 
 export type ClientEvent = (typeof CLIENT_EVENTS)[number];

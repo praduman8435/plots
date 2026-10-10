@@ -37,12 +37,22 @@ export const HIDDEN_REASON_LABELS: Record<HiddenReason, string> = {
 export function StatusBadge({
   status,
   hiddenReason,
+  removedAt,
   size,
 }: {
   status: ListingStatus;
   hiddenReason?: HiddenReason | null;
+  /** The seller removed it — shown instead of the status, which no longer changes. */
+  removedAt?: Date | null;
   size?: "sm" | "md";
 }) {
+  if (removedAt) {
+    return (
+      <Badge tone="neutral" size={size} title={`Removed by the seller on ${removedAt.toLocaleDateString("en-IN")}`}>
+        Removed by seller
+      </Badge>
+    );
+  }
   const unavailable = status === "HIDDEN" && hiddenReason === "AVAILABILITY_UNCONFIRMED";
   return (
     <Badge tone={unavailable ? "amber" : STATUS_TONES[status]} size={size}>

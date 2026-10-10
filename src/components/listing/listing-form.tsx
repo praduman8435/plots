@@ -401,7 +401,7 @@ export function ListingForm({
 
       <div className={cn("flex flex-col gap-4 sm:gap-5", wizard && page !== 0 && "hidden")}>
       {/* ── Land type ── */}
-      <Section title="What kind of land is it?" step={wizard ? undefined : 1}>
+      <Section id="form-type" title="What kind of land is it?" step={wizard ? undefined : 1}>
         <div
           role="radiogroup"
           aria-label="Land type"
@@ -454,7 +454,7 @@ export function ListingForm({
       </Section>
 
       {/* ── Location ── */}
-      <Section title="Where is it?" step={wizard ? undefined : 2}>
+      <Section id="form-location" title="Where is it?" step={wizard ? undefined : 2}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="State" htmlFor={fid("state")} error={errors.state}>
             <Select
@@ -539,7 +539,7 @@ export function ListingForm({
       </Section>
 
       {/* ── Size & price ── */}
-      <Section title="Size and price" step={wizard ? undefined : 3}>
+      <Section id="form-price" title="Size and price" step={wizard ? undefined : 3}>
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Land size" htmlFor={fid("area")} error={errors.area} hint={sqftHint ?? "Exactly as you'd say it"}>
             <div className="flex gap-2">
@@ -647,8 +647,9 @@ export function ListingForm({
       <div className={cn("flex flex-col gap-4 sm:gap-5", wizard && page !== 1 && "hidden")}>
       {/* ── Photos (first on this page: photos sell land) ── */}
       <Section
+        id="form-photos"
         title="Photos"
-        step={wizard ? undefined : 6}
+        step={wizard ? undefined : 4}
         description="Add clear photos of the land. A road / frontage photo and a nearby landmark help too. 2 or more photos get far more enquiries."
       >
         <div data-field="images">
@@ -657,7 +658,7 @@ export function ListingForm({
       </Section>
 
       {/* ── Features ── */}
-      <Section title="What does it have?" step={wizard ? undefined : 4} description="Tap all that apply.">
+      <Section id="form-features" title="What does it have?" step={wizard ? undefined : 5} description="Tap all that apply.">
         <div className="flex flex-wrap gap-2" data-field="features">
           {FEATURE_OPTIONS.map((f) => {
             const on = features.includes(f);
@@ -682,7 +683,7 @@ export function ListingForm({
       </Section>
 
       {/* ── Description ── */}
-      <Section title="Tell buyers about it" step={wizard ? undefined : 5}>
+      <Section id="form-description" title="Tell buyers about it" step={wizard ? undefined : 6}>
         <Field
           label="Description"
           htmlFor={fid("description")}
@@ -785,9 +786,9 @@ export function ListingForm({
   );
 }
 
-function Section({ title, description, step, children }: { title: string; description?: string; step?: number; children: ReactNode }) {
+function Section({ id, title, description, step, children }: { id?: string; title: string; description?: string; step?: number; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-line bg-white p-4 shadow-soft sm:p-6">
+    <section id={id} className="scroll-mt-24 rounded-2xl border border-line bg-white p-4 shadow-soft sm:p-6">
       <header className="mb-4 flex items-start gap-3">
         {step != null && (
           <span className="tabular mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-700 ring-1 ring-brand-100">

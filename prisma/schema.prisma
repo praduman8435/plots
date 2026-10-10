@@ -302,6 +302,8 @@ model Property {
   rejectionReason String?
   publishedAt     DateTime? /// first time it went ACTIVE
   soldAt          DateTime?
+  /// The seller removed it: never shown or changed again; kept for history (enquiries, reports).
+  removedAt       DateTime?
 
   // Weekly availability check (see runAvailabilityChecks). Never faked:
   lastConfirmedAt         DateTime? /// seller explicitly said "still available" (YES / dashboard)

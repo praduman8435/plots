@@ -594,12 +594,12 @@ async function sendStatus(t: Turn) {
     return;
   }
   const plots = await db.property.findMany({
-    where: { sellerId: seller.id },
+    where: { sellerId: seller.id, removedAt: null },
     orderBy: { createdAt: "desc" },
     take: 10,
     select: { title: true, code: true, status: true, hiddenReason: true, slug: true, lastConfirmedAt: true, availabilityCheckSentAt: true },
   });
-  const total = await db.property.count({ where: { sellerId: seller.id } });
+  const total = await db.property.count({ where: { sellerId: seller.id, removedAt: null } });
   const lines = plots.map((p, i) => {
     const confirmed = p.lastConfirmedAt && p.status === "ACTIVE" ? ` · ${t.c.confirmed({ when: daysAgo(t.lang, p.lastConfirmedAt) })}` : "";
     const link = p.status === "ACTIVE" ? `\n   ${site.url}/property/${p.slug}` : "";
@@ -642,7 +642,7 @@ async function confirmAvailability(t: Turn) {
   }
   const awaiting = await plotsAwaitingAvailability(seller.id);
   const hidden = await db.property.findMany({
-    where: { sellerId: seller.id, status: "HIDDEN", hiddenReason: "AVAILABILITY_UNCONFIRMED" },
+    where: { sellerId: seller.id, status: "HIDDEN", hiddenReason: "AVAILABILITY_UNCONFIRMED", removedAt: null },
     orderBy: { createdAt: "asc" },
     select: { id: true, title: true, slug: true },
   });
@@ -731,7 +731,7 @@ async function pickSold(t: Turn, propertyId: string) {
   const seller = await t.loadSeller();
   const plot = seller
     ? await db.property.findFirst({
-        where: { id: propertyId, sellerId: seller.id },
+        where: { id: propertyId, sellerId: seller.id, removedAt: null },
         select: { id: true, title: true, code: true, price: true, status: true },
       })
     : null;
@@ -777,7 +777,7 @@ async function markSold(t: Turn, sellerId: string, plot: { id: string; title: st
 /** Live or hidden plots, oldest first. */
 async function sellablePlots(sellerId: string) {
   return db.property.findMany({
-    where: { sellerId, status: { in: ["ACTIVE", "HIDDEN"] } },
+    where: { sellerId, status: { in: ["ACTIVE", "HIDDEN"] }, removedAt: null },
     orderBy: { createdAt: "asc" },
     select: { id: true, title: true, code: true, price: true, area: true, areaUnit: true },
     take: 10,
@@ -819,7 +819,7 @@ async function handleSoldReply(t: Turn, replyId: string) {
   const plot =
     seller && propertyId
       ? await db.property.findFirst({
-          where: { id: propertyId, sellerId: seller.id },
+          where: { id: propertyId, sellerId: seller.id, removedAt: null },
           select: { id: true, title: true, code: true, status: true, hiddenReason: true, availabilityCheckSentAt: true },
         })
       : null;

@@ -90,6 +90,24 @@ async function main() {
     );
     check("hide-for-no-reply on a plot that isn't waiting → no-op", (await changeListingStatus(waiting.id, { type: "HIDE_UNCONFIRMED" }, { notify: false })) === "noop" || final.status === "HIDDEN");
 
+    // ── Seller removes a listing: hidden for good, frozen ──
+    const { isPubliclyViewable } = await import("../src/lib/listing-visibility");
+    const toRemove = await plot("ACTIVE");
+    check("remove: applied", (await changeListingStatus(toRemove.id, { type: "REMOVE" }, { notify: false })) === "applied");
+    const removed = await db.property.findUniqueOrThrow({ where: { id: toRemove.id }, include: { seller: true } });
+    check("remove: hidden by seller, removedAt set", removed.status === "HIDDEN" && removed.hiddenReason === "BY_SELLER" && removed.removedAt !== null, removed);
+    check("remove: not publicly viewable", !isPubliclyViewable(removed));
+    const revive = await Promise.all([
+      changeListingStatus(toRemove.id, { type: "CONFIRM_AVAILABLE" }, { notify: false }),
+      changeListingStatus(toRemove.id, { type: "APPROVE" }, { notify: false }),
+      changeListingStatus(toRemove.id, { type: "UNHIDE" }, { notify: false }),
+    ]);
+    check("remove: nothing brings it back", revive.every((r) => r === "noop") && (await db.property.findUniqueOrThrow({ where: { id: toRemove.id } })).status === "HIDDEN", revive);
+    const soldThenRemoved = await plot("SOLD", { soldAt: new Date() });
+    await changeListingStatus(soldThenRemoved.id, { type: "REMOVE" }, { notify: false });
+    const sr = await db.property.findUniqueOrThrow({ where: { id: soldThenRemoved.id }, include: { seller: true } });
+    check("remove: a sold plot stays 'sold' for history, but isn't shown", sr.status === "SOLD" && sr.removedAt !== null && !isPubliclyViewable(sr));
+
     // ── Atomic edits ──
     const edited = await plot("ACTIVE");
     const input = {

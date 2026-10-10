@@ -167,6 +167,7 @@ export async function getReportDetail(id: string) {
           soldAt: true,
           freshnessAt: true,
           availabilityCheckSentAt: true,
+          removedAt: true,
           city: { select: { name: true } },
           images: { select: { url: true }, orderBy: { position: "asc" }, take: 4 },
         },

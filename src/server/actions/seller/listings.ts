@@ -11,13 +11,13 @@ import { resolveCity } from "@/server/cities";
 import { isOurImageUrl } from "@/server/storage";
 import { changeListingStatus, createListing, updateListing, type StatusAction } from "@/server/listings/service";
 
-type SellerAction = "MARK_SOLD" | "CONFIRM_AVAILABLE" | "HIDE" | "UNHIDE";
+type SellerAction = "MARK_SOLD" | "CONFIRM_AVAILABLE" | "HIDE" | "UNHIDE" | "REMOVE";
 
-/** A seller can only act on their own plots, and only through these four actions. */
+/** A seller can only act on their own plots, and only through these actions. */
 export async function sellerListingAction(propertyId: string, action: SellerAction): Promise<{ ok: boolean; message?: string }> {
   const seller = await requireSeller();
-  const p = await db.property.findFirst({ where: { id: propertyId, sellerId: seller.id }, select: { id: true, slug: true, status: true, hiddenReason: true } });
-  if (!p) return { ok: false, message: "Plot not found." };
+  const p = await db.property.findFirst({ where: { id: propertyId, sellerId: seller.id }, select: { id: true, slug: true, status: true, hiddenReason: true, removedAt: true } });
+  if (!p || p.removedAt) return { ok: false, message: "Plot not found." };
 
   const allowed: Record<SellerAction, boolean> = {
     MARK_SOLD: p.status === "ACTIVE" || p.status === "HIDDEN",
@@ -25,6 +25,7 @@ export async function sellerListingAction(propertyId: string, action: SellerActi
     CONFIRM_AVAILABLE: p.status === "ACTIVE" || p.status === "SOLD" || (p.status === "HIDDEN" && p.hiddenReason !== "BY_ADMIN"),
     HIDE: p.status === "ACTIVE",
     UNHIDE: p.status === "HIDDEN" && p.hiddenReason === "BY_SELLER",
+    REMOVE: true,
   };
   if (!allowed[action]) return { ok: false, message: "That action isn't available for this plot." };
 
@@ -33,6 +34,7 @@ export async function sellerListingAction(propertyId: string, action: SellerActi
     CONFIRM_AVAILABLE: { type: "CONFIRM_AVAILABLE" },
     HIDE: { type: "HIDE", by: "SELLER" },
     UNHIDE: { type: "UNHIDE" },
+    REMOVE: { type: "REMOVE" },
   };
   // The seller is looking at the result on screen, so no WhatsApp echo.
   const result = await changeListingStatus(p.id, map[action], { notify: false, via: "dashboard" });
@@ -82,8 +84,8 @@ export async function createSellerListing(payload: ListingFormPayload): Promise<
  */
 export async function updateSellerListing(propertyId: string, payload: ListingFormPayload): Promise<ListingFormResult> {
   const seller = await requireSeller();
-  const p = await db.property.findFirst({ where: { id: propertyId, sellerId: seller.id }, select: { id: true, slug: true, status: true, code: true } });
-  if (!p) return { ok: false, message: "Property not found." };
+  const p = await db.property.findFirst({ where: { id: propertyId, sellerId: seller.id }, select: { id: true, slug: true, status: true, code: true, removedAt: true } });
+  if (!p || p.removedAt) return { ok: false, message: "Property not found." };
   if (p.status === "SOLD") return { ok: false, message: "Sold properties can't be edited. Mark it available again first." };
 
   const parsed = listingInputSchema.safeParse(payload.listing);

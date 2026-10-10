@@ -111,7 +111,7 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
         title={p.title}
         description={
           <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={p.status} hiddenReason={p.hiddenReason} size="sm" />
+            <StatusBadge status={p.status} hiddenReason={p.hiddenReason} removedAt={p.removedAt} size="sm" />
             {edited && <EditedBadge />}
             <SourceBadge source={p.source} />
             <span className="tabular font-medium text-ink-soft">{p.code}</span>
@@ -187,7 +187,7 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
         <aside className="flex flex-col gap-5 lg:col-start-2 lg:row-span-4 lg:row-start-1">
           <Card title="Status">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <StatusBadge status={p.status} hiddenReason={p.hiddenReason} />
+              <StatusBadge status={p.status} hiddenReason={p.hiddenReason} removedAt={p.removedAt} />
               {edited && <EditedBadge />}
               {p.status === "HIDDEN" && p.hiddenReason && !unavailable && <span className="text-xs text-muted">{HIDDEN_REASON_LABELS[p.hiddenReason]}</span>}
             </div>
