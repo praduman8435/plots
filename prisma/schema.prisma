@@ -559,3 +559,121 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+// ───────────────────────────── Land parcel map ─────────────────────────────
+// A standalone map of cadastral parcels (docs/LAND_MAP.md). Deliberately NOT
+// linked to sellers or listings. Only authorized datasets are imported; each
+// carries its licence and attribution, and synthetic sample data is flagged.
+// Geometry is GeoJSON in EPSG:4326 plus bbox columns and a grid-cell index for
+// viewport queries (PostGIS isn't required; see the doc for when to move to it).
+
+/// One source of parcels, e.g. one authorized village export.
+model ParcelDataset {
+  id              String    @id @default(cuid())
+  /// Stable slug used by the importer, e.g. "up-gbn-dadri-bisrakh-2026-10".
+  key             String    @unique
+  name            String
+  sourceName      String
+  sourceUrl       String?
+  /// Letter, order or agreement under which we may use and show the data.
+  sourceReference String?
+  license         String
+  attribution     String
+  /// Sample polygons for development. Never served in production.
+  isSynthetic     Boolean   @default(false)
+  stateName       String
+  districtName    String
+  /// CRS of the source file (transformed to EPSG:4326 on import).
+  sourceCrs       String
+  acquiredAt      DateTime
+  sourceUpdatedAt DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  parcels Parcel[]
+  imports ParcelImport[]
+
+  @@map("parcel_datasets")
+}
+
+/// One run of the importer (scripts/land-map/import-parcels.ts).
+model ParcelImport {
+  id           String    @id @default(cuid())
+  datasetId    String
+  fileName     String
+  fileSha256   String
+  /// RUNNING | SUCCEEDED | FAILED
+  status       String
+  featuresRead Int       @default(0)
+  inserted     Int       @default(0)
+  updated      Int       @default(0)
+  unchanged    Int       @default(0)
+  rejected     Int       @default(0)
+  /// First rejections and warnings: [{ recordId, reason }]
+  report       Json?
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+
+  dataset ParcelDataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  parcels Parcel[]
+
+  @@index([datasetId, startedAt])
+  @@map("parcel_imports")
+}
+
+model Parcel {
+  id               String    @id @default(cuid())
+  datasetId        String
+  /// The source's own id for this feature — the trace back to the original record.
+  sourceRecordId   String
+  stateName        String
+  districtName     String
+  tehsilName       String?
+  villageName      String?
+  villageCode      String?
+  /// Gata / Khasra / survey number exactly as in the source.
+  parcelNumber     String?
+  /// parcelNumber normalised for lookup ("12 / 3" → "12/3").
+  parcelNumberKey  String?
+  ulpin            String?
+  /// Area as recorded by the source, in its own unit.
+  recordedArea     Float?
+  recordedAreaUnit String?
+  /// Geodesic area of the polygon (m², WGS 84 sphere).
+  computedAreaSqm  Float
+  landClass        String?
+  /// GeoJSON Polygon/MultiPolygon in EPSG:4326 — the imported geometry.
+  geometry         Json
+  /// Simplified copy for drawing. Derived; never edited by hand.
+  displayGeometry  Json
+  minLng           Float
+  minLat           Float
+  maxLng           Float
+  maxLat           Float
+  centroidLng      Float
+  centroidLat      Float
+  /// Grid cell of the south-west corner (0.01° ≈ 1.1 km) — the viewport index. See src/lib/land-map/geo.ts.
+  cellX            Int
+  cellY            Int
+  /// The source's properties as received (minus personal fields the importer drops). Never sent to browsers.
+  sourceAttributes Json
+  /// Hash of geometry + mapped fields: an unchanged re-import writes nothing.
+  contentHash      String
+  /// UNVERIFIED | VERIFIED | FLAGGED
+  qualityStatus    String    @default("UNVERIFIED")
+  importId         String
+  sourceUpdatedAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  dataset    ParcelDataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  lastImport ParcelImport  @relation(fields: [importId], references: [id], onDelete: Restrict)
+
+  @@unique([datasetId, sourceRecordId])
+  @@index([cellX, cellY])
+  @@index([villageName, parcelNumberKey])
+  @@index([parcelNumberKey])
+  @@index([ulpin])
+  @@map("parcels")
+}

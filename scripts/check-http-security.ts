@@ -212,6 +212,16 @@ async function main() {
     const profilePage = await get(`/s/${A.profileSlug}`);
     check("public profile has the report button", has(profilePage.text, "Report this profile"));
 
+    // ── Land parcel map: one switch for the page and every API (off in CI, the default) ──
+    const landPaths = ["/land-map", "/api/land-map/coverage", "/api/land-map/search?q=sector", "/api/land-map/parcels?west=77.5&south=28.4&east=77.51&north=28.41&zoom=16", "/api/land-map/parcels/cabcdefghij123"];
+    const land = await Promise.all(landPaths.map((p) => get(p)));
+    const landOff = land.every((r) => r.status === 404);
+    check("land map: page and APIs agree on the feature flag", landOff || land.every((r) => r.status !== 404), land.map((r) => r.status));
+    if (landOff) {
+      check("land map disabled: the page is the normal 404 page", has(land[0].text, "Page not found"));
+      check("land map disabled: APIs return no map data", land.slice(1).every((r) => !/FeatureCollection|coverage|parcelNumber|places/.test(r.text)), land.map((r) => r.text.slice(0, 80)));
+    }
+
     // ── Unknown pages: a proper 404 page inside the site ──
     const nf = await get("/search/no-such-page");
     check("unknown nested URL → 404 with the not-found page", nf.status === 404 && has(nf.text, "Page not found"), nf.status);
