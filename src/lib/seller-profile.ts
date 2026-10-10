@@ -1,7 +1,7 @@
 import { site } from "./site";
 
 /**
- * Public seller profile links: /s/<slug>, e.g. /s/praduman-rp44qh.
+ * Public seller profile links: /sellers/<slug>, e.g. /sellers/praduman-rp44qh (old /s/… links redirect).
  * The slug is the seller's name in url-safe words plus the random part of
  * their Seller ID, so it is unique without collision handling and reveals
  * nothing private. It is stored once (Seller.profileSlug) and never
@@ -24,7 +24,7 @@ export function isValidProfileSlug(slug: string): boolean {
 }
 
 export function sellerProfilePath(slug: string): string {
-  return `/s/${slug}`;
+  return `/sellers/${slug}`;
 }
 
 export function sellerProfileUrl(slug: string): string {

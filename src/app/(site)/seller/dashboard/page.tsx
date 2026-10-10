@@ -160,7 +160,7 @@ export default async function SellerDashboard(props: PageProps<"/seller/dashboar
                 <ButtonA {...sellOnWhatsAppProps()} variant="secondary" size="sm" className="hidden sm:inline-flex">
                   <WhatsAppIcon className="text-brand-600" /> Add via WhatsApp
                 </ButtonA>
-                <ButtonLink href="/seller/plots/new" size="sm">
+                <ButtonLink href="/seller/properties/new" size="sm">
                   <Plus /> Add property
                 </ButtonLink>
               </div>
@@ -191,7 +191,7 @@ export default async function SellerDashboard(props: PageProps<"/seller/dashboar
                 <Sprout className="mx-auto size-8 text-brand-600" aria-hidden />
                 <p className="mt-3 font-semibold">No properties yet</p>
                 <p className="mt-1 text-sm text-muted">Add your first property — it takes a few minutes.</p>
-                <ButtonLink href="/seller/plots/new" className="mt-5">
+                <ButtonLink href="/seller/properties/new" className="mt-5">
                   <Plus /> Add property
                 </ButtonLink>
               </div>
@@ -236,7 +236,7 @@ export default async function SellerDashboard(props: PageProps<"/seller/dashboar
                       {awaiting && <Note tone="amber">Is it still available? Let buyers know with one tap.</Note>}
 
                       <div className="mt-3 border-t border-line pt-3">
-                        <PlotActions id={p.id} slug={p.slug} title={p.title} status={p.status} hiddenReason={p.hiddenReason} awaitingReply={awaiting} />
+                        <PlotActions id={p.id} code={p.code} slug={p.slug} title={p.title} status={p.status} hiddenReason={p.hiddenReason} awaitingReply={awaiting} />
                       </div>
                     </li>
                   );

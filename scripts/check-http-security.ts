@@ -136,9 +136,15 @@ async function main() {
     check("admin: real admin → 200", (await get("/admin/reports", adminCookie)).status === 200);
 
     // ── Cross-seller access (BOLA) ──
-    const editOther = await get(`/seller/plots/${plotB.id}/edit`, A.cookie);
+    const editOther = await get(`/seller/properties/${plotB.code.toLowerCase()}/edit`, A.cookie);
     check("seller A can't open seller B's edit page", editOther.status === 404 && !editOther.text.includes(plotB.title), editOther.status);
-    check("seller A can open own edit page", (await get(`/seller/plots/${plotA.id}/edit`, A.cookie)).status === 200);
+    check("seller A can open own edit page", (await get(`/seller/properties/${plotA.code.toLowerCase()}/edit`, A.cookie)).status === 200);
+    const legacyEdit = await get(`/seller/plots/${plotA.id}/edit`, A.cookie);
+    check("old edit URL → permanent redirect", legacyEdit.status === 308 && (legacyEdit.headers.get("location") ?? "").includes(`/seller/properties/${plotA.id}/edit`));
+    const viaId = await get(`/seller/properties/${plotA.id}/edit`, A.cookie);
+    check("edit by internal id → redirect to the readable code URL", viaId.status === 307 && (viaId.headers.get("location") ?? "").endsWith(`/seller/properties/${plotA.code.toLowerCase()}/edit`), viaId.headers.get("location"));
+    const oldProfile = await get(`/s/${A.profileSlug}`);
+    check("old profile URL /s/… → /sellers/…", oldProfile.status === 308 && (oldProfile.headers.get("location") ?? "").endsWith(`/sellers/${A.profileSlug}`));
     check("seller dashboard shows only own plots", dash.text.includes(plotA.title) && !dash.text.includes(plotB.title));
     // Admin password guesses fired in parallel: only the first 8 (per email + IP) reach a password check.
     const raceEmail = `race-${stamp}@example.invalid`;
@@ -163,7 +169,7 @@ async function main() {
     const crashes: string[] = [];
     for (const [file, name] of actions) {
       for (const payload of hostile) {
-        const r = await callAction("/seller", file, name, [payload], "", { "x-test-client-ip": `192.0.2.${Math.floor(Math.random() * 250) + 1}` });
+        const r = await callAction("/seller/login", file, name, [payload], "", { "x-test-client-ip": `192.0.2.${Math.floor(Math.random() * 250) + 1}` });
         if (r.status >= 500 || /at \w+ \(|PrismaClient|Invalid `prisma/.test(r.text)) crashes.push(`${name}(${JSON.stringify(payload)?.slice(0, 40)}) → ${r.status}`);
       }
     }
@@ -228,7 +234,7 @@ async function main() {
     check("client-supplied sellerId ignored (server derives the seller)", okPayload(forged) && forgedRow?.sellerId === B.id);
     const crossOrigin = await callAction(`/property/${plotA.slug}`, "src/server/actions/report.ts", "reportAction", [{ target: "PROFILE", ref: A.profileSlug, reason: "FRAUD" }], "", { Origin: "https://evil.example", "x-test-client-ip": "192.0.2.12" });
     check("cross-origin Server Action call rejected (CSRF)", !okPayload(crossOrigin) && (await db.report.count({ where: { sellerId: A.id, target: "PROFILE" } })) === 0, crossOrigin.status);
-    const signedInReport = await callAction(`/s/${A.profileSlug}`, "src/server/actions/report.ts", "reportAction", [{ target: "PROFILE", ref: A.profileSlug, reason: "ABUSIVE" }], B.cookie);
+    const signedInReport = await callAction(`/sellers/${A.profileSlug}`, "src/server/actions/report.ts", "reportAction", [{ target: "PROFILE", ref: A.profileSlug, reason: "ABUSIVE" }], B.cookie);
     const signedRow = await db.report.findFirst({ where: { sellerId: A.id, target: "PROFILE" } });
     check("signed-in seller recorded as reporter, separate from reported seller", okPayload(signedInReport) && signedRow?.reporterSellerId === B.id && signedRow?.sellerId === A.id);
 
@@ -256,7 +262,7 @@ async function main() {
     const dashA = await get("/seller/dashboard", A.cookie);
     const codes = (await db.report.findMany({ where: { sellerId: A.id }, select: { code: true } })).map((r) => r.code);
     check("reported seller's dashboard shows no reports", !dashA.text.includes("onerror=alert") && codes.length > 0 && codes.every((c) => !dashA.text.includes(c)));
-    const profilePage = await get(`/s/${A.profileSlug}`);
+    const profilePage = await get(`/sellers/${A.profileSlug}`);
     check("public profile has the report button", has(profilePage.text, "Report this profile"));
 
     // ── Unknown pages: a proper 404 page inside the site ──

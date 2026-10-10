@@ -7,7 +7,6 @@ import { SectionHeading } from "@/components/site/sections";
 import { ButtonA, ButtonLink } from "@/components/ui/button";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { getSellerSession } from "@/lib/seller/session";
 import { site } from "@/lib/site";
 import { sellOnWhatsAppProps } from "@/lib/whatsapp-links";
 
@@ -29,9 +28,10 @@ const WEB_STEPS = [
   { icon: Camera, title: "Photos & submit", text: "Add a few clear photos. Our team checks it, then it goes live." },
 ];
 
-export default async function SellPage() {
-  const seller = await getSellerSession();
-  const web = seller?.onboardedAt ? { href: "/seller/plots/new", label: "Add another property" } : { href: "/sell/start", label: "Start selling" };
+export default function SellPage() {
+  // Same page for everyone, so it is served from the CDN: /sell/start sends a signed-in seller
+  // straight to "add a property".
+  const web = { href: "/sell/start", label: "Start selling" };
 
   return (
     <>
@@ -67,14 +67,12 @@ export default async function SellPage() {
               </li>
             ))}
           </ul>
-          {!seller && (
-            <p className="mt-5 text-sm text-white/70">
-              Already a seller?{" "}
-              <Link href="/seller?next=/seller/plots/new" className="font-semibold text-white underline underline-offset-4">
-                Sign in with your Seller ID
-              </Link>
-            </p>
-          )}
+          <p className="mt-5 text-sm text-white/70">
+            Already a seller?{" "}
+            <Link href="/seller/login?next=/seller/properties/new" className="font-semibold text-white underline underline-offset-4">
+              Sign in with your Seller ID
+            </Link>
+          </p>
         </div>
       </section>
 

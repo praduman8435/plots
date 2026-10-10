@@ -57,7 +57,7 @@ export default async function SellChatPage({ searchParams }: { searchParams: Pro
             <p className="text-sm font-semibold text-ink">Prefer a form?</p>
             <p className="mt-1 text-sm text-muted">Same listing, all fields on one page.</p>
             <div className="mt-3 flex flex-col gap-1.5 text-sm font-semibold">
-              <Link href="/seller/plots/new" className="text-brand-700 hover:text-brand-800">
+              <Link href="/seller/properties/new" className="text-brand-700 hover:text-brand-800">
                 Add a property with the form →
               </Link>
               <Link href="/seller/dashboard" className="inline-flex items-center gap-1.5 text-muted hover:text-ink">

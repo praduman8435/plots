@@ -157,7 +157,7 @@ function catalog(lang: Lang) {
             "• *CANCEL* — stop the current listing",
             "• *LANGUAGE* — हिंदी / English",
             "",
-            `Manage everything online: ${v.url}/seller`,
+            `Manage everything online: ${v.url}/seller/dashboard`,
           ].join("\n")
         : [
             "मैं इन कामों में मदद कर सकता हूँ 🙂",
@@ -172,7 +172,7 @@ function catalog(lang: Lang) {
             "• *रद्द* — अभी की लिस्टिंग रोकें",
             "• *भाषा* — English / हिंदी",
             "",
-            `सब कुछ ऑनलाइन देखें: ${v.url}/seller`,
+            `सब कुछ ऑनलाइन देखें: ${v.url}/seller/dashboard`,
           ].join("\n"),
     continueListing: en ? "👇 Let's continue your listing." : "👇 चलिए, आपकी लिस्टिंग आगे बढ़ाते हैं।",
     greetingMidListing: en ? "Namaste 🙏 We were in the middle of your listing." : "नमस्ते जी 🙏 हम आपकी लिस्टिंग भर रहे थे।",
@@ -206,14 +206,14 @@ function catalog(lang: Lang) {
     liveReplyYes: en ? "✅ Live – reply *YES* if still available" : "✅ लाइव – अभी भी उपलब्ध है तो *हाँ* लिखें",
     noneListed: en ? "You don't have any listings yet. Send *SELL* to add one." : "अभी कोई लिस्टिंग नहीं है। जोड़ने के लिए *बेचना* लिखें।",
     idLine: (v: Vars) => (en ? `Your Seller ID: *${v.code}*` : `आपकी सेलर ID: *${v.code}*`),
-    manageAt: (v: Vars) => (en ? `See and manage everything at ${v.url}/seller` : `सब कुछ यहाँ देखें और बदलें: ${v.url}/seller`),
+    manageAt: (v: Vars) => (en ? `See and manage everything at ${v.url}/seller/dashboard` : `सब कुछ यहाँ देखें और बदलें: ${v.url}/seller/dashboard`),
     noIdYet: en
       ? "You'll get your Seller ID as soon as you list your first land. Send *SELL* to start."
       : "पहली ज़मीन लिस्ट करते ही आपको सेलर ID मिल जाएगी। शुरू करने के लिए *बेचना* लिखें।",
     yourId: (v: Vars) =>
       en
-        ? `🪪 Your Seller ID is *${v.code}*\n\nUse it to sign in at ${v.url}/seller — we'll send a code to this WhatsApp number. It never changes, so keep it handy.`
-        : `🪪 आपकी सेलर ID है *${v.code}*\n\nइससे ${v.url}/seller पर लॉग इन करें — हम इसी WhatsApp नंबर पर कोड भेजेंगे। यह ID कभी नहीं बदलती, संभाल कर रखें।`,
+        ? `🪪 Your Seller ID is *${v.code}*\n\nUse it to sign in at ${v.url}/seller/login — we'll send a code to this WhatsApp number. It never changes, so keep it handy.`
+        : `🪪 आपकी सेलर ID है *${v.code}*\n\nइससे ${v.url}/seller/login पर लॉग इन करें — हम इसी WhatsApp नंबर पर कोड भेजेंगे। यह ID कभी नहीं बदलती, संभाल कर रखें।`,
 
     // Availability
     nothingToConfirm: en
@@ -407,8 +407,8 @@ function catalog(lang: Lang) {
     // Notifications (outside the chat flow)
     nRegistered: (v: Vars) =>
       en
-        ? `Namaste ${first(String(v.name))} ji 🙏 Your seller account is ready.\n\nSeller ID: *${v.code}*\n\nUse it to add and manage your land: ${v.url}/seller\n\nTo list land from WhatsApp anytime, just send *SELL*.`
-        : `नमस्ते ${first(String(v.name))} जी 🙏 आपका सेलर अकाउंट तैयार है।\n\nसेलर ID: *${v.code}*\n\nइससे अपनी ज़मीन जोड़ें और देखें: ${v.url}/seller\n\nWhatsApp से कभी भी ज़मीन लिस्ट करने के लिए बस *बेचना* लिखें।`,
+        ? `Namaste ${first(String(v.name))} ji 🙏 Your seller account is ready.\n\nSeller ID: *${v.code}*\n\nUse it to add and manage your land: ${v.url}/seller/dashboard\n\nTo list land from WhatsApp anytime, just send *SELL*.`
+        : `नमस्ते ${first(String(v.name))} जी 🙏 आपका सेलर अकाउंट तैयार है।\n\nसेलर ID: *${v.code}*\n\nइससे अपनी ज़मीन जोड़ें और देखें: ${v.url}/seller/dashboard\n\nWhatsApp से कभी भी ज़मीन लिस्ट करने के लिए बस *बेचना* लिखें।`,
     nVerifyIdentity: (v: Vars) =>
       en
         ? `One small step, ${first(String(v.name))} ji: verify your identity so buyers see *✓ Aadhaar verified* on your listings.\n\nIt takes 2 minutes, once. We never show your Aadhaar to anyone.\n\n${v.url}/seller/verify`
@@ -436,8 +436,8 @@ function catalog(lang: Lang) {
     nReactivated: (v: Vars) => (en ? `👍 Your land is live again.\n\n${v.plot}\n${v.link}` : `👍 आपकी ज़मीन फिर से लाइव है।\n\n${v.plot}\n${v.link}`),
     nEnquiry: (v: Vars) =>
       en
-        ? `📩 A buyer is interested in your land\n\n${v.buyer} · +91 ${v.phone} ${v.call ? "is calling you" : "is messaging you on WhatsApp"}.\nFor: ${v.title} (${v.code})\n\nA quick, kind reply makes all the difference. All enquiries: ${v.url}/seller`
-        : `📩 एक खरीदार आपकी ज़मीन में रुचि रखते हैं\n\n${v.buyer} · +91 ${v.phone} ${v.call ? "आपको कॉल कर रहे हैं" : "आपको WhatsApp पर मैसेज कर रहे हैं"}।\nज़मीन: ${v.title} (${v.code})\n\nजल्दी और अच्छे से जवाब देने से सौदा बनता है। सभी पूछताछ: ${v.url}/seller`,
+        ? `📩 A buyer is interested in your land\n\n${v.buyer} · +91 ${v.phone} ${v.call ? "is calling you" : "is messaging you on WhatsApp"}.\nFor: ${v.title} (${v.code})\n\nA quick, kind reply makes all the difference. All enquiries: ${v.url}/seller/dashboard`
+        : `📩 एक खरीदार आपकी ज़मीन में रुचि रखते हैं\n\n${v.buyer} · +91 ${v.phone} ${v.call ? "आपको कॉल कर रहे हैं" : "आपको WhatsApp पर मैसेज कर रहे हैं"}।\nज़मीन: ${v.title} (${v.code})\n\nजल्दी और अच्छे से जवाब देने से सौदा बनता है। सभी पूछताछ: ${v.url}/seller/dashboard`,
     nCheckOne: (v: Vars) =>
       en
         ? `Is your land still available?\n\n${v.line}\n\nReply *YES* – still available\nReply *NO* – it's sold`

@@ -6,7 +6,7 @@ import { completeIdentityVerification, finishOnboarding, safeNext } from "@/serv
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const seller = await getSellerSession();
-  if (!seller) return NextResponse.redirect(new URL("/seller", url));
+  if (!seller) return NextResponse.redirect(new URL("/seller/login", url));
 
   const attempt = url.searchParams.get("attempt") ?? "";
   const next = safeNext(url.searchParams.get("next"), seller.onboardedAt ? "/seller/dashboard" : "/sell/start?done=1");

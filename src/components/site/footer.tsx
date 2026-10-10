@@ -26,7 +26,7 @@ export async function SiteFooter() {
       links: [
         { href: "/sell", label: "How selling works" },
         { href: sellOnWhatsAppLink(), label: "List on WhatsApp", external: isWhatsAppConnected() },
-        { href: "/seller", label: "Seller login" },
+        { href: "/seller/login", label: "Seller login" },
       ],
     },
   ];

@@ -11,7 +11,7 @@ import { formatArea } from "@/lib/units";
 export const metadata: Metadata = { title: "Submitted", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
-export default async function SubmittedPage(props: PageProps<"/seller/plots/submitted">) {
+export default async function SubmittedPage(props: PageProps<"/seller/properties/submitted">) {
   const seller = await requireSeller();
   const sp = await props.searchParams;
   const code = typeof sp.code === "string" ? sp.code : "";
@@ -54,7 +54,7 @@ export default async function SubmittedPage(props: PageProps<"/seller/plots/subm
             <ButtonLink href="/seller/dashboard" size="xl" className="w-full">
               Go to my properties
             </ButtonLink>
-            <ButtonLink href="/seller/plots/new" size="xl" variant="secondary" className="w-full">
+            <ButtonLink href="/seller/properties/new" size="xl" variant="secondary" className="w-full">
               <Plus /> Add another property
             </ButtonLink>
           </div>

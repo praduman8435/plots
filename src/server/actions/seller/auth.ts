@@ -125,5 +125,5 @@ export async function signInWithoutCode(input: unknown): Promise<{ ok: false; me
 
 export async function sellerSignOut() {
   await destroySellerSession();
-  redirect("/seller");
+  redirect("/seller/login");
 }

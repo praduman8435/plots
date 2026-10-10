@@ -82,7 +82,7 @@ export async function createSellerListing(payload: ListingFormPayload): Promise<
   const property = await createListing({ sellerId: seller.id, source: "WEB", input: parsed.data, images });
   revalidatePath("/seller/dashboard");
   revalidatePath("/admin", "layout");
-  return { ok: true, redirectTo: `/seller/plots/submitted?code=${property.code}` };
+  return { ok: true, redirectTo: `/seller/properties/submitted?code=${property.code}` };
 }
 
 /**
@@ -118,5 +118,5 @@ export async function updateSellerListing(propertyId: string, payload: ListingFo
   revalidatePath(`/property/${p.slug}`);
   revalidatePath("/");
   revalidatePath("/admin", "layout");
-  return { ok: true, redirectTo: `/seller/plots/submitted?code=${p.code}&edited=1` };
+  return { ok: true, redirectTo: `/seller/properties/submitted?code=${p.code}&edited=1` };
 }

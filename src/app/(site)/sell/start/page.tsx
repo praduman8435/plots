@@ -24,7 +24,7 @@ export default async function SellStartPage(props: PageProps<"/sell/start">) {
   const kyc = getKycProvider();
 
   // Returning, fully registered seller → only property details.
-  if (seller?.onboardedAt && sp.done !== "1") redirect("/seller/plots/new");
+  if (seller?.onboardedAt && sp.done !== "1") redirect("/seller/properties/new");
 
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-mist pb-16">
@@ -95,7 +95,7 @@ export default async function SellStartPage(props: PageProps<"/sell/start">) {
                   {seller.identityStatus === "VERIFIED" ? " · Aadhaar verified ✓" : " · Phone verified ✓"}
                 </p>
               </div>
-              <ButtonLink href="/seller/plots/new" size="xl" className="mt-7 w-full">
+              <ButtonLink href="/seller/properties/new" size="xl" className="mt-7 w-full">
                 Add your first property <ArrowRight />
               </ButtonLink>
               <Link href="/seller/dashboard" className="mt-3 inline-block py-2 text-sm font-semibold text-muted hover:text-ink">
@@ -107,7 +107,7 @@ export default async function SellStartPage(props: PageProps<"/sell/start">) {
         {!seller && (
           <p className="mt-5 text-center text-sm text-muted">
             Already listed with us?{" "}
-            <Link href="/seller?next=/seller/plots/new" className="font-semibold text-brand-700">
+            <Link href="/seller/login?next=/seller/properties/new" className="font-semibold text-brand-700">
               Sign in with your Seller ID
             </Link>
           </p>

@@ -58,6 +58,16 @@ const nextConfig: NextConfig = {
     // Only our own Blob store (anyone can create a *.public.blob store); wildcard only when it is unknown (local).
     remotePatterns: [{ protocol: "https", hostname: ourBlobHost() ?? "*.public.blob.vercel-storage.com", pathname: "/plots/**" }],
   },
+  // Old URLs (shared on WhatsApp, bookmarked) keep working.
+  async redirects() {
+    return [
+      { source: "/s/:slug", destination: "/sellers/:slug", permanent: true },
+      { source: "/seller", destination: "/seller/login", permanent: true },
+      { source: "/seller/plots/new", destination: "/seller/properties/new", permanent: true },
+      { source: "/seller/plots/submitted", destination: "/seller/properties/submitted", permanent: true },
+      { source: "/seller/plots/:id/edit", destination: "/seller/properties/:id/edit", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

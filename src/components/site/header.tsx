@@ -5,7 +5,7 @@ import { Logo } from "@/components/ui/logo";
 const nav = [
   { href: "/search", label: "Search land" },
   { href: "/cities", label: "All cities" },
-  { href: "/seller", label: "Seller login" },
+  { href: "/seller/login", label: "Seller login" },
 ];
 
 export function SiteHeader() {

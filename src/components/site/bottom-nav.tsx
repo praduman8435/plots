@@ -10,14 +10,14 @@ const items = [
   { href: "/", label: "Home", icon: Home, match: (p: string) => p === "/" },
   { href: "/search", label: "Search", icon: Search, match: (p: string) => p.startsWith("/search") },
   { href: "/sell", label: "Sell", icon: Plus, match: (p: string) => p.startsWith("/sell"), primary: true },
-  { href: "/seller", label: "My plots", icon: UserRound, match: (p: string) => p.startsWith("/seller") },
+  { href: "/seller/dashboard", label: "My plots", icon: UserRound, match: (p: string) => p.startsWith("/seller/") },
 ];
 
 /** App-style tab bar on phones. Hidden on plot pages, which have their own contact bar. */
 export function BottomNav() {
   const pathname = usePathname();
   // Plot pages have their own contact bar; form pages have a sticky submit bar.
-  if (pathname.startsWith("/property/") || pathname.startsWith("/seller/plots/") || pathname.startsWith("/sell/start") || pathname.startsWith("/sell/chat")) return null;
+  if (pathname.startsWith("/property/") || pathname.startsWith("/seller/properties/") || pathname.startsWith("/sell/start") || pathname.startsWith("/sell/chat")) return null;
 
   return (
     <nav

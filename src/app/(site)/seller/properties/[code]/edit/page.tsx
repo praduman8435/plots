@@ -2,12 +2,13 @@ import { ArrowLeft, Info } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ListingForm } from "@/components/listing/listing-form";
 import { RemoveListingButton } from "@/components/seller/plot-actions";
 import { Badge } from "@/components/ui/badge";
 import type { ListingStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { editPropertyPath, propertyCodeFromParam } from "@/lib/property-code";
 import { requireSeller } from "@/lib/seller/require";
 import { updateSellerListing } from "@/server/actions/seller/listings";
 import { getLiveCities } from "@/server/listings/queries";
@@ -32,10 +33,17 @@ const STATUS: Record<ListingStatus, { label: string; tone: "brand" | "amber" | "
 };
 export const dynamic = "force-dynamic";
 
-export default async function EditPlotPage(props: PageProps<"/seller/plots/[id]/edit">) {
+export default async function EditPropertyPage(props: PageProps<"/seller/properties/[code]/edit">) {
   const seller = await requireSeller();
-  const { id } = await props.params;
-  const p = await db.property.findFirst({ where: { id, sellerId: seller.id }, include: { images: { orderBy: { position: "asc" } } } });
+  const { code: param } = await props.params;
+  const code = propertyCodeFromParam(param);
+  if (!code) {
+    // Old links used the internal id: send them to the readable URL.
+    const legacy = /^c[a-z0-9]{20,30}$/.test(param) ? await db.property.findFirst({ where: { id: param, sellerId: seller.id }, select: { code: true } }) : null;
+    if (legacy) redirect(editPropertyPath(legacy.code));
+    notFound();
+  }
+  const p = await db.property.findFirst({ where: { code, sellerId: seller.id }, include: { images: { orderBy: { position: "asc" } } } });
   if (!p || p.status === "SOLD" || p.removedAt) notFound();
   const cities = await getLiveCities();
   const action = updateSellerListing.bind(null, p.id);

@@ -146,7 +146,7 @@ Trust boundaries:
 |---|---|---|
 | Home, city, city×type pages | ISR, 60 s | `revalidatePath` on every status change and seller suspension |
 | Plot page | ISR on first visit (`generateStaticParams → []`), 60 s | same; a plot that disappears returns 404 immediately |
-| Seller profile `/s/…` | rendered per request | — |
+| Seller profile `/sellers/…` | rendered per request | — |
 | Search | rendered per request (unbounded query space; no shared cache) | — |
 | Seller/admin pages, APIs | per request; Next sends `private, no-store` | — |
 | Photos | `/_next/image` + CDN; Blob objects are immutable with random names | — |
@@ -231,3 +231,44 @@ The current design can absorb it without a rewrite:
 - **Per-state adapters.** Each state's land-records source sits behind one interface (like `KycProvider`), with its own licence and terms.
 - **Spatial support when it ships.** Enable PostGIS on the same Supabase Postgres (`geometry` columns, GiST indexes). `properties.latitude/longitude` stays the coarse marketplace location, and the public approximate-location privacy rule stays.
 - **Not now.** No PostGIS, GIS service or map microservice until the feature is actually built.
+- **Tried once (Oct 2026), then removed.** A standalone `/land-map` prototype was built and removed at the owner's request; its tables were dropped by `20261012090000_remove_land_parcel_map`. Findings worth keeping:
+  - Survey of India village boundaries for Uttar Pradesh are openly downloadable from the National Water Data Portal (EPSG:7755; reuse allowed with acknowledgement).
+  - Plot (Gata) polygons in UP Bhu-Naksha are not offered for bulk reuse. They need the Revenue Department's or NIC's permission.
+
+## 11. URLs
+
+Public pages:
+
+| Page | URL |
+|---|---|
+| Home | `/` |
+| Search | `/search` |
+| A city | `/<city>` |
+| A city and land type | `/<city>/<land-type>` |
+| A property | `/property/<slug>`, for example `/property/2-bigha-agricultural-land-in-sathiyaon-azamgarh-tnrp4h` |
+| A seller's page | `/sellers/<slug>` |
+| All cities | `/cities` |
+| Selling: overview | `/sell` |
+| Selling: register | `/sell/start` |
+| Selling: assistant chat | `/sell/chat` |
+
+Seller area, all under `/seller/` and not indexed:
+
+| Page | URL |
+|---|---|
+| Login | `/seller/login` |
+| Dashboard | `/seller/dashboard` |
+| Add a property | `/seller/properties/new` |
+| Edit a property | `/seller/properties/<code>/edit`, using the property code, for example `p-tnrp4h` |
+| After submitting | `/seller/properties/submitted` |
+| Identity check | `/seller/verify` |
+
+Older URLs redirect permanently in `next.config.ts`, so links already shared on WhatsApp keep working:
+
+| Old URL | Now goes to |
+|---|---|
+| `/s/<slug>` | `/sellers/<slug>` |
+| `/seller` | `/seller/login` |
+| `/seller/plots/…` | `/seller/properties/…` |
+
+An edit link that uses an internal id redirects to the URL with the property code.

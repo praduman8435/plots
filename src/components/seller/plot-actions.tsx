@@ -6,12 +6,14 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { editPropertyPath } from "@/lib/property-code";
 import { sellerListingAction } from "@/server/actions/seller/listings";
 
 type Action = Parameters<typeof sellerListingAction>[1];
 
 type Props = {
   id: string;
+  code: string;
   slug: string;
   title: string;
   status: "PENDING" | "ACTIVE" | "HIDDEN" | "SOLD" | "REJECTED";
@@ -26,7 +28,7 @@ type Confirm = { action: Action; title: string; text: string; cta: string; dange
  * (confirm it's available, or bring it back), Edit, and everything else in a
  * "More" sheet — including Remove listing, which asks first.
  */
-export function PlotActions({ id, slug, title, status, hiddenReason, awaitingReply }: Props) {
+export function PlotActions({ id, code, slug, title, status, hiddenReason, awaitingReply }: Props) {
   const sheet = useRef<HTMLDialogElement>(null);
   const [pending, start] = useTransition();
   const [confirm, setConfirm] = useState<Confirm | null>(null);
@@ -64,7 +66,7 @@ export function PlotActions({ id, slug, title, status, hiddenReason, awaitingRep
           </Button>
         )}
         {status !== "SOLD" && (
-          <Link href={`/seller/plots/${id}/edit`} className={buttonVariants({ variant: "secondary", size: "sm", className: "flex-1 sm:flex-none" })}>
+          <Link href={editPropertyPath(code)} className={buttonVariants({ variant: "secondary", size: "sm", className: "flex-1 sm:flex-none" })}>
             <Pencil /> Edit
           </Link>
         )}

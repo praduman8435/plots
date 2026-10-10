@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Add a property", robots: { index: fa
 export const dynamic = "force-dynamic";
 
 /** "Add another property": only property details — the seller profile is reused, never asked again. */
-export default async function NewPlotPage(props: PageProps<"/seller/plots/new">) {
+export default async function NewPlotPage(props: PageProps<"/seller/properties/new">) {
   const seller = await requireSeller();
   const sp = await props.searchParams;
   const kyc = getKycProvider();
@@ -25,7 +25,7 @@ export default async function NewPlotPage(props: PageProps<"/seller/plots/new">)
     return (
       <div className="min-h-[calc(100dvh-4rem)] bg-mist pb-16">
         <div className="mx-auto max-w-lg px-4 pt-8 sm:pt-12">
-          <IdentityCard next="/seller/plots/new" providerLabel={kyc.label} failed={sp.kyc === "failed"} title="First, verify your identity — once" />
+          <IdentityCard next="/seller/properties/new" providerLabel={kyc.label} failed={sp.kyc === "failed"} title="First, verify your identity — once" />
         </div>
       </div>
     );

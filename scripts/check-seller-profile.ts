@@ -41,9 +41,9 @@ for (const bad of ["", "UPPER", "../etc", "a b", "x".repeat(80), "-lead", "has_u
 }
 
 // ── 2. Share links ──
-const text = profileShareText("Praduman", "https://plots-red.vercel.app/s/praduman-rp44qh");
+const text = profileShareText("Praduman", "https://plots-red.vercel.app/sellers/praduman-rp44qh");
 const wa = whatsappShareLink(text);
-check("share text uses public name + url", text.includes("Praduman's") && text.includes("/s/praduman-rp44qh"), text);
+check("share text uses public name + url", text.includes("Praduman's") && text.includes("/sellers/praduman-rp44qh"), text);
 check("WhatsApp link targets wa.me with no recipient", wa.startsWith("https://wa.me/?text="), wa);
 check("WhatsApp text is URL-encoded", decodeURIComponent(wa.slice("https://wa.me/?text=".length)) === text && !wa.slice(20).includes(" "));
 

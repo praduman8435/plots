@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default async function SellerLoginPage(props: PageProps<"/seller">) {
+export default async function SellerLoginPage(props: PageProps<"/seller/login">) {
   const sp = await props.searchParams;
   const next = typeof sp.next === "string" && sp.next.startsWith("/seller/") ? sp.next : undefined;
   if (await getSellerSession()) redirect(next ?? "/seller/dashboard");

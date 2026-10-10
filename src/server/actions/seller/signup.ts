@@ -75,7 +75,7 @@ export async function verifySignup(input: { name: string; phone: string; code: s
   await createSellerSession(seller.id);
 
   // Returning seller: skip everything they've already done.
-  if (seller.onboardedAt) redirect("/seller/plots/new");
+  if (seller.onboardedAt) redirect("/seller/properties/new");
   redirect("/sell/start");
 }
 

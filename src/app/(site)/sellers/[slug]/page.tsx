@@ -22,7 +22,7 @@ function pageOf(sp: Record<string, string | string[] | undefined>) {
   return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
 }
 
-export async function generateMetadata(props: PageProps<"/s/[slug]">): Promise<Metadata> {
+export async function generateMetadata(props: PageProps<"/sellers/[slug]">): Promise<Metadata> {
   const { slug } = await props.params;
   const profile = await getPublicSellerProfile(slug, 1);
   if (!profile) return { title: "Seller not found", robots: { index: false } };
@@ -52,7 +52,7 @@ export async function generateMetadata(props: PageProps<"/s/[slug]">): Promise<M
   };
 }
 
-export default async function SellerProfilePage(props: PageProps<"/s/[slug]">) {
+export default async function SellerProfilePage(props: PageProps<"/sellers/[slug]">) {
   const { slug } = await props.params;
   const profile = await getPublicSellerProfile(slug, pageOf(await props.searchParams));
   if (!profile) notFound();
