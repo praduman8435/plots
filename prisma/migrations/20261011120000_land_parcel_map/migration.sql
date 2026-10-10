@@ -1,5 +1,9 @@
+-- Land parcel map tables (docs/LAND_MAP.md). Re-runnable: the first attempt of
+-- this migration stopped half-way on a duplicated foreign key, so every
+-- statement tolerates objects that already exist. Additive only.
+
 -- CreateTable
-CREATE TABLE "parcel_datasets" (
+CREATE TABLE IF NOT EXISTS "parcel_datasets" (
     "id" TEXT NOT NULL,
     "key" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -22,7 +26,7 @@ CREATE TABLE "parcel_datasets" (
 );
 
 -- CreateTable
-CREATE TABLE "parcel_imports" (
+CREATE TABLE IF NOT EXISTS "parcel_imports" (
     "id" TEXT NOT NULL,
     "datasetId" TEXT NOT NULL,
     "fileName" TEXT NOT NULL,
@@ -41,7 +45,7 @@ CREATE TABLE "parcel_imports" (
 );
 
 -- CreateTable
-CREATE TABLE "parcels" (
+CREATE TABLE IF NOT EXISTS "parcels" (
     "id" TEXT NOT NULL,
     "datasetId" TEXT NOT NULL,
     "sourceRecordId" TEXT NOT NULL,
@@ -79,42 +83,57 @@ CREATE TABLE "parcels" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "parcel_datasets_key_key" ON "parcel_datasets"("key");
+CREATE UNIQUE INDEX IF NOT EXISTS "parcel_datasets_key_key" ON "parcel_datasets"("key");
 
 -- CreateIndex
-CREATE INDEX "parcel_imports_datasetId_startedAt_idx" ON "parcel_imports"("datasetId", "startedAt");
+CREATE INDEX IF NOT EXISTS "parcel_imports_datasetId_startedAt_idx" ON "parcel_imports"("datasetId", "startedAt");
 
 -- CreateIndex
-CREATE INDEX "parcels_cellX_cellY_idx" ON "parcels"("cellX", "cellY");
+CREATE INDEX IF NOT EXISTS "parcels_cellX_cellY_idx" ON "parcels"("cellX", "cellY");
 
 -- CreateIndex
-CREATE INDEX "parcels_villageName_parcelNumberKey_idx" ON "parcels"("villageName", "parcelNumberKey");
+CREATE INDEX IF NOT EXISTS "parcels_villageName_parcelNumberKey_idx" ON "parcels"("villageName", "parcelNumberKey");
 
 -- CreateIndex
-CREATE INDEX "parcels_parcelNumberKey_idx" ON "parcels"("parcelNumberKey");
+CREATE INDEX IF NOT EXISTS "parcels_parcelNumberKey_idx" ON "parcels"("parcelNumberKey");
 
 -- CreateIndex
-CREATE INDEX "parcels_ulpin_idx" ON "parcels"("ulpin");
+CREATE INDEX IF NOT EXISTS "parcels_ulpin_idx" ON "parcels"("ulpin");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "parcels_datasetId_sourceRecordId_key" ON "parcels"("datasetId", "sourceRecordId");
+CREATE UNIQUE INDEX IF NOT EXISTS "parcels_datasetId_sourceRecordId_key" ON "parcels"("datasetId", "sourceRecordId");
 
 -- AddForeignKey
-ALTER TABLE "parcel_imports" ADD CONSTRAINT "parcel_imports_datasetId_fkey" FOREIGN KEY ("datasetId") REFERENCES "parcel_datasets"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "parcel_imports" ADD CONSTRAINT "parcel_imports_datasetId_fkey" FOREIGN KEY ("datasetId") REFERENCES "parcel_datasets"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "parcels" ADD CONSTRAINT "parcels_datasetId_fkey" FOREIGN KEY ("datasetId") REFERENCES "parcel_datasets"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "parcels" ADD CONSTRAINT "parcels_datasetId_fkey" FOREIGN KEY ("datasetId") REFERENCES "parcel_datasets"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "parcels" ADD CONSTRAINT "parcels_importId_fkey" FOREIGN KEY ("importId") REFERENCES "parcel_imports"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
-ALTER TABLE "parcels" ADD CONSTRAINT "parcels_importId_fkey" FOREIGN KEY ("importId") REFERENCES "parcel_imports"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
+DO $$ BEGIN
+  ALTER TABLE "parcels" ADD CONSTRAINT "parcels_importId_fkey" FOREIGN KEY ("importId") REFERENCES "parcel_imports"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Status values the app relies on.
-ALTER TABLE "parcel_imports" ADD CONSTRAINT "parcel_imports_status_check" CHECK ("status" IN ('RUNNING', 'SUCCEEDED', 'FAILED'));
-ALTER TABLE "parcels" ADD CONSTRAINT "parcels_quality_status_check" CHECK ("qualityStatus" IN ('UNVERIFIED', 'VERIFIED', 'FLAGGED'));
-ALTER TABLE "parcels" ADD CONSTRAINT "parcels_bbox_check" CHECK ("minLng" <= "maxLng" AND "minLat" <= "maxLat");
+DO $$ BEGIN
+  ALTER TABLE "parcel_imports" ADD CONSTRAINT "parcel_imports_status_check" CHECK ("status" IN ('RUNNING', 'SUCCEEDED', 'FAILED'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  ALTER TABLE "parcels" ADD CONSTRAINT "parcels_quality_status_check" CHECK ("qualityStatus" IN ('UNVERIFIED', 'VERIFIED', 'FLAGGED'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  ALTER TABLE "parcels" ADD CONSTRAINT "parcels_bbox_check" CHECK ("minLng" <= "maxLng" AND "minLat" <= "maxLat");
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Same as every other table: no access through Supabase's public API; the app connects as the owner.
 ALTER TABLE "parcel_datasets" ENABLE ROW LEVEL SECURITY;
