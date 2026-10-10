@@ -1,13 +1,43 @@
 import { ArrowRight, MapPin } from "lucide-react";
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { HeroSearch } from "@/components/site/hero-search";
 import { IntentLink } from "@/components/ui/intent-link";
 import { HowItWorksBoth, LandTypeTiles, ListingRail, SectionHeading, WhyUs } from "@/components/site/sections";
 import { ButtonLink } from "@/components/ui/button";
+import { defaultShareImage, ogBase, site } from "@/lib/site";
 import { getCitiesWithCounts, getLatestListings, getMarketStats } from "@/server/listings/queries";
 
 export const revalidate = 60;
+
+/** The tab says just "InstaPlots"; link previews and search snippets carry the pitch. */
+export const metadata: Metadata = {
+  title: { absolute: site.name },
+  alternates: { canonical: "/" },
+  openGraph: {
+    ...ogBase,
+    type: "website",
+    title: `${site.name}: land and plots for sale near you`,
+    description: site.description,
+    url: "/",
+    images: [defaultShareImage],
+  },
+  twitter: { card: "summary_large_image", title: `${site.name}: land and plots for sale near you`, description: site.description, images: [defaultShareImage] },
+};
+
+/** Tells Google the site's name and logo (shown next to results). */
+const siteLd = [
+  { "@context": "https://schema.org", "@type": "WebSite", name: site.name, alternateName: "instaplots.com", url: site.url },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: site.name,
+    url: site.url,
+    logo: `${site.url}/brand/icon-512.png`,
+    description: site.description,
+  },
+];
 
 /** Cover photos for city cards: a stable pick per city until cities get their own images. */
 const CITY_COVERS = ["/demo/land-090.webp", "/demo/land-097.webp", "/demo/land-118.webp", "/demo/land-174.webp", "/demo/land-045.webp", "/demo/land-182.webp", "/demo/land-057.webp", "/demo/land-096.webp"];
@@ -23,6 +53,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteLd).replace(/</g, "\\u003c") }} />
       {/* ───── Hero: search first ───── */}
       <section className="relative isolate overflow-hidden bg-brand-950">
         {/* The LCP on phones. Dimmed to 60% behind text, so a lighter encode (q50) is visually identical. */}

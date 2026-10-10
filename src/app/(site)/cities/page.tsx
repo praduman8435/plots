@@ -6,7 +6,7 @@ import { getCitiesWithCounts } from "@/server/listings/queries";
 
 export const revalidate = 300;
 export const metadata: Metadata = {
-  title: "Land for sale — all cities",
+  title: "Land and plots for sale by city",
   description: "Browse land and plots for sale by city and town across India. Contact sellers directly on WhatsApp.",
 };
 

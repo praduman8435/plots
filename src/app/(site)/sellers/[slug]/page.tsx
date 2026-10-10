@@ -11,6 +11,7 @@ import { IntentLink } from "@/components/ui/intent-link";
 import { cn } from "@/lib/cn";
 import { sellerLabel } from "@/lib/seller-label";
 import { sellerProfilePath, sellerProfileUrl } from "@/lib/seller-profile";
+import { defaultShareImage, ogBase } from "@/lib/site";
 import { getPublicSellerProfile } from "@/server/seller/profile";
 
 // Always current: a plot that is sold, hidden or newly approved shows up (or disappears) immediately.
@@ -42,13 +43,14 @@ export async function generateMetadata(props: PageProps<"/sellers/[slug]">): Pro
     // No live listings → nothing useful for search engines (and nothing to preview).
     robots: { index: profile.total > 0, follow: true },
     openGraph: {
+      ...ogBase,
       type: "profile",
       title,
       description,
       url: sellerProfilePath(profile.slug),
-      images: cover ? [{ url: cover.url, width: cover.width ?? 1600, height: cover.height ?? 1200, alt: `Land by ${profile.name}` }] : undefined,
+      images: cover ? [{ url: cover.url, width: cover.width ?? 1600, height: cover.height ?? 1200, alt: `Land by ${profile.name}` }] : [defaultShareImage],
     },
-    twitter: { card: cover ? "summary_large_image" : "summary", title, description },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 

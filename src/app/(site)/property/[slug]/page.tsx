@@ -16,7 +16,7 @@ import { LAND_TYPES, LAND_TYPE_SLUGS, formatPricePerUnit, placeName } from "@/li
 import { isPubliclyViewable } from "@/lib/listing-visibility";
 import { sellerLabel } from "@/lib/seller-label";
 import { sellerProfilePath } from "@/lib/seller-profile";
-import { site } from "@/lib/site";
+import { defaultShareImage, ogBase, site } from "@/lib/site";
 import { AREA_UNITS, formatArea, formatSqftHint } from "@/lib/units";
 import { getListingBySlug, getSimilarListings } from "@/server/listings/queries";
 
@@ -39,16 +39,21 @@ export async function generateMetadata(props: PageProps<"/property/[slug]">): Pr
   if (!p || !isPubliclyViewable(p)) return { title: "Property not found" };
   const where = `${placeName(p)}, ${p.city.name}`;
   const description = `${formatArea(p.area, p.areaUnit)} ${LAND_TYPES[p.landType].label.toLowerCase()} for sale near ${where} — ${formatPrice(p.price)}. ${p.description.slice(0, 110)}`;
+  const images = p.images[0] ? [{ url: p.images[0].url, width: p.images[0].width ?? 1600, height: p.images[0].height ?? 1200 }] : [defaultShareImage];
   return {
     title: `${formatArea(p.area, p.areaUnit)} ${LAND_TYPES[p.landType].label} for sale in ${where} — ${formatPrice(p.price)}`,
     description,
     alternates: { canonical: `/property/${p.slug}` },
     robots: { index: p.status === "ACTIVE" },
     openGraph: {
+      ...ogBase,
+      type: "website",
+      url: `/property/${p.slug}`,
       title: `${formatPrice(p.price)} · ${formatArea(p.area, p.areaUnit)} ${LAND_TYPES[p.landType].label} · ${where}`,
       description,
-      images: p.images[0] ? [{ url: p.images[0].url, width: p.images[0].width ?? 1600, height: p.images[0].height ?? 1200 }] : undefined,
+      images,
     },
+    twitter: { card: "summary_large_image", images },
   };
 }
 
@@ -95,9 +100,23 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
     contentLocation: { "@type": "Place", name: where, address: { "@type": "PostalAddress", addressLocality: placeName(p), addressRegion: p.city.state, addressCountry: "IN" } },
   };
 
+  // "Other" land has no city + type page, so it links to the city instead.
+  const typePath = p.landType === "OTHER" ? null : `/${p.city.slug}/${LAND_TYPE_SLUGS[p.landType]}`;
+  const similarPath = typePath ?? `/${p.city.slug}`;
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { name: "Home", url: site.url },
+      { name: p.city.name, url: `${site.url}/${p.city.slug}` },
+      ...(typePath ? [{ name: LAND_TYPES[p.landType].label, url: `${site.url}${typePath}` }] : []),
+      { name: p.title, url: `${site.url}/property/${p.slug}` },
+    ].map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: c.url })),
+  };
+
   return (
     <article className="pb-32 md:pb-20">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify([jsonLd, breadcrumbLd]).replace(/</g, "\\u003c") }} />
       <ViewBeacon id={p.id} />
 
       <nav aria-label="Breadcrumb" className="container-page hidden pt-6 text-sm text-muted md:block">
@@ -105,8 +124,12 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
           <li><Link href="/" className="hover:text-ink">Home</Link></li>
           <li aria-hidden>/</li>
           <li><Link href={`/${p.city.slug}`} className="hover:text-ink">{p.city.name}</Link></li>
-          <li aria-hidden>/</li>
-          <li><Link href={`/${p.city.slug}/${LAND_TYPE_SLUGS[p.landType]}`} className="hover:text-ink">{LAND_TYPES[p.landType].label}</Link></li>
+          {typePath && (
+            <>
+              <li aria-hidden>/</li>
+              <li><Link href={typePath} className="hover:text-ink">{LAND_TYPES[p.landType].label}</Link></li>
+            </>
+          )}
         </ol>
       </nav>
 
@@ -266,7 +289,7 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
                 {available ? (
                   <ContactActions variant="panel" source="detail" plot={plotRef} sellerName={p.seller.name} />
                 ) : (
-                  <ButtonLink href={`/${p.city.slug}/${LAND_TYPE_SLUGS[p.landType]}`} size="lg" className="w-full">
+                  <ButtonLink href={similarPath} size="lg" className="w-full">
                     See similar land
                   </ButtonLink>
                 )}
@@ -306,7 +329,7 @@ export default async function PropertyPage(props: PageProps<"/property/[slug]">)
             <ContactActions variant="dock" source="detail" plot={plotRef} sellerName={p.seller.name} />
           </div>
         ) : (
-          <ButtonLink href={`/${p.city.slug}/${LAND_TYPE_SLUGS[p.landType]}`} size="lg" className="w-full">
+          <ButtonLink href={similarPath} size="lg" className="w-full">
             See similar land
           </ButtonLink>
         )}
