@@ -7,27 +7,67 @@
  *
  * Re-running for an existing email updates the name and password and
  * re-activates the account. ADMIN_RESET_MFA=true also turns off two-step
- * sign-in (for an admin who lost both their phone and recovery codes). The password is never printed by this script
- * (pnpm echoes the command line, so on shared machines pass it via the
- * ADMIN_PASSWORD environment variable and omit the third argument).
+ * sign-in (for an admin who lost both their phone and recovery codes).
+ *
+ * Leave the password out and the script asks for it (hidden, typed twice), so
+ * it never lands in shell history. ADMIN_PASSWORD or a third argument also work.
+ * It prints which database host it is about to change before touching it.
  */
 import "dotenv/config";
+import { createInterface } from "node:readline";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { hashSecret } from "../src/lib/scrypt-hash";
 
 const MIN_PASSWORD_LENGTH = 12;
 
+/** Reads one line from the terminal without echoing it. */
+function askHidden(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    rl.question(question, (answer) => {
+      rl.close();
+      process.stdout.write("\n");
+      resolve(answer);
+    });
+    // The prompt is already printed; from here on, swallow the echo of typed characters.
+    (rl as unknown as { _writeToOutput: (text: string) => void })._writeToOutput = () => {};
+  });
+}
+
+function databaseHost(url: string | undefined): string {
+  try {
+    return url ? new URL(url).host : "(DATABASE_URL is not set)";
+  } catch {
+    return "(DATABASE_URL is not a valid URL — percent-encode special characters in the password)";
+  }
+}
+
 async function main() {
   const [rawEmail, rawName, argPassword] = process.argv.slice(2);
-  const password = argPassword ?? process.env.ADMIN_PASSWORD;
   const email = rawEmail?.trim().toLowerCase();
   const name = rawName?.trim();
 
-  if (!email || !name || !password) {
-    console.error('Usage: pnpm db:create-admin <email> "<name>" <password>');
+  if (!email || !name) {
+    console.error('Usage: pnpm db:create-admin <email> "<name>"   (the password is asked for)');
     process.exitCode = 1;
     return;
+  }
+  console.log(`Database: ${databaseHost(process.env.DATABASE_URL)}`);
+
+  let password = argPassword ?? process.env.ADMIN_PASSWORD;
+  if (!password) {
+    if (!process.stdin.isTTY) {
+      console.error("No password given. Run this in a terminal, or set ADMIN_PASSWORD.");
+      process.exitCode = 1;
+      return;
+    }
+    password = await askHidden(`New password for ${email} (hidden, ${MIN_PASSWORD_LENGTH}+ characters): `);
+    if (password.length >= MIN_PASSWORD_LENGTH && (await askHidden("Type it again: ")) !== password) {
+      console.error("The two passwords don't match. Nothing was changed.");
+      process.exitCode = 1;
+      return;
+    }
   }
   if (!/^[^\s@]+@[^\s@]+$/.test(email)) {
     console.error("That doesn't look like an email address.");
