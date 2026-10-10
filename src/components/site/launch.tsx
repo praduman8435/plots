@@ -1,8 +1,7 @@
-import { ArrowRight, Award, BadgeCheck, Check, TrendingUp } from "lucide-react";
+import { ArrowRight, Award, Check } from "lucide-react";
 import { BuyerRequestButton } from "@/components/site/buyer-request";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { site } from "@/lib/site";
 import type { BuyerDemand } from "@/server/buyer-requests";
 import { DEMAND_MIN_TO_SHOW } from "@/server/buyer-requests";
 
@@ -36,45 +35,32 @@ export function FoundingCard({ spots, compact = false, href = "/sell" }: { spots
   const counting = spots.taken >= SHOW_COUNT_FROM;
   const pct = Math.round((spots.taken / spots.total) * 100);
   return (
-    <div className={cn("relative isolate overflow-hidden rounded-[2rem] bg-brand-950 text-white", compact ? "p-6 sm:p-7" : "p-7 sm:p-10")}>
-      <div className="absolute -top-24 -right-24 -z-10 size-72 rounded-full bg-brand-500/25 blur-3xl" aria-hidden />
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-xs font-bold tracking-widest text-brand-200 uppercase">
-          <Award className="size-3.5" aria-hidden /> Founding sellers
-        </span>
-        <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white ring-1 ring-white/15">
-          {spotsLabel(spots)}
-        </span>
-      </div>
-      <h2 className={cn("mt-3 font-extrabold tracking-tight", compact ? "text-2xl" : "text-[1.75rem] leading-tight sm:text-4xl")}>
-        Have land to sell? Be one of our first {spots.total}.
-      </h2>
-      <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-white/80 sm:text-base">
-        Every listing on {site.name} is checked by our team before buyers see it. Our first {spots.total} sellers get the{" "}
-        <b className="font-semibold text-white">Founding Seller</b> badge, so buyers know they were here from the start, and their land is shown first.
+    <div className={cn("relative isolate flex flex-col overflow-hidden rounded-[1.75rem] bg-brand-950 p-6 text-white sm:p-8", !compact && "lg:p-10")}>
+      <div className="absolute -top-24 -right-24 -z-10 size-64 rounded-full bg-brand-500/20 blur-3xl" aria-hidden />
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-brand-200">
+        <Award className="size-4" aria-hidden />
+        <span className="tracking-wide uppercase">Founding sellers</span>
+        <span aria-hidden className="text-white/30">·</span>
+        <span className="text-white/70">{spotsLabel(spots)}</span>
+      </p>
+      <h2 className={cn("mt-3 text-2xl leading-tight font-extrabold tracking-tight sm:text-3xl", !compact && "lg:text-[2rem]")}>Have land to sell?</h2>
+      <p className="mt-2 max-w-md text-[15px] leading-relaxed text-white/75">
+        List it free. Our team checks every listing, and our first {spots.total} sellers get a Founding Seller badge and the top spot in search.
       </p>
 
-      <ul className="mt-5 grid max-w-xl gap-2 text-sm text-white/85 sm:grid-cols-2">
-        <li className="flex items-center gap-2">
-          <BadgeCheck className="size-4 shrink-0 text-brand-300" aria-hidden /> Free to list, checked before it goes live
-        </li>
-        <li className="flex items-center gap-2">
-          <TrendingUp className="size-4 shrink-0 text-brand-300" aria-hidden /> Founding Seller badge, shown first
-        </li>
-      </ul>
-
-      <div className="mt-6 max-w-xl">
-        {counting && (
-          <div className="mb-2 h-2 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin={0} aria-valuemax={spots.total} aria-valuenow={spots.taken} aria-label="Founding spots taken">
-            <div className="h-full rounded-full bg-linear-to-r from-brand-400 to-brand-200" style={{ width: `${pct}%` }} />
+      {counting && (
+        <div className="mt-5 max-w-sm">
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin={0} aria-valuemax={spots.total} aria-valuenow={spots.taken} aria-label="Founding spots taken">
+            <div className="h-full rounded-full bg-brand-300" style={{ width: `${pct}%` }} />
           </div>
-        )}
-        <p className="text-xs text-white/60">Your spot is confirmed when your first listing goes live.</p>
-      </div>
+        </div>
+      )}
 
-      <ButtonLink href={href} variant="white" size="lg" className="mt-6 w-full sm:w-auto">
-        List your land free <ArrowRight />
-      </ButtonLink>
+      <div className="mt-6 sm:mt-auto sm:pt-7">
+        <ButtonLink href={href} variant="white" size="md" className="h-12 w-full px-5 font-semibold sm:h-11 sm:w-auto">
+          List your land free <ArrowRight />
+        </ButtonLink>
+      </div>
     </div>
   );
 }
@@ -82,22 +68,22 @@ export function FoundingCard({ spots, compact = false, href = "/sell" }: { spots
 function BuyerCard({ demand, places }: { demand: BuyerDemand; places: string[] }) {
   const waiting = demand.buyers >= DEMAND_MIN_TO_SHOW ? demand.buyers : 0;
   return (
-    <div className="flex flex-col rounded-[2rem] bg-brand-50 p-7 ring-1 ring-brand-100 sm:p-10">
-      <p className="text-xs font-bold tracking-widest text-brand-700 uppercase">Looking for land?</p>
-      <h2 className="mt-3 text-[1.75rem] leading-tight font-extrabold tracking-tight text-ink sm:text-4xl">Tell us what you need.</h2>
-      <p className="mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft sm:text-base">
-        Where, what kind, and your budget. We&apos;ll WhatsApp you as soon as matching land is listed. No login, no fee.
-      </p>
-      <ul className="mt-5 grid gap-2 text-sm text-ink-soft">
-        {["Any city, town or village", "Farmland, house plots or shop land", "Only our team sees your number"].map((t) => (
-          <li key={t} className="flex items-center gap-2">
-            <Check className="size-4 shrink-0 text-brand-600" aria-hidden /> {t}
+    <div className="flex flex-col rounded-[1.75rem] bg-brand-50 p-6 ring-1 ring-brand-100 sm:p-8 lg:p-10">
+      <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">Looking for land?</p>
+      <h2 className="mt-3 text-2xl leading-tight font-extrabold tracking-tight text-ink sm:text-3xl lg:text-[2rem]">Tell us what you need.</h2>
+      <p className="mt-2 max-w-md text-[15px] leading-relaxed text-ink-soft">Share the place and your budget. We&apos;ll WhatsApp you when matching land is listed.</p>
+      <ul className="mt-4 flex flex-wrap gap-2 text-[13px] font-medium text-ink-soft">
+        {["Free", "No login", "Your number stays private"].map((t) => (
+          <li key={t} className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-100">
+            <Check className="size-3.5 text-brand-600" aria-hidden /> {t}
           </li>
         ))}
       </ul>
-      <div className="mt-auto pt-7">
-        <BuyerRequestButton places={places} className="w-full sm:w-auto" />
-        {waiting > 0 && <p className="mt-3 text-sm text-muted">Join {waiting} buyers already waiting for land.</p>}
+      <div className="mt-6 sm:mt-auto sm:pt-7">
+        <BuyerRequestButton places={places} size="md" className="h-12 w-full px-5 font-semibold sm:h-11 sm:w-auto">
+          Get land alerts
+        </BuyerRequestButton>
+        {waiting > 0 && <p className="mt-3 text-sm text-muted">{waiting} buyers are already waiting.</p>}
       </div>
     </div>
   );
