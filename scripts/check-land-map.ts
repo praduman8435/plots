@@ -68,6 +68,9 @@ const merc = toWgs84([8607999.9, 3320000.0], "EPSG:3857");
 check("CRS: Web Mercator → near Noida", merc[0] > 77.3 && merc[0] < 77.4 && merc[1] > 28.5 && merc[1] < 28.6, merc);
 check("CRS: names normalised", normalizeCrs("urn:ogc:def:crs:OGC:1.3:CRS84") === "EPSG:4326" && normalizeCrs("urn:ogc:def:crs:EPSG::32643") === "EPSG:32643" && normalizeCrs(undefined) === "EPSG:4326");
 check("CRS: unknown rejected", normalizeCrs("EPSG:24378") === null);
+const lccOrigin = toWgs84([4_000_000, 4_000_000], "EPSG:7755");
+check("CRS: EPSG:7755 (India NSF LCC) origin → 80°E 24°N", Math.abs(lccOrigin[0] - 80) < 1e-9 && Math.abs(lccOrigin[1] - 24) < 1e-9, lccOrigin);
+check("CRS: EPSG:7755 recognised", normalizeCrs("urn:ogc:def:crs:EPSG::7755") === "EPSG:7755");
 
 const square = (lng: number, lat: number, d: number): PolygonGeometry => ({
   type: "Polygon",
@@ -222,12 +225,23 @@ async function main() {
     check("places: unknown → none", searchPlaces("zzqqxx").length === 0);
     check("places: limited", searchPlaces("a").length <= 8);
 
+    const { villagesInView, VILLAGES, villageSource } = await import("../src/server/land-map/villages");
+    check("villages: all 333 official villages of the district", VILLAGES.length === 333);
+    check("villages: every boundary inside the district bounds", VILLAGES.every((v) => v.bbox.west >= 77.2 && v.bbox.east <= 77.85 && v.bbox.south >= 27.9 && v.bbox.north <= 28.7));
+    const whole = villagesInView({ west: 77.25, south: 28.0, east: 77.8, north: 28.7, zoom: 12 });
+    check("villages: the whole district in one view", whole.mode === "villages" && whole.features.length === 333);
+    check("villages: below zoom 11 → zoom-in", villagesInView({ west: 77.4, south: 28.4, east: 77.5, north: 28.5, zoom: 10 }).mode === "zoom-in");
+    const bis = searchPlaces("bisrakh jalalpur")[0];
+    check("villages: official village searchable with its extent", bis?.context.startsWith("Village (official boundary)") === true && Boolean(bis?.bbox));
+    check("villages: source credited", /Survey of India/.test(villageSource.attribution));
+
     // Routes and page, flag off then on (TRUSTED_IP_HEADER unset → per-IP limits skipped here; tested below).
     delete process.env.TRUSTED_IP_HEADER;
     const parcelsRoute = await import("../src/app/api/land-map/parcels/route");
     const detailRoute = await import("../src/app/api/land-map/parcels/[id]/route");
     const searchRoute = await import("../src/app/api/land-map/search/route");
     const coverageRoute = await import("../src/app/api/land-map/coverage/route");
+    const villagesRoute = await import("../src/app/api/land-map/villages/route");
     const qs = new URLSearchParams(Object.fromEntries(Object.entries(view).map(([k, v]) => [k, String(v)])));
     const ctx = { params: Promise.resolve({ id: stored.id }) } as never;
     const call = async () => ({
@@ -235,6 +249,7 @@ async function main() {
       detail: await detailRoute.GET(new Request("http://x"), ctx),
       search: await searchRoute.GET(new Request("http://x/api/land-map/search?q=5")),
       coverage: await coverageRoute.GET(),
+      villages: await villagesRoute.GET(new Request(`http://x/api/land-map/villages?${qs}`)),
     });
 
     delete process.env.LAND_PARCEL_MAP_ENABLED;

@@ -15,8 +15,11 @@ Nothing here is legal advice. Before any real dataset is imported, the access an
 | DoLR ULPIN / Bhu-Aadhaar | Identifier, not geometry | No public API found | No terms found | Inspected |
 | data.gov.in | Unknown | — | GODL if present | **Not verified** (403 for automated fetch) |
 | OpenStreetMap | No cadastral parcels; place names and admin outlines | Overpass / Nominatim (policy-limited) | ODbL 1.0 | **Used** for place search |
+| Survey of India Village Boundary, on the National Water Data Portal (NWIC) | **Village** polygons (not plots), with Census 2011 codes | Direct public download (GeoJSON / SHP / KML) | Portal copyright policy: free reproduction with acknowledgement | **Used**: all 333 villages of the district |
 
-**Conclusion:** no source we could inspect offers authorized bulk or API access to cadastral parcel polygons for Gautam Buddha Nagar that we may store and show. So **no real parcel boundaries are implemented**. The import pipeline, APIs and map are built and tested with a clearly labelled synthetic dataset. Real data needs the authorization listed under *Remaining dependencies*.
+**Conclusion:**
+- **Village level — done with real data.** The official revenue-village boundaries of all 333 villages of Gautam Buddha Nagar come from the Survey of India dataset on the National Water Data Portal, which may be reproduced with acknowledgement.
+- **Plot (Gata) level — not available.** No source we could inspect offers authorized bulk or API access to plot polygons that we may store and show. The plot import pipeline, APIs and map are built and tested with a clearly labelled synthetic dataset. Real plots need the authorization listed under *Remaining dependencies*.
 
 ## Findings per source
 
@@ -63,13 +66,44 @@ Nothing here is legal advice. Before any real dataset is imported, the access an
 - **Licence:** ODbL 1.0. The map shows "© OpenStreetMap" and "Places © OpenStreetMap contributors (ODbL)". The extract is a derived database published under ODbL in this repository.
 - **Limits:** OSM has no cadastral parcels for the district, and its outlines are approximate (simplified to ~80 m). The UI labels them "approximate outline", not revenue boundaries. We draw nothing from imagery, roads or field shapes.
 
+### 8. Survey of India — Village Boundary, via the National Water Data Portal (NWIC) — used
+
+- **Dataset:** https://nwdp.nwic.gov.in/dataset/village-boundary
+  - Inspected: 36 states/UTs, each in KML, GeoJSON and SHP.
+  - Data producer listed as Geological Survey of India; the organisation box says Survey of India (the page is inconsistent).
+  - Last updated 2 May 2025.
+  - The download links are direct, with no login.
+- **Terms:**
+  - The dataset page shows no licence field.
+  - The portal's [copyright policy](https://nwdp.nwic.gov.in/footer/copyrightPolicy) says the material may be reproduced free of charge, in any format or media, without specific permission. Conditions: it must be reproduced accurately, not used in a derogatory manner or misleading context, and the source must be prominently acknowledged.
+  - This permission excludes material explicitly identified as third-party copyright. The village file is not marked that way.
+  - **We credit it on the map** ("Village boundaries: Survey of India, via National Water Data Portal (NWIC)"), in the village panel and in the docs.
+- **File used:** Uttar Pradesh GeoJSON (`vb_soi_up_geojson.zip`, 124 MB, which contains one 606 MB file `vb_soi_up.GeoJSON`).
+  - CRS: **EPSG:7755** (WGS 84 / India NSF LCC). It is transformed to EPSG:4326 with an ellipsoidal LCC inverse (`src/lib/land-map/geo.ts`).
+  - 333 features have `district = "Gautam Buddha Nagar"`.
+  - Attributes: village name, Census 2011 village code, sub-district (tehsil) name and code, block, rural/urban, Census area, and village amenity fields (we don't use those).
+- **Checks run when building the extract** (`scripts/land-map/build-villages.ts`):
+  - All 333 villages fall inside the district bounds.
+  - The median ratio of polygon area to Census area is **1.02**.
+  - 48 of the 57 OSM village points that match a village by name fall inside that village's polygon.
+- **What it is not:** these are revenue-village outer boundaries. They do not contain plots (Gata) and say nothing about ownership. The UI says so.
+
+### Why we don't extract plots from Bhu-Naksha
+
+The UP Bhunaksha viewer shows plots publicly, but the system is run for the Revenue Department and states no reuse permission. NIC's Bhu-Naksha site says it is for authorized officials. Copying or extracting data in bulk from a computer system without its owner's permission can create liability under **Section 43(b) of the Information Technology Act, 2000** ([text, Income Tax Department copy](https://incometaxindia.gov.in/Acts/Information%20Technology%20Act,%202000/102120000000005390.htm)).
+
+Open-data policy — the [National Geospatial Policy 2022](https://www.indiaenvironmentportal.org.in/reports-and-documents/national-geospatial-policy-2022) and data under NDSAP — supports reuse of data the government **publishes** for reuse, like the NWDP village file. It does not cover scraping an application. So plot data needs the department's export or written permission.
+
 ### Also seen (not used)
 
+- [Stanford EarthWorks, UP village boundaries 2011](https://earthworks.stanford.edu/catalog/stanford-dg232hy0110): access is restricted (login needed).
+- [GISMAP IN](https://www.gismaps.in/Village_Boundaries_Maps/Uttar_Pradesh_VillageMaps.html): commercial; licence and price not checked.
 - [ArcGIS "Noida City Boundary"](https://cdn.arcgis.com/home/item.html?id=29a492c3a6174bffac6a37fd134b1756): a city outline, not parcels. We saw it only in search results and did not inspect it.
 
 ## Coverage implemented
 
-- **Real parcel boundaries: none.** No authorized dataset exists yet.
+- **Official village boundaries:** all **333 villages** of Gautam Buddha Nagar (Survey of India via NWDP). They are searchable, and clicking one shows its Census code, tehsil, block and areas.
+- **Plot (Gata) boundaries: none.** No authorized dataset exists yet.
 - **Place search and navigation:** Gautam Buddha Nagar district (OSM).
 - **Synthetic sample:** 96 made-up plots in a made-up "Synthetic Test Village (sample)". These are served only when `LAND_PARCEL_MAP_SYNTHETIC=true`, never in Vercel production, and are labelled on the map, in search and in the panel.
 

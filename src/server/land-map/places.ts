@@ -1,12 +1,14 @@
 import "server-only";
 import index from "@/data/land-map/gbn-places.json";
+import { VILLAGES } from "./villages";
 import type { AreaGeometry, BBox } from "@/lib/land-map/geo";
 
 /**
  * Place search for the parcel map: Gautam Buddha Nagar district, its tehsils,
- * Noida, sectors, villages and localities from a committed OpenStreetMap
- * extract (scripts/land-map/build-places.ts, © OpenStreetMap contributors,
- * ODbL). Names and outlines for navigation only — never cadastral data.
+ * Noida, sectors and localities from a committed OpenStreetMap extract
+ * (scripts/land-map/build-places.ts, © OpenStreetMap contributors, ODbL),
+ * plus the official revenue villages (Survey of India, villages.ts).
+ * Names and outlines for navigation only — never plot (cadastral) data.
  * Searched in memory on the server; the browser only gets the matches.
  */
 
@@ -29,6 +31,7 @@ export function regionOutlines() {
   return {
     district: { name: data.district.name, state: data.district.state, bbox: data.district.bbox, outline: data.district.outline },
     tehsils: data.tehsils.map((t) => ({ name: t.name, bbox: t.bbox, outline: t.outline })),
+    city: data.city ? { name: data.city.name, bbox: data.city.bbox } : null,
   };
 }
 
@@ -37,11 +40,24 @@ const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p
 
 type Entry = PlaceHit & { key: string; keyHi?: string; rank: number };
 
+const OFFICIAL_NAMES = new Set(VILLAGES.map((v) => norm(v.name)));
+
 const BASE: (PlaceHit & { rank: number })[] = [
   { id: data.district.id, name: data.district.name, kind: "district", context: `District, ${data.district.state}`, center: center(data.district.bbox), bbox: data.district.bbox, rank: 0 },
   ...(data.city ? [{ id: data.city.id, name: data.city.name, kind: "city" as const, context: `City, ${data.district.name}`, center: center(data.city.bbox), bbox: data.city.bbox, rank: 1 }] : []),
   ...data.tehsils.map((t) => ({ id: t.id, name: `${t.name} tehsil`, kind: "tehsil" as const, context: data.district.name, center: center(t.bbox), bbox: t.bbox, rank: 2 })),
-  ...data.places.map((p) => ({
+  // Official village boundaries (Survey of India) — searchable and zoomable to their extent.
+  ...VILLAGES.map((v) => ({
+    id: v.id,
+    name: v.name,
+    kind: "village" as const,
+    context: ["Village (official boundary)", v.tehsil ? `${v.tehsil} tehsil` : data.district.name].join(" · "),
+    center: v.center,
+    bbox: v.bbox,
+    rank: 3,
+  })),
+  // OSM places, minus villages the official list already has.
+  ...data.places.filter((p) => !(p.kind === "village" && OFFICIAL_NAMES.has(norm(p.name)))).map((p) => ({
     id: p.id,
     name: p.name,
     nameHi: p.nameHi,

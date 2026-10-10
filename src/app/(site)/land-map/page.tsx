@@ -4,6 +4,7 @@ import { LandMap } from "@/components/land-map/land-map";
 import { isLandParcelMapEnabled } from "@/lib/land-map/flag";
 import { parcelCoverage } from "@/server/land-map/parcels";
 import { placeSource, regionOutlines } from "@/server/land-map/places";
+import { villageSource } from "@/server/land-map/villages";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export default async function LandMapPage() {
   const coverage = await parcelCoverage().catch(() => []);
   return (
     <div className="h-[calc(100dvh-4rem)]">
-      <LandMap region={regionOutlines()} initialCoverage={coverage} placeAttribution={placeSource.attribution} />
+      <LandMap region={regionOutlines()} initialCoverage={coverage} placeAttribution={placeSource.attribution} villageAttribution={villageSource.attribution} />
     </div>
   );
 }

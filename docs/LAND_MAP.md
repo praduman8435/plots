@@ -5,8 +5,9 @@ Data sources and permissions are in [`land-data-sources.md`](./land-data-sources
 
 ## Current coverage
 
-- **Real parcel boundaries:** none. No authorized dataset is available yet (see the data sources doc).
-- **Place search and navigation:** Gautam Buddha Nagar district, using OpenStreetMap (ODbL). This covers the district, 3 tehsils, 100 sectors, 124 villages and 35 localities.
+- **Official village boundaries:** all 333 revenue villages of Gautam Buddha Nagar (Survey of India, via the National Water Data Portal). They are shown from zoom 11, are searchable, and can be clicked for details. Real data.
+- **Plot (Gata) boundaries:** none. No authorized dataset is available yet (see the data sources doc).
+- **Place search and navigation:** OpenStreetMap (ODbL) for the district, 3 tehsils, 100 sectors and the localities, plus the 333 official villages.
 - **Development only:** 96 synthetic sample parcels, labelled everywhere and never served in Vercel production.
 
 ## Feature flag
@@ -30,6 +31,7 @@ Data sources and permissions are in [`land-data-sources.md`](./land-data-sources
 Browser (/land-map, Leaflet + OSM tiles)
   ├─ search box ── GET /api/land-map/search?q=        → places (OSM index, in memory) + parcel lookup (DB)
   ├─ map moves ─── GET /api/land-map/parcels?bbox&zoom → parcels in view (zoom ≥ 15), debounced, stale requests aborted
+  ├─ map moves ─── GET /api/land-map/villages?bbox&zoom → official village boundaries in view (zoom ≥ 11)
   ├─ click ─────── GET /api/land-map/parcels/:id       → public attributes + source + freshness
   └─ (server render) coverage boxes + district/tehsil outlines
 
@@ -43,15 +45,17 @@ Postgres (same database, new tables, RLS on)
 Offline (never in a web request)
   scripts/land-map/import-parcels.ts  ← manifest.json + GeoJSON (authorized export)
   scripts/land-map/build-places.ts    ← OpenStreetMap (place index)
+  scripts/land-map/build-villages.ts  ← Survey of India village boundaries (NWDP GeoJSON, EPSG:7755)
   scripts/land-map/make-synthetic.ts  → synthetic sample
 ```
 
 **Files:**
 - `src/lib/land-map/flag.ts`: the feature switch.
-- `src/lib/land-map/geo.ts`: geometry. Covers CRS transforms (EPSG:4326, 3857, 32643, 32644), validation, geodesic area, bbox/centroid, Douglas-Peucker simplification and the grid cell.
+- `src/lib/land-map/geo.ts`: geometry. Covers CRS transforms (EPSG:4326, 3857, 32643, 32644 and 7755 India NSF LCC), validation, geodesic area, bbox/centroid, Douglas-Peucker simplification and the grid cell.
 - `src/server/land-map/import.ts`: prepare (pure) and write (one transaction).
 - `src/server/land-map/parcels.ts`: viewport, coverage, detail and lookup queries.
-- `src/server/land-map/places.ts`: place search over `src/data/land-map/gbn-places.json`.
+- `src/server/land-map/places.ts`: place search over `src/data/land-map/gbn-places.json` and the official villages.
+- `src/server/land-map/villages.ts`: the official village boundaries, held in memory from `src/data/land-map/gbn-villages.json` (612 KB, simplified to about 2 m; served by viewport, never all at once to the page).
 - `src/server/land-map/http.ts`: the route gate (flag, rate limit) and response helpers.
 - `src/app/api/land-map/**`: the route handlers.
 - `src/app/(site)/land-map/page.tsx` and `src/components/land-map/land-map.tsx`: the page and the map UI.
@@ -134,6 +138,12 @@ Through the API, on a production build: the 96-parcel synthetic viewport took ab
 
 **Synthetic sample:** `pnpm land-map:synthetic`, then `pnpm land-map:import data/land-map/synthetic/manifest.json --allow-synthetic`.
 
+**Village boundaries refresh:**
+1. Download the Uttar Pradesh GeoJSON from https://nwdp.nwic.gov.in/dataset/village-boundary.
+2. Unzip it into its own folder.
+3. Run `pnpm land-map:villages /path/to/vb_soi_up.GeoJSON`. The script streams the 600 MB file, keeps the district's features, transforms EPSG:7755 to 4326, simplifies the boundaries and reports its checks.
+4. Commit `src/data/land-map/gbn-villages.json`.
+
 **Place index refresh** (only occasionally): `pnpm land-map:places`. This makes a handful of Overpass and Nominatim requests, spaced to respect their usage policies. Commit the resulting JSON.
 
 ## API
@@ -145,6 +155,7 @@ All routes are GET, 404 when the flag is off, rate-limited per client IP (`landM
 | `/api/land-map/parcels` | `west,south,east,north` (degrees; each side ≤ 0.05°), `zoom` 0–22 | `{mode:"zoom-in", minZoom:15}` below zoom 15. Otherwise `{mode:"parcels", type:"FeatureCollection", features[≤1500], truncated}`. Each feature has `id`, simplified geometry, `parcelNumber`, `villageName` and `synthetic`. 400 for an invalid or too-large box. |
 | `/api/land-map/parcels/:id` | — | `{parcel}`: Gata number, ULPIN, village, tehsil, district, state, recorded area (with unit), computed area, land class, quality, bbox, geometry, and `source` (dataset, source, licence, attribution, source record id, source update date, obtained date, import date). 404 if unknown. |
 | `/api/land-map/search` | `q` (1–60 characters), optional `village` | `{places[≤8], parcels[≤20], cadastral}`. Places come from the OSM index. Parcels are a lookup by Gata number (e.g. `12/3`, `Gata 45`) or a 14-character ULPIN. A number that exists in several villages returns **all** of them with their village; nothing is guessed. |
+| `/api/land-map/villages` | `west,south,east,north` (each side ≤ 0.8°), `zoom` | `{mode:"zoom-in", minZoom:11}` below zoom 11. Otherwise `{mode:"villages", features}`: official village polygons with name, Census code, tehsil (+ code), block, rural/urban, Census area (ha) and boundary area (ha). |
 | `/api/land-map/coverage` | — | `{coverage:[{datasetId, name, attribution, synthetic, parcels, villages, bbox}]}` |
 
 ## Map behaviour
@@ -165,7 +176,7 @@ All routes are GET, 404 when the flag is off, rate-limited per client IP (`landM
 
 ## Tests
 
-- **`pnpm check:land-map`** (81 checks, uses the local DB):
+- **`pnpm check:land-map`** (89 checks, uses the local DB):
   - flag parsing;
   - CRS round trips (UTM 43N/44N against an independent forward projection, within 1 cm), Web Mercator, area within 0.5 %;
   - invalid geometries rejected (bow-tie, out of area, wrong CRS, too complex, too big, zero area);
@@ -173,6 +184,6 @@ All routes are GET, 404 when the flag is off, rate-limited per client IP (`landM
   - database imports: idempotent re-import, updates, nothing deleted, synthetic/real lock;
   - viewport: correctness, synthetic hiding, low zoom, box validation, caps;
   - lookup: duplicates across villages, village context, ULPIN;
-  - detail privacy; coverage; place search;
+  - detail privacy; coverage; place search; official villages (all 333, inside the district, searchable, credited, zoom-gated); EPSG:7755;
   - API routes returning 404 (with no data in the body) when off, and 200 when on; caching; 400s; rate limiting.
 - **`pnpm check:http`** (against a production build): the page and every API agree with the flag, which is off by default. Disabled means the normal 404 page and no data in the body. Unknown nested URLs give the site's 404.

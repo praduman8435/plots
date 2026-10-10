@@ -13,7 +13,7 @@ export type AreaGeometry = PolygonGeometry | MultiPolygonGeometry;
 export type BBox = { west: number; south: number; east: number; north: number };
 
 /** Gautam Buddha Nagar with a margin — anything outside is not a Noida-area parcel. */
-export const GBN_BOUNDS: BBox = { west: 77.2, south: 28.1, east: 77.8, north: 28.7 };
+export const GBN_BOUNDS: BBox = { west: 77.2, south: 27.9, east: 77.85, north: 28.7 };
 
 export const LIMITS = {
   /** Vertices in one polygon (all rings). Real cadastral plots have tens to a few hundred. */
@@ -42,7 +42,7 @@ export function polygons(g: AreaGeometry): PolygonCoords[] {
 // ───────────────────────────── Coordinate reference systems ─────────────────────────────
 
 /** CRSs the importer understands. Others must be converted first (e.g. ogr2ogr -t_srs EPSG:4326). */
-export const SUPPORTED_CRS = ["EPSG:4326", "EPSG:3857", "EPSG:32643", "EPSG:32644"] as const;
+export const SUPPORTED_CRS = ["EPSG:4326", "EPSG:3857", "EPSG:32643", "EPSG:32644", "EPSG:7755"] as const;
 export type SupportedCrs = (typeof SUPPORTED_CRS)[number];
 
 /** "urn:ogc:def:crs:OGC:1.3:CRS84", "EPSG:4326", "urn:ogc:def:crs:EPSG::32643" → a supported code, or null. */
@@ -54,6 +54,7 @@ export function normalizeCrs(name: string | undefined | null): SupportedCrs | nu
   if (code === "3857" || code === "900913") return "EPSG:3857";
   if (code === "32643") return "EPSG:32643";
   if (code === "32644") return "EPSG:32644";
+  if (code === "7755") return "EPSG:7755";
   return null;
 }
 
@@ -99,6 +100,45 @@ function fromUtmNorth([easting, northing]: Position, zone: number): Position {
   return [lon * (180 / Math.PI), lat * (180 / Math.PI)];
 }
 
+/**
+ * EPSG:7755 "WGS 84 / India NSF LCC" (Lambert Conformal Conic, 2 standard
+ * parallels 12°28'22.638"N and 35°10'22.096"N, origin 24°N 80°E, false
+ * easting/northing 4,000,000 m) — used by Survey of India / national datasets.
+ * Ellipsoidal inverse, Snyder (1987) eq. 15-1…15-11, 7-9.
+ */
+const LCC_7755 = (() => {
+  const e = Math.sqrt(WGS84_F * (2 - WGS84_F));
+  const rad = Math.PI / 180;
+  const m = (phi: number) => Math.cos(phi) / Math.sqrt(1 - (e * Math.sin(phi)) ** 2);
+  const t = (phi: number) => Math.tan(Math.PI / 4 - phi / 2) / ((1 - e * Math.sin(phi)) / (1 + e * Math.sin(phi))) ** (e / 2);
+  const phi1 = 12.472955 * rad;
+  const phi2 = 35.17280444444444 * rad;
+  const phi0 = 24 * rad;
+  const n = (Math.log(m(phi1)) - Math.log(m(phi2))) / (Math.log(t(phi1)) - Math.log(t(phi2)));
+  const F = m(phi1) / (n * t(phi1) ** n);
+  const rho0 = WGS84_A * F * t(phi0) ** n;
+  return { e, n, F, rho0, lon0: 80 * rad, x0: 4_000_000, y0: 4_000_000 };
+})();
+
+function fromIndiaLcc([x, y]: Position): Position {
+  const { e, n, F, rho0, lon0, x0, y0 } = LCC_7755;
+  const dx = x - x0;
+  const dy = rho0 - (y - y0);
+  const rho = Math.sign(n) * Math.hypot(dx, dy);
+  const theta = Math.atan2(dx, dy);
+  const tt = (rho / (WGS84_A * F)) ** (1 / n);
+  let phi = Math.PI / 2 - 2 * Math.atan(tt);
+  for (let i = 0; i < 10; i++) {
+    const next = Math.PI / 2 - 2 * Math.atan(tt * ((1 - e * Math.sin(phi)) / (1 + e * Math.sin(phi))) ** (e / 2));
+    if (Math.abs(next - phi) < 1e-12) {
+      phi = next;
+      break;
+    }
+    phi = next;
+  }
+  return [((theta / n + lon0) * 180) / Math.PI, (phi * 180) / Math.PI];
+}
+
 /** One position from `crs` to WGS 84 lon/lat. */
 export function toWgs84(p: Position, crs: SupportedCrs): Position {
   switch (crs) {
@@ -110,6 +150,8 @@ export function toWgs84(p: Position, crs: SupportedCrs): Position {
       return fromUtmNorth(p, 43);
     case "EPSG:32644":
       return fromUtmNorth(p, 44);
+    case "EPSG:7755":
+      return fromIndiaLcc(p);
   }
 }
 

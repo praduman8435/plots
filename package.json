@@ -24,6 +24,7 @@
     "check:land-map": "tsx --conditions=react-server scripts/check-land-map.ts",
     "land-map:import": "tsx scripts/land-map/import-parcels.ts",
     "land-map:places": "tsx scripts/land-map/build-places.ts",
+    "land-map:villages": "tsx scripts/land-map/build-villages.ts",
     "land-map:synthetic": "tsx scripts/land-map/make-synthetic.ts"
   },
   "dependencies": {

@@ -213,13 +213,16 @@ async function main() {
     check("public profile has the report button", has(profilePage.text, "Report this profile"));
 
     // ── Land parcel map: one switch for the page and every API (off in CI, the default) ──
-    const landPaths = ["/land-map", "/api/land-map/coverage", "/api/land-map/search?q=sector", "/api/land-map/parcels?west=77.5&south=28.4&east=77.51&north=28.41&zoom=16", "/api/land-map/parcels/cabcdefghij123"];
+    const landPaths = ["/land-map", "/api/land-map/coverage", "/api/land-map/search?q=sector", "/api/land-map/parcels?west=77.5&south=28.4&east=77.51&north=28.41&zoom=16", "/api/land-map/villages?west=77.4&south=28.4&east=77.5&north=28.5&zoom=12"];
     const land = await Promise.all(landPaths.map((p) => get(p)));
     const landOff = land.every((r) => r.status === 404);
     check("land map: page and APIs agree on the feature flag", landOff || land.every((r) => r.status !== 404), land.map((r) => r.status));
+    // An unknown parcel is a 404 either way — so only check it reveals nothing.
+    const unknownParcel = await get("/api/land-map/parcels/cabcdefghij123");
+    check("land map: unknown parcel → 404 without data", unknownParcel.status === 404 && !/sourceRecordId|parcelNumber/.test(unknownParcel.text));
     if (landOff) {
       check("land map disabled: the page is the normal 404 page", has(land[0].text, "Page not found"));
-      check("land map disabled: APIs return no map data", land.slice(1).every((r) => !/FeatureCollection|coverage|parcelNumber|places/.test(r.text)), land.map((r) => r.text.slice(0, 80)));
+      check("land map disabled: APIs return no map data", land.slice(1).every((r) => !/FeatureCollection|coverage|parcelNumber|places|villages/.test(r.text)), land.map((r) => r.text.slice(0, 80)));
     }
 
     // ── Unknown pages: a proper 404 page inside the site ──
