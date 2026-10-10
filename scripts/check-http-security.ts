@@ -212,6 +212,10 @@ async function main() {
     const profilePage = await get(`/s/${A.profileSlug}`);
     check("public profile has the report button", has(profilePage.text, "Report this profile"));
 
+    // ── Unknown pages: a proper 404 page inside the site ──
+    const nf = await get("/search/no-such-page");
+    check("unknown nested URL → 404 with the not-found page", nf.status === 404 && has(nf.text, "Page not found"), nf.status);
+
     // Admin view: stored XSS rendered as text
     const reportRow = await db.report.findFirstOrThrow({ where: { propertyId: plotA.id } });
     const adminView = await get(`/admin/reports/${reportRow.id}`, adminCookie);
