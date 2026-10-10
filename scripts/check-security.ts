@@ -96,6 +96,16 @@ async function pure() {
   check("8 distinct recovery codes", new Set(codes).size === 8 && codes.every((c) => /^[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}$/.test(c)));
   check("recovery code normalisation", mfa.normalizeRecoveryCode(codes[0].toLowerCase().replace(/-/g, " ")) === codes[0]);
 
+  const { toMetaPayload } = await import("../src/server/whatsapp/client");
+  const otp = toMetaPayload("+919876543210", { type: "template", templateName: "login_code", language: "en", bodyParameters: ["482913"], copyCode: "482913" }) as {
+    to: string;
+    template: { components: { type: string; sub_type?: string; index?: string; parameters: { text: string }[] }[] };
+  };
+  const button = otp.template.components.find((c) => c.type === "button");
+  check("whatsapp: OTP template carries the code for the Copy code button", button?.sub_type === "url" && button.index === "0" && button.parameters[0]?.text === "482913", otp);
+  check("whatsapp: number sent without +", otp.to === "919876543210");
+  const plain = toMetaPayload("+919876543210", { type: "template", templateName: "availability_check", bodyParameters: ["x"] }) as { template: { components: { type: string }[] } };
+  check("whatsapp: other templates have no button component", plain.template.components.every((c) => c.type !== "button"));
   const { checkProductionEnv } = await import("../src/lib/env-check");
   const bad = checkProductionEnv({});
   check("env check: missing DATABASE_URL/SESSION_SECRET are errors", bad.errors.length === 2);

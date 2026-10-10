@@ -28,7 +28,7 @@ export class WhatsAppOtpProvider implements OtpProvider {
   async sendOtp({ phoneNormalized, code }: { phoneNormalized: string; code: string; purpose: string }) {
     await sendWhatsAppMessage(
       phoneNormalized,
-      { type: "template", templateName: this.templateName, language: this.language, bodyParameters: [code] },
+      { type: "template", templateName: this.templateName, language: this.language, bodyParameters: [code], copyCode: code },
       "otp",
     );
   }

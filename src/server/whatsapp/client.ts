@@ -26,7 +26,14 @@ export type OutgoingMessage =
       rows: { id: string; title: string; description?: string }[];
       footer?: string;
     }
-  | { type: "template"; templateName: string; language?: string; bodyParameters: string[] };
+  | {
+      type: "template";
+      templateName: string;
+      language?: string;
+      bodyParameters: string[];
+      /** Authentication templates: the code again for the "Copy code" button (Meta rejects the send without it). */
+      copyCode?: string;
+    };
 
 /** Builds Meta's request body. Exported for tests. */
 export function toMetaPayload(to: string, message: OutgoingMessage): Record<string, unknown> {
@@ -79,7 +86,10 @@ export function toMetaPayload(to: string, message: OutgoingMessage): Record<stri
         template: {
           name: message.templateName,
           language: { code: message.language ?? "en" },
-          components: [{ type: "body", parameters: message.bodyParameters.map((text) => ({ type: "text", text })) }],
+          components: [
+            { type: "body", parameters: message.bodyParameters.map((text) => ({ type: "text", text })) },
+            ...(message.copyCode ? [{ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: message.copyCode }] }] : []),
+          ],
         },
       };
   }
