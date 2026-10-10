@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { WhatsAppIcon } from "@/components/ui/icons";
+import { formatPhone } from "@/lib/phone";
 import { site } from "@/lib/site";
 import { supportWhatsAppLink } from "@/lib/whatsapp-links";
 
@@ -90,6 +91,16 @@ export function LegalContact() {
             <WhatsAppIcon className="size-4" /> +{site.whatsappNumber}
           </a>
         </dd>
+        {site.supportPhone && (
+          <>
+            <dt className="font-medium text-muted">Phone</dt>
+            <dd>
+              <a href={`tel:${site.supportPhone}`} className="font-semibold text-brand-700 hover:underline">
+                {formatPhone(site.supportPhone)}
+              </a>
+            </dd>
+          </>
+        )}
         {address && (
           <>
             <dt className="font-medium text-muted">Address</dt>

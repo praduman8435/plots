@@ -7,7 +7,8 @@ export const site = {
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   /** Our WhatsApp Business number (digits only, with country code) — sellers chat here to list. */
   whatsappNumber: (process.env.NEXT_PUBLIC_WHATSAPP_BUSINESS_NUMBER ?? "919999999999").replace(/\D/g, ""),
-  supportPhone: process.env.NEXT_PUBLIC_SUPPORT_PHONE ?? "+919999999999",
+  /** Our call-us number (E.164), shown in the footer and on the legal pages. Empty = not shown. */
+  supportPhone: process.env.NEXT_PUBLIC_SUPPORT_PHONE?.trim() || "",
   /**
    * Who runs InstaPlots, for the legal pages (/privacy-policy, /terms, /data-deletion).
    * Set in Vercel so they match your registration (Udyam/GST); empty ones are left out.

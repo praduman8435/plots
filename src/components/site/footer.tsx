@@ -1,8 +1,9 @@
-import { ShieldCheck } from "lucide-react";
+import { Phone, ShieldCheck } from "lucide-react";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { IntentLink } from "@/components/ui/intent-link";
 import { Logo } from "@/components/ui/logo";
 import { LAND_TYPES } from "@/lib/land";
+import { formatPhone } from "@/lib/phone";
 import { getCitiesWithCounts } from "@/server/listings/queries";
 import { site } from "@/lib/site";
 import { isWhatsAppConnected, sellOnWhatsAppLink, supportWhatsAppLink } from "@/lib/whatsapp-links";
@@ -70,6 +71,11 @@ export async function SiteFooter() {
           >
             <WhatsAppIcon className="size-4" /> Chat with us
           </a>
+          {site.supportPhone && (
+            <a href={`tel:${site.supportPhone}`} className="mt-3 flex items-center gap-2 text-sm text-white/80 transition hover:text-white">
+              <Phone className="size-4" aria-hidden /> Call us: {formatPhone(site.supportPhone)}
+            </a>
+          )}
           <p className="mt-5 flex gap-2 text-xs leading-relaxed text-white/55">
             <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
             {site.disclaimer}
