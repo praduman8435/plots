@@ -283,6 +283,11 @@ const PHRASES: Record<Exclude<BotCommand, "START">, string[]> = {
     // Button titles of the weekly check (template quick replies arrive as their text).
     "yes all available", "yes all", "all available", "all are available", "yes all are available", "sab available",
     "sab available hai", "haan sab available", "yes available hai", "still available yes",
+    // How people actually answer "still available?" in their own words.
+    "haan available hai", "haan available", "han available hai", "ha available hai", "haa available hai", "haan hai",
+    "abhi bhi available hai", "ab bhi available hai", "haan abhi bhi available hai", "haan ji available hai",
+    "available hai ji", "haan bikau hai", "abhi bika nahi", "nahi bika", "abhi nahi bika", "yes it is", "yes still",
+    "हाँ उपलब्ध", "हाँ है", "हां है", "अभी भी उपलब्ध है", "हाँ अभी उपलब्ध है", "अभी नहीं बिका", "नहीं बिका",
     // Hindi button titles (template quick replies arrive as their text).
     "हाँ उपलब्ध है", "हाँ सब उपलब्ध", "हां उपलब्ध है", "हां सब उपलब्ध", "उपलब्ध है", "अभी उपलब्ध है",
   ],

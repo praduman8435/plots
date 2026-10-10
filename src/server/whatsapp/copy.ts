@@ -415,8 +415,8 @@ function catalog(lang: Lang) {
     needsFixing: (v: Vars) => (en ? `⚠️ One thing needs fixing: ${v.issue}.` : `⚠️ एक चीज़ ठीक करनी है: ${v.issue}।`),
     submitted: (v: Vars) =>
       en
-        ? `🙏 Thank you, ${first(String(v.name))} ji! Your land is with our team now.\n\nWe check every listing so buyers can trust it — usually within a few hours. We'll message you here the moment it's live.\n\nTo list more land, send *SELL*. To see your listings, send *STATUS*.`
-        : `🙏 धन्यवाद, ${first(String(v.name))} जी! आपकी ज़मीन अब हमारी टीम के पास है।\n\nहर लिस्टिंग की जाँच होती है ताकि खरीदार भरोसा कर सकें — आमतौर पर कुछ घंटों में। लाइव होते ही हम यहीं मैसेज करेंगे।\n\nऔर ज़मीन लिस्ट करने के लिए *बेचना*, अपनी लिस्टिंग देखने के लिए *स्टेटस* लिखें।`,
+        ? `🙏 Thank you, ${first(String(v.name))} ji! Your land is with our team now.\n\nWe check every listing so buyers can trust it, and we'll message you here the moment it's live.\n\nTo list more land, send *SELL*. To see your listings, send *STATUS*.`
+        : `🙏 धन्यवाद, ${first(String(v.name))} जी! आपकी ज़मीन अब हमारी टीम के पास है।\n\nहर लिस्टिंग की जाँच होती है ताकि खरीदार भरोसा कर सकें, और लाइव होते ही हम यहीं मैसेज करेंगे।\n\nऔर ज़मीन लिस्ट करने के लिए *बेचना*, अपनी लिस्टिंग देखने के लिए *स्टेटस* लिखें।`,
 
     // Notifications (outside the chat flow)
     nRegistered: (v: Vars) =>
@@ -429,8 +429,8 @@ function catalog(lang: Lang) {
         : `${first(String(v.name))} जी, एक छोटा-सा कदम: अपनी पहचान सत्यापित करें ताकि खरीदार आपकी लिस्टिंग पर *✓ Aadhaar verified* देखें।\n\nसिर्फ़ एक बार, 2 मिनट। आपका आधार हम किसी को नहीं दिखाते।\n\n${v.url}/seller/verify`,
     nReceived: (v: Vars) =>
       en
-        ? `✅ Your land has reached us.\n\n${v.plot}\n\nOur team will check it and message you when it's live — usually within a few hours.\n\nSeller ID: *${v.code}*`
-        : `✅ आपकी ज़मीन हम तक पहुँच गई है।\n\n${v.plot}\n\nहमारी टीम जाँच करके लाइव होते ही आपको मैसेज करेगी — आमतौर पर कुछ घंटों में।\n\nसेलर ID: *${v.code}*`,
+        ? `✅ Your land has reached us.\n\n${v.plot}\n\nOur team will check it and message you when it's live.\n\nSeller ID: *${v.code}*`
+        : `✅ आपकी ज़मीन हम तक पहुँच गई है।\n\n${v.plot}\n\nहमारी टीम जाँच करके लाइव होते ही आपको मैसेज करेगी।\n\nसेलर ID: *${v.code}*`,
     nLive: (v: Vars) =>
       en
         ? `🎉 Good news — your land is live on ${SITE}.\n\n${v.title}\n${v.where} · ${v.price}\n\n${v.link}\n\nBuyers can now call or WhatsApp you directly. Share this link in your WhatsApp groups — more eyes, more calls.\n\nSeller ID: *${v.code}*`

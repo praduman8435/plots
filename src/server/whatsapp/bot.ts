@@ -658,6 +658,14 @@ const plotLink = (slug: string) => `${site.url}/property/${slug}`;
  * hidden because we didn't hear back go live again. The bot writes its own
  * reply, so the listing service doesn't notify.
  */
+/** The seller has plots waiting on "still available?", or paused because they didn't answer it. */
+async function awaitingAvailabilityAnswer(t: Turn): Promise<boolean> {
+  const seller = await t.loadSeller();
+  if (!seller) return false;
+  if ((await plotsAwaitingAvailability(seller.id)).length > 0) return true;
+  return (await db.property.count({ where: { sellerId: seller.id, status: "HIDDEN", hiddenReason: "AVAILABILITY_UNCONFIRMED", removedAt: null } })) > 0;
+}
+
 async function confirmAvailability(t: Turn) {
   const seller = await t.loadSeller();
   if (!seller) {
@@ -1177,8 +1185,12 @@ async function mergeExtracted(t: Turn, ex: ExtractedListing, override = false): 
 const READ_FIRST: ReadonlySet<BotStep> = new Set<BotStep>(["IDLE", "ASK_NAME", "ASK_CITY", "ASK_LOCALITY", "ASK_DESCRIPTION"]);
 
 /** Elsewhere a short, plain answer ("2 bigha", "18 lakh", "done") goes straight to the parser — faster and free. */
+/** Any Indian script other than Devanagari (Gurmukhi, Bengali, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam, Urdu…). */
+const REGIONAL_SCRIPT = /[\u0980-\u0DFF\u0600-\u06FF\uABC0-\uABFF\u1C50-\u1C7F]/;
+
 function readFirst(step: BotStep, text: string): boolean {
-  return READ_FIRST.has(step) || text.includes("?") || text.trim().split(/\s+/).length > 4;
+  // Our fixed parser knows English and Hindi; the AI reads every other script, so they get answered in their language.
+  return READ_FIRST.has(step) || text.includes("?") || text.trim().split(/\s+/).length > 4 || REGIONAL_SCRIPT.test(text);
 }
 
 /** The last few messages before this one, oldest first, so the AI follows the conversation. */
@@ -1305,6 +1317,11 @@ async function aiAgent(t: Turn, text: string): Promise<boolean> {
       const replyId = inFlow ? shortcutFor(t, u.intent) : null;
       if (replyId) {
         await handleStep(t, { kind: "interactive", replyId });
+        return true;
+      }
+      // "Haan, abhi bhi available hai" in their own words, while we wait on a still-available answer.
+      if (!inFlow && u.intent === "yes" && (await awaitingAvailabilityAnswer(t))) {
+        await withResume(t, () => confirmAvailability(t));
         return true;
       }
       break;

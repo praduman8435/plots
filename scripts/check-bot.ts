@@ -193,6 +193,7 @@ async function main() {
       return { intent: "question", reply: "I'm the InstaPlots assistant, here to help you list your land.", ask: "Got a few photos of the land to share?" };
     if (/^who are you$/.test(msg)) return { intent: "question", reply: "I'm the InstaPlots assistant, here to help you list your land." };
     if (/^thanks a lot$/.test(msg)) return { intent: "chat", reply: "Always happy to help, ji." };
+    if (/^ਕਿੰਨੀ ਕੀਮਤ$/.test(msg)) return { intent: "question", reply: "ਜੀ, ਪੂਰੀ ਜ਼ਮੀਨ ਦੀ ਕੁੱਲ ਕੀਮਤ ਲਿਖੋ।", ask: "ਤੁਸੀਂ ਕਿੰਨੇ ਦੀ ਵੇਚਣੀ ਚਾਹੁੰਦੇ ਹੋ?" };
     if (/^Suresh Kumar$/.test(msg)) return { intent: "answer", fields: { name: "Suresh Kumar" } };
     if (/price 20 lakh kar do/.test(msg)) return { intent: "correction", fields: { priceRupees: 2000000 }, reply: "Theek hai ji." };
     if (/abhi photo nahi hai mere paas/.test(msg)) return { intent: "no" };
@@ -265,6 +266,10 @@ async function main() {
     check("Agent: short plain answers skip the AI", sent.length === calls && (await step(ai2)) === "ASK_PRICE");
     r = await text(ai2, "how much should I ask?");
     check("Agent: unclear answer gets a helpful reply, then the question again", /total keemat/.test(r.body) && /asking price/i.test(r.body) && (await step(ai2)) === "ASK_PRICE", r.body.slice(0, 200));
+
+    const before = sent.length;
+    r = await text(ai2, "ਕਿੰਨੀ ਕੀਮਤ");
+    check("Agent: a short message in another script goes to the AI and is answered in it", sent.length === before + 1 && /ਕੀਮਤ ਲਿਖੋ/.test(r.body) && /ਵੇਚਣੀ ਚਾਹੁੰਦੇ/.test(r.body) && (await step(ai2)) === "ASK_PRICE", r.body.slice(0, 200));
 
     mode = "fail";
     r = await text(ai2, "what do you think?");

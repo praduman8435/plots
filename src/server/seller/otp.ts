@@ -49,7 +49,7 @@ export async function requestOtp(phoneNormalized: string, provider?: OtpProvider
         success: false,
         error: {
           type: "COOLDOWN",
-          message: "A code was sent recently. Please wait before requesting another.",
+          message: "We just sent you a code. Use that one, or tap Resend when the timer ends.",
           retryAfterSeconds: Math.ceil(OTP_CONFIG.resendCooldownSeconds - secondsSinceLast),
         },
       };
@@ -76,7 +76,7 @@ export async function requestOtp(phoneNormalized: string, provider?: OtpProvider
     isSeller ? hitRateLimit("otpSendGlobalSellers", "all") : hitRateLimit("otpSendGlobal", "all", Date.now(), { limit: OTP_CONFIG.maxRequestsGlobalPerHour }),
   ]);
   if (!reserved[0].ok) {
-    return { success: false, error: { type: "COOLDOWN", message: "A code was sent recently. Please wait before requesting another.", retryAfterSeconds: reserved[0].retryAfterSeconds } };
+    return { success: false, error: { type: "COOLDOWN", message: "We just sent you a code. Use that one, or tap Resend when the timer ends.", retryAfterSeconds: reserved[0].retryAfterSeconds } };
   }
   if (reserved.some((r) => !r.ok)) {
     return { success: false, error: { type: "RATE_LIMITED", message: "Too many codes requested. Please try again later." } };

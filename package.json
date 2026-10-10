@@ -20,7 +20,8 @@
     "check:security": "tsx --conditions=react-server scripts/check-security.ts",
     "check:http": "tsx --conditions=react-server scripts/check-http-security.ts",
     "check:integrity": "tsx --conditions=react-server scripts/check-integrity.ts",
-    "check:bot": "tsx --conditions=react-server scripts/check-bot.ts"
+    "check:bot": "tsx --conditions=react-server scripts/check-bot.ts",
+    "check:whatsapp-e2e": "tsx --conditions=react-server scripts/check-whatsapp-e2e.mts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

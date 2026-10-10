@@ -28,7 +28,7 @@ export default async function SubmittedPage(props: PageProps<"/seller/properties
           <CheckCircle2 className="mx-auto size-12 text-brand-600" aria-hidden />
           <h1 className="mt-4 text-2xl font-extrabold sm:text-3xl">{sp.edited ? "Your changes have been submitted" : "Your land has been submitted"}</h1>
           <p className="mx-auto mt-2 max-w-sm text-[15px] text-muted">
-            We&apos;ll review your listing before it appears to buyers — usually within a few hours.
+            Our team checks every listing before buyers see it.
           </p>
 
           <div className="mt-6 flex items-center gap-3.5 rounded-2xl bg-mist p-3 text-left ring-1 ring-line">
