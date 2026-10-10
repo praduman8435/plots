@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma, type Seller, type WhatsAppConversation } from "@/generated/prisma/client";
 import { AreaUnit, LandType, type ListingStatus, type HiddenReason, type SellerType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { COMMON_STATES, STATE_REGIONS, matchState, shortStateName, splitCityAndState } from "@/lib/india";
+import { STATE_REGIONS, matchState, numberedStateList, shortStateName, splitCityAndState, stateFromNumber } from "@/lib/india";
 import { LAND_TYPES, LAND_TYPE_SLUGS, buildTitle, placeName } from "@/lib/land";
 import { maskPhoneForLogging } from "@/lib/phone";
 import { site } from "@/lib/site";
@@ -977,14 +977,6 @@ async function saveBuyerAlert(t: Turn, f: ExtractedListing): Promise<string | nu
   return valid.data.place;
 }
 
-/** States that already have listings, most active first (shown as quick picks; any state can be typed). */
-async function popularStates(): Promise<string[]> {
-  const rows = await db.city.findMany({ where: { isLive: true }, select: { state: true, _count: { select: { properties: true } } } });
-  const totals = new Map<string, number>();
-  for (const r of rows) totals.set(r.state, (totals.get(r.state) ?? 0) + r._count.properties);
-  return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([state]) => state).slice(0, 9);
-}
-
 /** Cities already used in this state, most active first (quick picks; any city can be typed). */
 function citiesInState(state: string) {
   return db.city.findMany({ where: { isLive: true, state }, orderBy: [{ properties: { _count: "desc" } }, { name: "asc" }], take: 9 });
@@ -1012,20 +1004,10 @@ async function promptFor(t: Turn, step: BotStep, lead?: string, ask?: string): P
         buttonLabel: c.chooseLandType,
         rows: LAND_TYPE_ORDER.map((lt) => ({ id: `type:${lt}`, title: landLabel(t.lang, lt), description: landHint(t.lang, lt) })),
       };
-    case "ASK_STATE": {
-      // States with listings first, topped up with the common ones, then "Other state" for the rest.
-      const popular = (await popularStates()).map((st) => matchState(st)).filter((st): st is (typeof COMMON_STATES)[number] => Boolean(st));
-      const states = [...new Set([...popular, ...COMMON_STATES])].slice(0, 9);
-      return {
-        type: "list",
-        body: `${pre}${q(c.askState)}`,
-        buttonLabel: c.chooseState,
-        rows: [
-          ...states.map((st) => ({ id: `state:${st}`, title: shortStateName(st) })),
-          { id: "state:more", title: c.otherState, description: c.otherStateHint },
-        ],
-      };
-    }
+    case "ASK_STATE":
+      // A WhatsApp list holds only 10 rows, so every state and UT goes in one numbered message:
+      // all 36 visible at once, answered with the number or the name.
+      return { type: "text", text: `${pre}${q(c.askState)}\n\n${numberedStateList(t.lang)}\n\n${c.replyStateNumber}` };
     case "ASK_CITY": {
       const cities = d.cityState ? await citiesInState(d.cityState) : [];
       if (cities.length === 0) return { type: "text", text: `${pre}${q(c.askCityTyped({ state: d.cityState ?? "" }))}` };
@@ -1440,7 +1422,7 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
         });
       }
       const fromId = replyId?.startsWith("state:") ? replyId.slice(6) : null;
-      const state = matchState(fromId ?? text ?? "");
+      const state = matchState(fromId ?? text ?? "") ?? (!fromId && text ? stateFromNumber(text) : null);
       if (!state) return (await aiAssist(t, text)) || reprompt(t, c.unknownState);
       return advance(t, "ASK_STATE", { ...d, cityState: state, cityId: undefined, cityName: undefined }, c.stateOk({ state }));
     }

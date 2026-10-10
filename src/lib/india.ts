@@ -49,11 +49,6 @@ export function titleCase(s: string): string {
 
 type State = (typeof INDIAN_STATES)[number];
 
-/** Asked about most often; fills the state list before we have listings to rank by. */
-export const COMMON_STATES: readonly State[] = [
-  "Uttar Pradesh", "Punjab", "Haryana", "Rajasthan", "Madhya Pradesh", "Bihar", "Maharashtra", "Uttarakhand", "Gujarat",
-];
-
 /**
  * Every state and UT in five regions of at most 10 (a WhatsApp list holds 10 rows),
  * so any state can be picked by tapping: "Other state" → region → state.
@@ -74,3 +69,20 @@ const SHORT_STATE_NAMES: Partial<Record<State, string>> = {
 export function shortStateName(state: State): string {
   return SHORT_STATE_NAMES[state] ?? state;
 }
+
+/** All 36 states and UTs in region order, numbered 1–36: the order of the WhatsApp state list. */
+export const NUMBERED_STATES: readonly State[] = STATE_REGIONS.flatMap((r) => r.states);
+
+/** "22" or "22." → the 22nd state of NUMBERED_STATES; anything else → null. */
+export function stateFromNumber(raw: string): State | null {
+  const m = /^\s*(\d{1,2})\s*\.?\s*$/.exec(raw);
+  const n = m ? Number(m[1]) : 0;
+  return n >= 1 && n <= NUMBERED_STATES.length ? NUMBERED_STATES[n - 1] : null;
+}
+
+/** Every state, numbered and grouped by region, for one WhatsApp message (lists hold only 10 rows). */
+export function numberedStateList(lang: "en" | "hi"): string {
+  let n = 0;
+  return STATE_REGIONS.map((r) => `*${lang === "hi" ? r.hi : r.en}*\n${r.states.map((s) => `${++n}. ${s}`).join("\n")}`).join("\n\n");
+}
+

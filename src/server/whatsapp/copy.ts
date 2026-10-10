@@ -284,9 +284,10 @@ function catalog(lang: Lang) {
     askName: en ? "First, what is your *name*? (e.g. Ramesh Yadav)" : "सबसे पहले, आपका *नाम* क्या है? (जैसे: रमेश यादव)",
     askLandType: en ? "What kind of land is it?" : "यह किस तरह की ज़मीन है?",
     chooseLandType: en ? "Choose land type" : "ज़मीन का प्रकार",
-    askState: en
-      ? "Which *state* is the land in?\n\nPick from the list, or just type it — e.g. _Punjab_, _Uttar Pradesh_, _Gujarat_."
-      : "ज़मीन किस *राज्य* में है?\n\nसूची से चुनें, या लिख दें — जैसे _पंजाब_, _उत्तर प्रदेश_, _गुजरात_।",
+    askState: en ? "Which *state* is the land in?" : "ज़मीन किस *राज्य* में है?",
+    replyStateNumber: en
+      ? "👉 Reply with the *number* (e.g. *1* for Uttar Pradesh) or type the state's name."
+      : "👉 *नंबर* भेजें (जैसे उत्तर प्रदेश के लिए *1*) या राज्य का नाम लिख दें।",
     chooseState: en ? "Choose state" : "राज्य चुनें",
     askCityTyped: (v: Vars) =>
       en
@@ -351,8 +352,8 @@ function catalog(lang: Lang) {
     thanksName: (v: Vars) => (en ? `Thank you, ${first(String(v.name))} ji! 🙏` : `धन्यवाद, ${first(String(v.name))} जी! 🙏`),
     chooseLandTypeFromList: en ? "Please choose the land type from the list 👇" : "कृपया सूची से ज़मीन का प्रकार चुनें 👇",
     unknownState: en
-      ? "I didn't recognise that state. Please pick one from the list, or type its name (e.g. *Punjab*)."
-      : "यह राज्य समझ नहीं आया। कृपया सूची से चुनें, या नाम लिखें (जैसे *पंजाब*)।",
+      ? "I didn't recognise that state. Please send its *number* from the list above, or type its name (e.g. *Punjab*)."
+      : "यह राज्य समझ नहीं आया। कृपया ऊपर की सूची से उसका *नंबर* भेजें, या नाम लिखें (जैसे *पंजाब*)।",
     stateOk: (v: Vars) => (en ? `🗺️ State: *${v.state}*` : `🗺️ राज्य: *${v.state}*`),
     typeCity: en ? "Please type the city or district name." : "कृपया शहर या ज़िले का नाम लिखें।",
     typeCityEnglish: en
