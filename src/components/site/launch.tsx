@@ -1,11 +1,20 @@
-import { ArrowRight, BadgeCheck, Check, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, Award, BadgeCheck, Check, TrendingUp } from "lucide-react";
 import { BuyerRequestButton } from "@/components/site/buyer-request";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+import { site } from "@/lib/site";
 import type { BuyerDemand } from "@/server/buyer-requests";
 import { DEMAND_MIN_TO_SHOW } from "@/server/buyer-requests";
 
 type Spots = { taken: number; left: number; total: number };
+
+/** Below this many claimed, the card shows no count: "100 of 100 left" reads as an empty shop. */
+const SHOW_COUNT_FROM = 10;
+
+/** The short line about spots: a live count once it says something, "first 100 only" before. */
+export function spotsLabel(spots: Spots): string {
+  return spots.taken >= SHOW_COUNT_FROM ? `${spots.left} of ${spots.total} spots left` : `First ${spots.total} sellers only`;
+}
 
 /**
  * The two invitations of a young marketplace, side by side: sellers, take one
@@ -24,45 +33,47 @@ export function LaunchSection({ spots, demand, places, className }: { spots: Spo
 }
 
 export function FoundingCard({ spots, compact = false, href = "/sell" }: { spots: Spots; compact?: boolean; href?: string }) {
-  const pct = Math.max(2, Math.round((spots.taken / spots.total) * 100));
+  const counting = spots.taken >= SHOW_COUNT_FROM;
+  const pct = Math.round((spots.taken / spots.total) * 100);
   return (
     <div className={cn("relative isolate overflow-hidden rounded-[2rem] bg-brand-950 text-white", compact ? "p-6 sm:p-7" : "p-7 sm:p-10")}>
       <div className="absolute -top-24 -right-24 -z-10 size-72 rounded-full bg-brand-500/25 blur-3xl" aria-hidden />
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-bold tracking-widest text-brand-200 uppercase">
-          <Sparkles className="size-3.5" aria-hidden /> Founding sellers
+          <Award className="size-3.5" aria-hidden /> Founding sellers
         </span>
         <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white ring-1 ring-white/15">
-          {spots.left} of {spots.total} spots left
+          {spotsLabel(spots)}
         </span>
       </div>
       <h2 className={cn("mt-3 font-extrabold tracking-tight", compact ? "text-2xl" : "text-[1.75rem] leading-tight sm:text-4xl")}>
-        Be one of our first {spots.total} sellers.
+        Have land to sell? Be one of our first {spots.total}.
       </h2>
       <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-white/80 sm:text-base">
-        List your land free. Keep the <b className="font-semibold text-white">Founding Seller</b> badge for good, and your land shows first when buyers search.
+        Every listing on {site.name} is checked by our team before buyers see it. Our first {spots.total} sellers get the{" "}
+        <b className="font-semibold text-white">Founding Seller</b> badge, so buyers know they were here from the start, and their land is shown first.
       </p>
 
       <ul className="mt-5 grid max-w-xl gap-2 text-sm text-white/85 sm:grid-cols-2">
         <li className="flex items-center gap-2">
-          <BadgeCheck className="size-4 shrink-0 text-brand-300" aria-hidden /> Founding Seller badge on your profile
+          <BadgeCheck className="size-4 shrink-0 text-brand-300" aria-hidden /> Free to list, checked before it goes live
         </li>
         <li className="flex items-center gap-2">
-          <TrendingUp className="size-4 shrink-0 text-brand-300" aria-hidden /> Shown first in search results
+          <TrendingUp className="size-4 shrink-0 text-brand-300" aria-hidden /> Founding Seller badge, shown first
         </li>
       </ul>
 
       <div className="mt-6 max-w-xl">
-        <div className="h-2 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin={0} aria-valuemax={spots.total} aria-valuenow={spots.taken} aria-label="Founding spots taken">
-          <div className="h-full rounded-full bg-linear-to-r from-brand-400 to-brand-200" style={{ width: `${pct}%` }} />
-        </div>
-        <p className="mt-2 text-xs text-white/60">
-          {spots.taken === 0 ? "No one has claimed a spot yet. Be the very first." : `${spots.taken} claimed. A spot is yours when your first listing goes live.`}
-        </p>
+        {counting && (
+          <div className="mb-2 h-2 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuemin={0} aria-valuemax={spots.total} aria-valuenow={spots.taken} aria-label="Founding spots taken">
+            <div className="h-full rounded-full bg-linear-to-r from-brand-400 to-brand-200" style={{ width: `${pct}%` }} />
+          </div>
+        )}
+        <p className="text-xs text-white/60">Your spot is confirmed when your first listing goes live.</p>
       </div>
 
       <ButtonLink href={href} variant="white" size="lg" className="mt-6 w-full sm:w-auto">
-        Claim your spot <ArrowRight />
+        List your land free <ArrowRight />
       </ButtonLink>
     </div>
   );

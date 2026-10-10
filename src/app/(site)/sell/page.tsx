@@ -2,7 +2,7 @@ import { ArrowRight, BadgeCheck, Camera, Check, ClipboardList, Fingerprint, IdCa
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { DemandCard, FoundingCard } from "@/components/site/launch";
+import { DemandCard, FoundingCard, spotsLabel } from "@/components/site/launch";
 import { PhoneChat } from "@/components/site/phone-chat";
 import { SectionHeading } from "@/components/site/sections";
 import { ButtonA, ButtonLink } from "@/components/ui/button";
@@ -49,7 +49,7 @@ export default async function SellPage() {
         <div className="container-page py-12 sm:py-16 lg:py-24">
           <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
             <BadgeCheck className="size-3.5 text-brand-200" aria-hidden />{" "}
-            {spots.left > 0 ? `Founding sellers · ${spots.left} of ${spots.total} spots left` : "For sellers · Free while we launch"}
+            {spots.left > 0 ? `Founding sellers · ${spotsLabel(spots)}` : "For sellers · Free while we launch"}
           </p>
           <h1 className="mt-4 max-w-3xl text-[2rem] leading-[1.1] font-extrabold tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">Your land. Your price. The right buyer.</h1>
           <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/80 sm:mt-4 sm:text-lg">

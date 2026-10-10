@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Camera, Clock, ExternalLink, MapPin, RotateCcw, ShieldCheck, Sparkles, TimerOff, BadgeCheck } from "lucide-react";
+import { CalendarClock, Camera, Clock, ExternalLink, Lightbulb, MapPin, RotateCcw, ShieldCheck, TimerOff, BadgeCheck } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import {
@@ -182,7 +182,7 @@ export function WhatsAppSimulator({ initial, defaultProfileName }: { initial: Si
           {suggestions.length > 0 && (
             <div className="mt-5">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
-                <Sparkles className="size-3.5 text-brand-600" aria-hidden /> Try answering
+                <Lightbulb className="size-3.5 text-brand-600" aria-hidden /> Try answering
               </p>
               <div className="flex flex-wrap gap-2">
                 {suggestions.map((s) => (
