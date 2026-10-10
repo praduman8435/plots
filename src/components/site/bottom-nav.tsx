@@ -17,7 +17,7 @@ const items = [
 export function BottomNav() {
   const pathname = usePathname();
   // Plot pages have their own contact bar; form pages have a sticky submit bar.
-  if (pathname.startsWith("/property/") || pathname.startsWith("/seller/plots/") || pathname.startsWith("/sell/start") || pathname.startsWith("/sell/chat") || pathname.startsWith("/land-map")) return null;
+  if (pathname.startsWith("/property/") || pathname.startsWith("/seller/plots/") || pathname.startsWith("/sell/start") || pathname.startsWith("/sell/chat")) return null;
 
   return (
     <nav

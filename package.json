@@ -20,12 +20,7 @@
     "check:security": "tsx --conditions=react-server scripts/check-security.ts",
     "check:http": "tsx --conditions=react-server scripts/check-http-security.ts",
     "check:integrity": "tsx --conditions=react-server scripts/check-integrity.ts",
-    "check:bot": "tsx --conditions=react-server scripts/check-bot.ts",
-    "check:land-map": "tsx --conditions=react-server scripts/check-land-map.ts",
-    "land-map:import": "tsx scripts/land-map/import-parcels.ts",
-    "land-map:places": "tsx scripts/land-map/build-places.ts",
-    "land-map:villages": "tsx scripts/land-map/build-villages.ts",
-    "land-map:synthetic": "tsx scripts/land-map/make-synthetic.ts"
+    "check:bot": "tsx --conditions=react-server scripts/check-bot.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",

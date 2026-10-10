@@ -47,9 +47,6 @@ export const LIMITS = {
   // Optional AI in the WhatsApp assistant (limits overridable by AI_MAX_CALLS_*): per chat, and all chats.
   aiPerChat: { limit: 25, windowSeconds: 86_400 },
   aiGlobal: { limit: 500, windowSeconds: 86_400 },
-  // Land parcel map: panning fires debounced viewport requests; search is typed.
-  landMapViewPerIp: { limit: 600, windowSeconds: 600 },
-  landMapSearchPerIp: { limit: 240, windowSeconds: 600 },
   // Admin second step (authenticator code), per admin account.
   adminMfaPerAdmin: { limit: 6, windowSeconds: 900 },
 } as const satisfies Record<string, { limit: number; windowSeconds: number }>;
