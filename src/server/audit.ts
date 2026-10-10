@@ -5,7 +5,7 @@ import { log } from "@/lib/log";
 
 export type AuditEntry = {
   action: string;
-  targetType: "report" | "listing" | "seller" | "admin";
+  targetType: "report" | "listing" | "seller" | "admin" | "buyer_request";
   targetId: string;
   reportId?: string | null;
   propertyId?: string | null;

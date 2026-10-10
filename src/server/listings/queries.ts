@@ -33,7 +33,8 @@ export type PropertyCardData = Prisma.PropertyGetPayload<{ select: typeof cardSe
 
 export const SORTS = {
   // Recently confirmed / recently published first — the most usable inventory on top.
-  recommended: { label: "Recommended", orderBy: [{ freshnessAt: { sort: "desc", nulls: "last" } }, { publishedAt: "desc" }] },
+  // Founding Sellers' land first (the launch promise), then the freshest.
+  recommended: { label: "Recommended", orderBy: [{ seller: { isFounding: "desc" } }, { freshnessAt: { sort: "desc", nulls: "last" } }, { publishedAt: "desc" }] },
   newest: { label: "Newest first", orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }] },
   price_asc: { label: "Price: low to high", orderBy: [{ price: "asc" }] },
   price_desc: { label: "Price: high to low", orderBy: [{ price: "desc" }] },
@@ -179,7 +180,7 @@ export async function getListingBySlug(slug: string) {
       city: true,
       seller: {
         select: {
-          id: true, name: true, sellerType: true, phoneVerifiedAt: true, identityStatus: true, createdAt: true, profileSlug: true, isBlocked: true,
+          id: true, name: true, sellerType: true, phoneVerifiedAt: true, identityStatus: true, createdAt: true, profileSlug: true, isBlocked: true, foundingNumber: true,
           _count: { select: { properties: { where: { status: "ACTIVE" } } } },
         },
       },

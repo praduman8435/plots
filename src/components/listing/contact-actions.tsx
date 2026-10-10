@@ -6,23 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { WhatsAppIcon } from "@/components/ui/icons";
 import { track } from "@/lib/analytics-client";
+import { type StoredBuyer, forgetStoredBuyer, readStoredBuyer, storeBuyer } from "@/lib/buyer-storage";
 import { normalizePhoneNumber } from "@/lib/phone";
 
 type Channel = "WHATSAPP" | "CALL";
-type Buyer = { name: string; phone: string };
+type Buyer = StoredBuyer;
 type PlotRef = { id: string; code: string; slug: string; title: string };
-
-const STORAGE_KEY = "plots.buyer";
-
-function readBuyer(): Buyer | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const b = raw ? (JSON.parse(raw) as Buyer) : null;
-    return b?.name && b?.phone ? b : null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * The marketplace's core action: buyer → seller on WhatsApp or a call.
@@ -65,7 +54,7 @@ export function ContactActions({
         // The saved name/number no longer passes the checks: ask again.
         tab?.close();
         try {
-          localStorage.removeItem(STORAGE_KEY);
+          forgetStoredBuyer();
         } catch {}
         setPending(channel);
         dialogRef.current?.showModal();
@@ -93,7 +82,7 @@ export function ContactActions({
 
   function start(channel: Channel) {
     track(channel === "WHATSAPP" ? "whatsapp_click" : "call_click", { propertyId: plot.id, props: { source } });
-    const buyer = readBuyer();
+    const buyer = readStoredBuyer();
     if (buyer) return void connect(channel, buyer);
     setPending(channel);
     dialogRef.current?.showModal();
@@ -160,7 +149,7 @@ export function ContactActions({
         channel={pending}
         onDone={(buyer) => {
           try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(buyer));
+            storeBuyer(buyer);
           } catch {}
           dialogRef.current?.close();
           if (pending) void connect(pending, buyer);

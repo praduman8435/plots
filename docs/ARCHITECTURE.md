@@ -251,6 +251,9 @@ Public pages:
 | Selling: overview | `/sell` |
 | Selling: register | `/sell/start` |
 | Selling: assistant chat | `/sell/chat` |
+| Privacy Policy | `/privacy-policy` |
+| Terms of Service | `/terms` |
+| Data deletion | `/data-deletion` |
 
 Seller area, all under `/seller/` and not indexed:
 
@@ -272,3 +275,12 @@ Older URLs redirect permanently in `next.config.ts`, so links already shared on 
 | `/seller/plots/…` | `/seller/properties/…` |
 
 An edit link that uses an internal id redirects to the URL with the property code.
+
+## 12. Launch programmes
+
+**Founding Sellers** (`src/server/founding.ts`). The first 100 sellers to get a listing approved get a numbered badge and come first in the "Recommended" sort. A spot is claimed when a listing goes live (admin approval or an admin publishing it), never at sign-up, so empty accounts can't use spots up. Claims are serialised with a transaction-scoped Postgres advisory lock, numbers continue from the highest given out, and a unique index plus CHECK constraints back this up. Home and `/sell` show the real count of spots left.
+
+**Buyer requests** (`src/server/buyer-requests.ts`, `POST /api/buyer-requests`). "Tell us what you need" saves a buyer's name, number, place and preferences. One row per number + place, so repeat taps update instead of inflating demand. The API checks Origin, caps requests per IP, per number and site-wide, and accepts only letters and simple punctuation (no links or digits in names). `/sell` shows how many distinct buyers are waiting and where, only once there are a few, and never who. The team works the list at `/admin/buyers` and WhatsApps buyers when matching land is listed.
+
+**Legal pages** read the operator name, email, address and grievance officer from `NEXT_PUBLIC_LEGAL_NAME`, `NEXT_PUBLIC_CONTACT_EMAIL`, `NEXT_PUBLIC_BUSINESS_ADDRESS` and `NEXT_PUBLIC_GRIEVANCE_OFFICER`; empty ones are left out. They describe what the code actually does, so update them when data handling changes.
+

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ApproxMap } from "@/components/listing/approx-map";
 import { approximateLocation } from "@/lib/approximate-location";
 import { ContactActions } from "@/components/listing/contact-actions";
+import { FoundingBadge } from "@/components/listing/founding-badge";
 import { BackButton, ShareButton, ViewBeacon } from "@/components/listing/detail-client";
 import { Gallery } from "@/components/listing/gallery";
 import { PropertyCard } from "@/components/listing/property-card";
@@ -365,7 +366,16 @@ function SellerCard({
   identityVerified,
   compact = false,
 }: {
-  seller: { name: string; sellerType: "OWNER" | "BROKER"; phoneVerifiedAt: Date | null; createdAt: Date; profileSlug: string | null; isBlocked: boolean; _count: { properties: number } };
+  seller: {
+    name: string;
+    sellerType: "OWNER" | "BROKER";
+    phoneVerifiedAt: Date | null;
+    createdAt: Date;
+    profileSlug: string | null;
+    isBlocked: boolean;
+    foundingNumber: number | null;
+    _count: { properties: number };
+  };
   identityVerified: boolean;
   compact?: boolean;
 }) {
@@ -382,6 +392,7 @@ function SellerCard({
         </div>
       </div>
       <ul className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+        {seller.foundingNumber && <FoundingBadge number={seller.foundingNumber} />}
         <VerifiedChip done={phoneVerified} icon={<BadgeCheck className="size-3.5" aria-hidden />} label={phoneVerified ? "Phone verified" : "Phone not verified"} />
         <VerifiedChip done={identityVerified} icon={<Fingerprint className="size-3.5" aria-hidden />} label={identityVerified ? "Aadhaar verified" : "Aadhaar pending"} />
       </ul>

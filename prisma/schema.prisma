@@ -113,6 +113,11 @@ model Seller {
   /// Web sign-up finished (name → OTP → identity step). Null = sign-up in progress.
   onboardedAt DateTime?
 
+  /// Founding Sellers: the first 100 sellers to get a listing approved (src/server/founding.ts).
+  /// Badge on their profile and listings, and their land comes first in "Recommended".
+  foundingNumber Int?    @unique
+  isFounding     Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -263,7 +268,8 @@ model City {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  properties Property[]
+  properties    Property[]
+  buyerRequests BuyerRequest[]
 
   @@map("cities")
 }
@@ -558,4 +564,35 @@ model AuditLog {
   @@index([sellerId, createdAt])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+enum BuyerRequestStatus {
+  OPEN
+  CONTACTED
+  CLOSED
+}
+
+/// "Tell us what you need": a buyer asks to hear on WhatsApp when matching land is listed.
+/// One row per number + place, so asking again updates the request instead of inflating demand.
+/// The phone is for our team only; the public sees counts, never who asked.
+model BuyerRequest {
+  id          String             @id @default(cuid())
+  name        String
+  phone       String /// E.164
+  place       String /// as typed: city, town or district
+  placeKey    String /// lower-case, single-spaced `place`: groups demand by place
+  area        String? /// village, sector or landmark
+  cityId      String? /// set when `place` matches one of our cities
+  city        City?              @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  landType    LandType?
+  budgetMax   BigInt? /// INR
+  status      BuyerRequestStatus @default(OPEN)
+  contactedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@unique([phone, placeKey])
+  @@index([status, updatedAt])
+  @@index([placeKey, status])
+  @@map("buyer_requests")
 }

@@ -39,6 +39,10 @@ export const LIMITS = {
   // Sellers adding / editing plots from the dashboard.
   listingCreatePerSeller: { limit: 20, windowSeconds: 86_400 },
   listingUpdatePerSeller: { limit: 60, windowSeconds: 3600 },
+  // "Tell us what you need": a buyer sends one or two; the caps stop anyone faking demand in bulk.
+  buyerRequestPerIp: { limit: 5, windowSeconds: 3600 },
+  buyerRequestPerPhone: { limit: 5, windowSeconds: 86_400 },
+  buyerRequestGlobal: { limit: 300, windowSeconds: 3600 },
   // Buyer reports (listing / seller profile). Real people report a few things a day at most.
   reportPerIp: { limit: 10, windowSeconds: 3600 },
   reportPerReporter: { limit: 10, windowSeconds: 86_400 },

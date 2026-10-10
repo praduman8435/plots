@@ -10,7 +10,9 @@ import { slugify } from "@/lib/slug";
 import { resolveCity } from "@/server/cities";
 import { toSqft } from "@/lib/units";
 import type { ListingInput } from "@/lib/validation/listing";
+import { log } from "@/lib/log";
 import { trackEvent } from "@/server/analytics";
+import { claimFoundingSpot } from "@/server/founding";
 import { notifySeller, sendAvailabilityCheck } from "@/server/whatsapp/notify";
 import type { StoredImage } from "@/server/storage";
 
@@ -99,7 +101,10 @@ export async function createListing(params: {
     }),
   );
 
-  if (params.publishNow) await db.city.updateMany({ where: { id: city.id, isLive: false }, data: { isLive: true } });
+  if (params.publishNow) {
+    await db.city.updateMany({ where: { id: city.id, isLive: false }, data: { isLive: true } });
+    await giveFoundingSpot(params.sellerId);
+  }
   await trackEvent("listing_submitted", { sellerId: params.sellerId, propertyId: property.id, props: { source: params.source } });
   if (params.notify !== false) {
     await notifySeller(property.id, params.publishNow ? "LISTING_LIVE" : "LISTING_RECEIVED");
@@ -251,6 +256,7 @@ async function applyStatusChange(propertyId: string, action: StatusAction, opts:
       await db.city.updateMany({ where: { id: p.cityId, isLive: false }, data: { isLive: true } });
       // Approval also confirms the seller's phone (we've spoken to them / WhatsApp proved it).
       await db.seller.updateMany({ where: { id: p.sellerId, phoneVerifiedAt: null }, data: { phoneVerifiedAt: now } });
+      await giveFoundingSpot(p.sellerId);
       await trackEvent("listing_approved", ev);
       await notify("LISTING_LIVE");
       return "applied";
@@ -393,4 +399,13 @@ export async function runAvailabilityChecks(now = new Date()) {
   for (const p of expired) await changeListingStatus(p.id, { type: "HIDE_UNCONFIRMED" }, { via: "cron" });
 
   return { checksSent: sent, undelivered, hiddenNoReply: expired.length };
+}
+
+/** A listing just went live: its seller may earn a Founding Seller spot. Never blocks the approval. */
+async function giveFoundingSpot(sellerId: string) {
+  try {
+    await claimFoundingSpot(sellerId);
+  } catch (err) {
+    log("error", "founding.claim_failed", { sellerId, err });
+  }
 }

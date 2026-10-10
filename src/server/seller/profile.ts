@@ -27,7 +27,7 @@ export async function getPublicSellerProfile(slugInput: string, pageInput = 1) {
 
   const seller = await db.seller.findUnique({
     where: { profileSlug: slug },
-    select: { id: true, name: true, sellerType: true, phoneVerifiedAt: true, identityStatus: true, createdAt: true, isBlocked: true, profileSlug: true },
+    select: { id: true, name: true, sellerType: true, phoneVerifiedAt: true, identityStatus: true, createdAt: true, isBlocked: true, profileSlug: true, foundingNumber: true },
   });
   if (!seller || seller.isBlocked || !seller.profileSlug) return null;
 
@@ -57,6 +57,7 @@ export async function getPublicSellerProfile(slugInput: string, pageInput = 1) {
     sellerType: seller.sellerType,
     phoneVerified: Boolean(seller.phoneVerifiedAt),
     identityVerified: seller.identityStatus === "VERIFIED",
+    foundingNumber: seller.foundingNumber,
     memberSince: seller.createdAt,
     total,
     page,

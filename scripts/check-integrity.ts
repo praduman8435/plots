@@ -207,7 +207,69 @@ async function main() {
   }
 }
 
+/** Founding Seller spots: a race of approvals can never share a number or go past the cap. */
+async function founding() {
+  const { FOUNDING_SPOTS, claimFoundingSpot, getFoundingSpots } = await import("../src/server/founding");
+  const stamp = Date.now().toString(36);
+  const before = await getFoundingSpots();
+  const extra = 20;
+  const ids: string[] = [];
+  try {
+    for (let i = 0; i < before.left + extra; i++) {
+      const s = await db.seller.create({
+        data: { code: `SLR-F${stamp}${i}`.slice(0, 20), name: `Founding Test ${i}`, phone: `+9195${String(Date.now() % 1e6).padStart(6, "0")}${String(i).padStart(2, "0")}` },
+        select: { id: true },
+      });
+      ids.push(s.id);
+    }
+    const results = await Promise.all(ids.map((id) => claimFoundingSpot(id)));
+    const given = results.filter((n): n is number => n !== null);
+    check("founding: race hands out exactly the spots left", given.length === before.left, { left: before.left, given: given.length });
+    check("founding: numbers are unique", new Set(given).size === given.length);
+    check("founding: never past the cap", given.every((n) => n >= 1 && n <= FOUNDING_SPOTS));
+    const winner = ids[results.findIndex((n) => n !== null)];
+    if (winner) check("founding: claiming again keeps the same number", (await claimFoundingSpot(winner)) === results[ids.indexOf(winner)]);
+    check("founding: counter shows none left", (await getFoundingSpots()).left === 0);
+    const flagged = await db.seller.count({ where: { id: { in: ids }, isFounding: true } });
+    check("founding: badge flag matches the number", flagged === given.length);
+  } finally {
+    await db.seller.deleteMany({ where: { id: { in: ids } } });
+  }
+}
+
+/** Buyer requests: asking again updates one row, and demand counts people, not taps. */
+async function buyerRequests() {
+  const { getBuyerDemand, saveBuyerRequest } = await import("../src/server/buyer-requests");
+  const phones = ["+919400000001", "+919400000002", "+919400000003"];
+  const city = await db.city.findFirstOrThrow({ select: { name: true } });
+  const spaced = ` ${city.name.toLowerCase()}  `;
+  try {
+    const before = await getBuyerDemand();
+    await saveBuyerRequest({ name: "Asha", phone: phones[0], place: city.name });
+    await saveBuyerRequest({ name: "Asha", phone: phones[0], place: spaced, landType: "AGRICULTURAL", budgetMax: 2_500_000 });
+    const rows = await db.buyerRequest.findMany({ where: { phone: phones[0] } });
+    check("buyer requests: same number + place is one request", rows.length === 1 && rows[0].landType === "AGRICULTURAL" && rows[0].budgetMax === BigInt(2_500_000), rows);
+    await saveBuyerRequest({ name: "Ravi", phone: phones[1], place: city.name });
+    await saveBuyerRequest({ name: "Mona", phone: phones[2], place: city.name });
+    await saveBuyerRequest({ name: "Spam", phone: "+919400000004", place: "Call 9876543210 now" });
+    const after = await getBuyerDemand();
+    check("buyer requests: demand counts distinct buyers", after.buyers - before.buyers === 4, { before: before.buyers, after: after.buyers });
+    const shown = after.places.find((p) => p.name === city.name)?.buyers ?? 0;
+    const shownBefore = before.places.find((p) => p.name === city.name)?.buyers ?? 0;
+    check("buyer requests: our city grouped however it was typed", shown - shownBefore === 3, after.places);
+    check("buyer requests: free-text places never shown publicly", after.places.every((p) => !/call|\d/i.test(p.name)), after.places);
+    await db.buyerRequest.updateMany({ where: { phone: phones[2] }, data: { status: "CLOSED" } });
+    check("buyer requests: closed ones stop counting", (await getBuyerDemand()).buyers - before.buyers === 3);
+    await saveBuyerRequest({ name: "Mona", phone: phones[2], place: city.name });
+    check("buyer requests: asking again re-opens", (await db.buyerRequest.findFirst({ where: { phone: phones[2] } }))?.status === "OPEN");
+  } finally {
+    await db.buyerRequest.deleteMany({ where: { phone: { in: [...phones, "+919400000004"] } } });
+  }
+}
+
 main()
+  .then(founding)
+  .then(buyerRequests)
   .catch((e) => {
     failed++;
     console.error(e);

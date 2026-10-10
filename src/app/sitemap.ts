@@ -18,6 +18,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: site.url, lastModified: now, changeFrequency: "daily", priority: 1 },
     { url: `${site.url}/sell`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${site.url}/cities`, changeFrequency: "daily", priority: 0.7 },
+    ...["/privacy-policy", "/terms", "/data-deletion"].map((path) => ({ url: `${site.url}${path}`, changeFrequency: "yearly" as const, priority: 0.2 })),
     ...cities.flatMap((c) => [
       { url: `${site.url}/${c.slug}`, lastModified: now, changeFrequency: "daily" as const, priority: 0.9 },
       // Only city + land-type pages that actually have land (no empty pages for Google).

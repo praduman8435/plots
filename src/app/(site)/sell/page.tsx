@@ -2,6 +2,7 @@ import { ArrowRight, BadgeCheck, Camera, Check, ClipboardList, Fingerprint, IdCa
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { DemandCard, FoundingCard } from "@/components/site/launch";
 import { PhoneChat } from "@/components/site/phone-chat";
 import { SectionHeading } from "@/components/site/sections";
 import { ButtonA, ButtonLink } from "@/components/ui/button";
@@ -9,6 +10,8 @@ import { WhatsAppIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { site } from "@/lib/site";
 import { sellOnWhatsAppProps } from "@/lib/whatsapp-links";
+import { DEMAND_MIN_TO_SHOW, getBuyerDemand } from "@/server/buyer-requests";
+import { getFoundingSpots } from "@/server/founding";
 
 export const metadata: Metadata = {
   title: "Sell your land — list free in a few minutes",
@@ -28,10 +31,14 @@ const WEB_STEPS = [
   { icon: Camera, title: "Photos & submit", text: "Add a few clear photos. Our team checks it, then it goes live." },
 ];
 
-export default function SellPage() {
-  // Same page for everyone, so it is served from the CDN: /sell/start sends a signed-in seller
-  // straight to "add a property".
+// Same page for everyone, so it is served from the CDN; the founding spots and buyer demand
+// on it refresh every few minutes. /sell/start sends a signed-in seller straight to "add a property".
+export const revalidate = 300;
+
+export default async function SellPage() {
   const web = { href: "/sell/start", label: "Start selling" };
+  const [spots, demand] = await Promise.all([getFoundingSpots(), getBuyerDemand()]);
+  const showDemand = demand.buyers >= DEMAND_MIN_TO_SHOW;
 
   return (
     <>
@@ -41,7 +48,8 @@ export default function SellPage() {
         <div className="absolute inset-0 -z-10 bg-linear-to-b from-brand-950/80 to-brand-950/90" />
         <div className="container-page py-12 sm:py-16 lg:py-24">
           <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/20">
-            <BadgeCheck className="size-3.5 text-brand-200" aria-hidden /> For sellers · Free while we launch
+            <BadgeCheck className="size-3.5 text-brand-200" aria-hidden />{" "}
+            {spots.left > 0 ? `Founding sellers · ${spots.left} of ${spots.total} spots left` : "For sellers · Free while we launch"}
           </p>
           <h1 className="mt-4 max-w-3xl text-[2rem] leading-[1.1] font-extrabold tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">Your land. Your price. The right buyer.</h1>
           <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/80 sm:mt-4 sm:text-lg">
@@ -75,6 +83,16 @@ export default function SellPage() {
           </p>
         </div>
       </section>
+
+      {/* ── Founding spots and real buyer demand */}
+      {(spots.left > 0 || showDemand) && (
+        <section className="container-page pt-12 sm:pt-20">
+          <div className={cn("grid gap-4 sm:gap-5", spots.left > 0 && showDemand && "lg:grid-cols-2")}>
+            {spots.left > 0 && <FoundingCard spots={spots} compact href={web.href} />}
+            <DemandCard demand={demand} />
+          </div>
+        </section>
+      )}
 
       {/* ── Two ways */}
       <section className="container-page py-12 sm:py-20">

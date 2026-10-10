@@ -6,12 +6,12 @@ import { FilterFields } from "@/components/search/filter-fields";
 import { FilterSheet } from "@/components/search/filter-sheet";
 import { SearchTracker } from "@/components/search/search-tracker";
 import { SortSelect } from "@/components/search/sort-select";
-import { Button, ButtonA } from "@/components/ui/button";
-import { WhatsAppIcon } from "@/components/ui/icons";
+import { BuyerRequestButton } from "@/components/site/buyer-request";
+import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/format";
 import { LAND_TYPES } from "@/lib/land";
 import { AREA_UNITS } from "@/lib/units";
-import { supportWhatsAppLink } from "@/lib/whatsapp-links";
+import { getPlaceSuggestions } from "@/server/buyer-requests";
 import { getLiveCities, parseSearchParams, searchListings, type SearchFilters } from "@/server/listings/queries";
 
 export async function generateMetadata(props: PageProps<"/search">): Promise<Metadata> {
@@ -47,6 +47,8 @@ function hrefWith(f: SearchFilters, patch: Partial<Record<keyof SearchFilters | 
 export default async function SearchPage(props: PageProps<"/search">) {
   const f = parseSearchParams(await props.searchParams);
   const [{ total, items, city, pages }, cities] = await Promise.all([searchListings(f), getLiveCities()]);
+  // Suggestions for "Tell us what you need", shown only when nothing matched.
+  const places = total === 0 ? await getPlaceSuggestions() : [];
 
   const unit = AREA_UNITS[f.areaUnit].short;
   const pills: { label: string; href: string }[] = [];
@@ -222,17 +224,18 @@ export default async function SearchPage(props: PageProps<"/search">) {
               </ul>
               <div className="mx-auto mt-8 max-w-sm rounded-2xl bg-white p-5 ring-1 ring-line">
                 <p className="font-semibold">Can&apos;t find what you&apos;re looking for?</p>
-                <p className="mt-1 text-sm text-muted">Tell us what land you need. We&apos;ll message you when something matching is listed.</p>
-                <ButtonA
+                <p className="mt-1 text-sm text-muted">Tell us what land you need. We&apos;ll WhatsApp you when something matching is listed.</p>
+                <BuyerRequestButton
                   className="mt-4 w-full"
-                  href={supportWhatsAppLink(
-                    `Hi, I'm looking for ${f.type ? LAND_TYPES[f.type].label.toLowerCase() : "land"}${f.q ? ` near ${f.q}` : ""} in ${place}${f.maxPrice ? `, budget up to ${formatPrice(f.maxPrice)}` : ""}. Please tell me when something is listed.`,
-                  )}
-                  target="_blank"
-                  rel="noopener"
-                >
-                  <WhatsAppIcon /> Tell us what you need
-                </ButtonA>
+                  places={places}
+                  // The search they just made, so the form is already filled in.
+                  defaults={{
+                    place: city?.name ?? f.q,
+                    area: city ? f.q : undefined,
+                    landType: f.type,
+                    budgetMax: f.maxPrice ? String(f.maxPrice) : undefined,
+                  }}
+                />
               </div>
             </div>
           )}

@@ -4,9 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { HeroSearch } from "@/components/site/hero-search";
 import { IntentLink } from "@/components/ui/intent-link";
+import { LaunchSection } from "@/components/site/launch";
 import { HowItWorksBoth, LandTypeTiles, ListingRail, SectionHeading, WhyUs } from "@/components/site/sections";
 import { ButtonLink } from "@/components/ui/button";
 import { defaultShareImage, ogBase, site } from "@/lib/site";
+import { getBuyerDemand, getPlaceSuggestions } from "@/server/buyer-requests";
+import { getFoundingSpots } from "@/server/founding";
 import { getCitiesWithCounts, getLatestListings, getMarketStats } from "@/server/listings/queries";
 
 export const revalidate = 60;
@@ -48,8 +51,16 @@ function cityCover(slug: string) {
 }
 
 export default async function HomePage() {
-  const [cities, latest, stats] = await Promise.all([getCitiesWithCounts(8), getLatestListings(8), getMarketStats()]);
+  const [cities, latest, stats, spots, demand, places] = await Promise.all([
+    getCitiesWithCounts(8),
+    getLatestListings(8),
+    getMarketStats(),
+    getFoundingSpots(),
+    getBuyerDemand(),
+    getPlaceSuggestions(),
+  ]);
   const totalLive = stats.live;
+  const launch = <LaunchSection spots={spots} demand={demand} places={places} />;
 
   return (
     <>
@@ -98,10 +109,10 @@ export default async function HomePage() {
       </section>
       )}
 
-      {/* ───── Latest land (or, before the first listing, an invitation to sellers) ───── */}
-      <section className="container-page py-12 sm:py-20">
-        {latest.length > 0 ? (
-          <>
+      {/* ───── Latest land, then the launch invitations (before the first listing: invitations only) ───── */}
+      {latest.length > 0 ? (
+        <>
+          <section className="container-page py-12 sm:py-20">
             <SectionHeading
               title="Latest land"
               action={
@@ -114,22 +125,12 @@ export default async function HomePage() {
             <ButtonLink href="/search" variant="secondary" size="lg" className="mt-6 w-full sm:hidden">
               View all {totalLive} plots <ArrowRight />
             </ButtonLink>
-          </>
-        ) : (
-          <div className="rounded-[2rem] border border-brand-100 bg-brand-50 p-7 sm:flex sm:items-center sm:justify-between sm:gap-8 sm:p-10">
-            <div className="max-w-xl">
-              <p className="text-sm font-bold tracking-wide text-brand-700">JUST OPENED</p>
-              <h2 className="mt-1.5 text-2xl font-extrabold text-ink sm:text-3xl">Fresh land is on its way.</h2>
-              <p className="mt-2 text-muted">
-                Sellers are adding their land now. Have land to sell? List it free, and be one of the first that buyers see.
-              </p>
-            </div>
-            <ButtonLink href="/sell" size="lg" className="mt-5 w-full shrink-0 sm:mt-0 sm:w-auto">
-              List your land free <ArrowRight />
-            </ButtonLink>
-          </div>
-        )}
-      </section>
+          </section>
+          <div className="pb-12 sm:pb-20">{launch}</div>
+        </>
+      ) : (
+        <div className="py-12 sm:py-20">{launch}</div>
+      )}
 
       {/* ───── Browse by type ───── */}
       <section className="bg-mist py-12 sm:py-20">

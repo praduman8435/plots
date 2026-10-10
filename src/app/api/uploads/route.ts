@@ -1,5 +1,6 @@
 import { getAdminSession } from "@/lib/admin/session";
 import { log } from "@/lib/log";
+import { isSameOrigin } from "@/lib/same-origin";
 import { hitRateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { getSellerSession } from "@/lib/seller/session";
 import { MAX_UPLOAD_BYTES, UnsupportedImageError, isAllowedImageType, saveImage } from "@/server/storage";
@@ -52,18 +53,5 @@ export async function POST(request: Request) {
     if (err instanceof UnsupportedImageError) return Response.json({ error: err.message }, { status: 415 });
     log("error", "upload.failed", { by: admin ? "admin" : "seller", err });
     return Response.json({ error: "Couldn't read this photo. Try another one." }, { status: 400 });
-  }
-}
-
-function isSameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return true; // non-browser clients; the session cookie is still required
-  try {
-    const host = new URL(origin).host;
-    const allowed = [request.headers.get("x-forwarded-host"), request.headers.get("host"), new URL(request.url).host];
-    if (process.env.NEXT_PUBLIC_SITE_URL) allowed.push(new URL(process.env.NEXT_PUBLIC_SITE_URL).host);
-    return allowed.includes(host);
-  } catch {
-    return false;
   }
 }

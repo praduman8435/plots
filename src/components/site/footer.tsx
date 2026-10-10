@@ -77,8 +77,19 @@ export async function SiteFooter() {
         </div>
       </div>
       <div className="border-t border-white/10">
-        <div className="container-page flex flex-col gap-1 py-5 text-xs text-white/45 sm:flex-row sm:justify-between md:pb-5">
+        <div className="container-page flex flex-col gap-3 py-5 text-xs text-white/45 sm:flex-row sm:items-center sm:justify-between md:pb-5">
           <p>© {new Date().getFullYear()} {site.name}. Made for India&apos;s land buyers.</p>
+          <nav aria-label="Legal" className="flex flex-wrap gap-x-5 gap-y-2">
+            <IntentLink href="/privacy-policy" className="hover:text-white">
+              Privacy Policy
+            </IntentLink>
+            <IntentLink href="/terms" className="hover:text-white">
+              Terms of Service
+            </IntentLink>
+            <IntentLink href="/data-deletion" className="hover:text-white">
+              Data deletion
+            </IntentLink>
+          </nav>
         </div>
       </div>
     </footer>

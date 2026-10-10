@@ -216,6 +216,36 @@ async function main() {
     check("enquiries: 20 per IP allowed, 21st → 429 (X-Forwarded-For ignored)", statuses.slice(0, 20).every((s) => s === 200) && statuses[20] === 429, statuses);
     const limited = await enquire("10.9.9.9");
     check("429 carries Retry-After", limited.status === 429 && Number(limited.headers.get("retry-after")) > 0);
+
+    // ── Buyer requests ("Tell us what you need") ──
+    const brIp = `198.51.101.${Math.floor(Math.random() * 200) + 1}`;
+    const brPhone = `97${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
+    // Bad input still counts against the IP (limits run before parsing), so probes use their own IPs.
+    const askFor = (body: unknown, headers: Record<string, string> = {}, ip = brIp) =>
+      fetch(`${BASE}/api/buyer-requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-test-client-ip": ip, ...headers },
+        body: JSON.stringify(body),
+      });
+    const wanted = { name: "Asha Devi", phone: brPhone, place: "Mohali", area: "Sector 82", landType: "RESIDENTIAL_PLOT", budgetMax: 5_000_000 };
+    check("buyer request: from another site → 403", (await askFor(wanted, { Origin: "https://evil.example" })).status === 403);
+    for (const [label, body] of [
+      ["link in name", { ...wanted, name: "Call http://evil.example" }],
+      ["digits in name", { ...wanted, name: "Asha 9876543210" }],
+      ["script in place", { ...wanted, place: "<script>alert(1)</script>" }],
+      ["unknown land type", { ...wanted, landType: "CASTLE" }],
+      ["negative budget", { ...wanted, budgetMax: -5 }],
+      ["budget as text", { ...wanted, budgetMax: "1e99" }],
+      ["bad phone", { ...wanted, phone: "12345" }],
+    ] as const) {
+      check(`buyer request: ${label} → 400`, (await askFor(body, {}, `198.51.102.${Math.floor(Math.random() * 250) + 1}`)).status === 400);
+    }
+    check("buyer request: valid → 200", (await askFor(wanted)).status === 200);
+    check("buyer request: asking again keeps one row", (await db.buyerRequest.count({ where: { phone: `+91${brPhone}` } })) === 1);
+    const brStatuses: number[] = [];
+    for (let i = 0; i < 6; i++) brStatuses.push((await askFor({ ...wanted, place: `Place ${i}` })).status);
+    check("buyer request: per-IP limit → 429", brStatuses.includes(429), brStatuses);
+    check("buyer request: buyer's number never in /sell", !(await get("/sell")).text.includes(brPhone));
     check("events: bad payload → 400", (await fetch(`${BASE}/api/events`, { method: "POST", body: "{nope" })).status === 400);
     check("cron without secret → 401", (await get("/api/cron/availability")).status === 401);
 
@@ -317,6 +347,7 @@ async function main() {
     await db.auditLog.deleteMany({ where: { OR: [{ adminUserId: { in: [admin.id, mfaAdmin.id] } }, { sellerId: { in: sellers } }] } });
     await db.report.deleteMany({ where: { OR: [{ sellerId: { in: sellers } }, { reporterSellerId: { in: sellers } }] } });
     await db.enquiry.deleteMany({ where: { propertyId: { in: [plotA.id, plotB.id] } } });
+    await db.buyerRequest.deleteMany({ where: { name: "Asha Devi" } });
     await db.property.deleteMany({ where: { slug: { startsWith: `check-http-${stamp}-` } } });
     await db.seller.deleteMany({ where: { id: { in: sellers } } });
     await db.adminUser.deleteMany({ where: { id: { in: [admin.id, mfaAdmin.id] } } });

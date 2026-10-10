@@ -2,6 +2,7 @@
 
 import {
   ArrowUpRight,
+  BellRing,
   CalendarCheck,
   ChartColumn,
   ClipboardCheck,
@@ -27,12 +28,12 @@ import { cn } from "@/lib/cn";
 import { adminLogout } from "@/server/actions/admin/auth";
 import { Toaster } from "./toast";
 
-type NavKey = "overview" | "review" | "listings" | "sellers" | "reports" | "enquiries" | "whatsapp" | "availability" | "insights";
+type NavKey = "overview" | "review" | "listings" | "sellers" | "reports" | "enquiries" | "buyers" | "whatsapp" | "availability" | "insights";
 type NavItem = { key: NavKey; href: string; label: string; short: string; icon: LucideIcon; count?: number; tone?: "amber" | "brand" };
 
 export type AdminShellProps = {
   admin: { name: string; email: string };
-  counts: { pending: number; unreadChats: number; needsAttention: number; openReports: number };
+  counts: { pending: number; unreadChats: number; needsAttention: number; openReports: number; openBuyerRequests: number };
   children: ReactNode;
 };
 
@@ -43,7 +44,7 @@ function useActiveKey(): NavKey | null {
   if (pathname.startsWith("/admin/listings")) {
     return pathname === "/admin/listings" && searchParams.get("status") === "PENDING" ? "review" : "listings";
   }
-  for (const key of ["sellers", "reports", "enquiries", "whatsapp", "availability", "insights"] as const) {
+  for (const key of ["sellers", "reports", "enquiries", "buyers", "whatsapp", "availability", "insights"] as const) {
     if (pathname.startsWith(`/admin/${key}`)) return key;
   }
   return null;
@@ -78,6 +79,7 @@ export function AdminShell({ admin, counts, children }: AdminShellProps) {
     { key: "sellers", href: "/admin/sellers", label: "Sellers", short: "Sellers", icon: Users },
     { key: "reports", href: "/admin/reports", label: "Reports", short: "Reports", icon: Flag, count: counts.openReports, tone: "amber" },
     { key: "enquiries", href: "/admin/enquiries", label: "Enquiries", short: "Enquiries", icon: PhoneIncoming },
+    { key: "buyers", href: "/admin/buyers", label: "Buyer requests", short: "Buyers", icon: BellRing, count: counts.openBuyerRequests },
     { key: "whatsapp", href: "/admin/whatsapp", label: "WhatsApp", short: "Chats", icon: MessageCircle, count: counts.unreadChats },
     { key: "availability", href: "/admin/availability", label: "Availability", short: "Availability", icon: CalendarCheck, count: counts.needsAttention, tone: "amber" },
     { key: "insights", href: "/admin/insights", label: "Insights", short: "Insights", icon: ChartColumn },

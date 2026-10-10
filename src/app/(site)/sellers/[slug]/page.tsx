@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContactActions } from "@/components/listing/contact-actions";
+import { FoundingBadge } from "@/components/listing/founding-badge";
 import { PropertyCard } from "@/components/listing/property-card";
 import { ReportSheet } from "@/components/report/report-sheet";
 import { ShareProfile } from "@/components/seller/share-profile";
@@ -91,8 +92,9 @@ export default async function SellerProfilePage(props: PageProps<"/sellers/[slug
                     {places.length > 0 && <> · Land in {places.join(", ")}</>}
                   </span>
                 </p>
-                {(profile.phoneVerified || profile.identityVerified) && (
+                {(profile.phoneVerified || profile.identityVerified || profile.foundingNumber) && (
                   <ul className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                    {profile.foundingNumber && <FoundingBadge number={profile.foundingNumber} />}
                     {profile.phoneVerified && (
                       <li className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-brand-800 ring-1 ring-brand-100">
                         <BadgeCheck className="size-3.5" aria-hidden /> Phone verified
