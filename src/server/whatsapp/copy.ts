@@ -398,6 +398,11 @@ function catalog(lang: Lang) {
     btnStop: en ? "Yes, stop" : "हाँ, रोकें",
     btnKeepGoing: en ? "Continue" : "जारी रखें",
     browseLand: (v: Vars) => (en ? `👉 See land for sale here: ${v.url}` : `👉 बिकाऊ ज़मीन यहाँ देखें: ${v.url}`),
+    otherState: en ? "Other state" : "दूसरा राज्य",
+    otherStateHint: en ? "See all states and UTs" : "सभी राज्य देखें",
+    chooseRegion: en ? "Choose region" : "हिस्सा चुनें",
+    chooseRegionPrompt: en ? "Which part of India is the land in? 👇" : "ज़मीन भारत के किस हिस्से में है? 👇",
+    chooseStateInRegion: (v: Vars) => (en ? `Choose the state in ${v.region} 👇 (or type its name)` : `${v.region} में राज्य चुनें 👇 (या नाम लिख दें)`),
     menuNudge: (v: Vars) =>
       en
         ? `I'm here 🙂 Tap *${v.list}* to start, or just type your question.`

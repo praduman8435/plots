@@ -274,7 +274,24 @@ async function main() {
     sent.length = 0;
     r = await text(ai2, "hmm not sure");
     check("AI off → no provider call, fixed reply", sent.length === 0 && /didn't get the price/i.test(r.body));
-    const fresh = newPhone();
+    // ── States: every state and UT can be picked by tapping (WhatsApp lists hold 10 rows).
+  const st = newPhone();
+  await tap(st, "lang:en");
+  await text(st, "SELL");
+  await text(st, "Kavya Nair");
+  r = await tap(st, "type:AGRICULTURAL");
+  check("States: list is never empty, 9 states + Other", (await step(st)) === "ASK_STATE" && r.ids.length === 10 && r.ids.includes("state:Uttar Pradesh") && r.ids.at(-1) === "state:more", r.ids);
+  r = await tap(st, "state:more");
+  check("States: Other → five regions", r.ids.length === 5 && r.ids.includes("region:south") && (await step(st)) === "ASK_STATE", r.ids);
+  r = await tap(st, "region:south");
+  check("States: a region lists its states", r.ids.includes("state:Kerala") && r.ids.includes("state:Tamil Nadu") && r.titles.every((x) => x.length <= 24), r);
+  r = await tap(st, "state:Kerala");
+  check("States: tapping one moves on to the city", (await step(st)) === "ASK_CITY" && (await db.whatsAppConversation.findUnique({ where: { phone: st } }))?.draft !== null, r.body.slice(0, 120));
+  const { INDIAN_STATES, STATE_REGIONS } = await import("../src/lib/india");
+  const reachable = new Set(STATE_REGIONS.flatMap((x) => x.states));
+  check("States: all 36 states and UTs are in a region, none twice", reachable.size === INDIAN_STATES.length && STATE_REGIONS.every((x) => x.states.length <= 10) && STATE_REGIONS.reduce((n, x) => n + x.states.length, 0) === INDIAN_STATES.length);
+
+  const fresh = newPhone();
   r = await text(fresh, "Hi");
   check("New chat: first message picks a language", r.ids.includes("lang:en"), r.ids);
   r = await text(fresh, "Kon ho tum");

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma, type Seller, type WhatsAppConversation } from "@/generated/prisma/client";
 import { AreaUnit, LandType, type ListingStatus, type HiddenReason, type SellerType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { matchState, splitCityAndState } from "@/lib/india";
+import { COMMON_STATES, STATE_REGIONS, matchState, shortStateName, splitCityAndState } from "@/lib/india";
 import { LAND_TYPES, LAND_TYPE_SLUGS, buildTitle, placeName } from "@/lib/land";
 import { maskPhoneForLogging } from "@/lib/phone";
 import { site } from "@/lib/site";
@@ -1013,8 +1013,18 @@ async function promptFor(t: Turn, step: BotStep, lead?: string, ask?: string): P
         rows: LAND_TYPE_ORDER.map((lt) => ({ id: `type:${lt}`, title: landLabel(t.lang, lt), description: landHint(t.lang, lt) })),
       };
     case "ASK_STATE": {
-      const states = await popularStates();
-      return { type: "list", body: `${pre}${q(c.askState)}`, buttonLabel: c.chooseState, rows: states.map((st) => ({ id: `state:${st}`, title: st })) };
+      // States with listings first, topped up with the common ones, then "Other state" for the rest.
+      const popular = (await popularStates()).map((st) => matchState(st)).filter((st): st is (typeof COMMON_STATES)[number] => Boolean(st));
+      const states = [...new Set([...popular, ...COMMON_STATES])].slice(0, 9);
+      return {
+        type: "list",
+        body: `${pre}${q(c.askState)}`,
+        buttonLabel: c.chooseState,
+        rows: [
+          ...states.map((st) => ({ id: `state:${st}`, title: shortStateName(st) })),
+          { id: "state:more", title: c.otherState, description: c.otherStateHint },
+        ],
+      };
     }
     case "ASK_CITY": {
       const cities = d.cityState ? await citiesInState(d.cityState) : [];
@@ -1411,6 +1421,24 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
     }
 
     case "ASK_STATE": {
+      // "Other state" → the regions; a region → its states (all 36 states and UTs reachable by tapping).
+      if (replyId === "state:more") {
+        return t.reply({
+          type: "list",
+          body: c.chooseRegionPrompt,
+          buttonLabel: c.chooseRegion,
+          rows: STATE_REGIONS.map((r) => ({ id: `region:${r.key}`, title: t.lang === "hi" ? r.hi : r.en, description: r.states.slice(0, 3).map(shortStateName).join(", ").slice(0, 72) })),
+        });
+      }
+      const region = replyId?.startsWith("region:") ? STATE_REGIONS.find((r) => r.key === replyId.slice(7)) : undefined;
+      if (region) {
+        return t.reply({
+          type: "list",
+          body: c.chooseStateInRegion({ region: t.lang === "hi" ? region.hi : region.en }),
+          buttonLabel: c.chooseState,
+          rows: region.states.map((st) => ({ id: `state:${st}`, title: shortStateName(st) })),
+        });
+      }
       const fromId = replyId?.startsWith("state:") ? replyId.slice(6) : null;
       const state = matchState(fromId ?? text ?? "");
       if (!state) return (await aiAssist(t, text)) || reprompt(t, c.unknownState);
