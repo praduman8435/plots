@@ -18,5 +18,5 @@ export function getWhatsAppTransportConfig(): WhatsAppTransportConfig {
   if (!apiToken || !phoneNumberId) {
     throw new Error("WhatsApp is not configured — set WHATSAPP_API_TOKEN and WHATSAPP_PHONE_NUMBER_ID.");
   }
-  return { apiToken, phoneNumberId, apiVersion: process.env.WHATSAPP_API_VERSION || "v21.0" };
+  return { apiToken, phoneNumberId, apiVersion: process.env.WHATSAPP_API_VERSION || "v26.0" };
 }
