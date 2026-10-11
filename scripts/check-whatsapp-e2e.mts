@@ -70,7 +70,7 @@ try {
   check("cron sends the availability check", c.checksSent >= 1 && Boolean(p.availabilityCheckSentAt), c);
   const last = await db.whatsAppMessage.findFirst({ where: { conversationId: (await conv())!.id, direction: "OUTBOUND" }, orderBy: { createdAt: "desc" } });
   check("seller got the still-available question with buttons", /available/i.test(last?.body ?? ""), last?.body?.slice(0, 200));
-  r = await tap("avail:yes", "Yes, available");
+  r = await tap(`avail:yes:${plot!.id}`, "Yes, available"); // template button payload
   p = await db.property.findUniqueOrThrow({ where: { id: plot!.id } });
   check("'Yes' confirms: stays live, timer cleared, confirmed now", p.status === "ACTIVE" && !p.availabilityCheckSentAt && Date.now() - (p.lastConfirmedAt?.getTime() ?? 0) < 60_000, { status: p.status, sent: p.availabilityCheckSentAt });
 
@@ -88,8 +88,7 @@ try {
   // ── "No, sold"
   await db.property.update({ where: { id: plot!.id }, data: { lastConfirmedAt: old, publishedAt: old, lastAvailabilityCheckAt: null, availabilityCheckSentAt: null } });
   await cron();
-  r = await tap("avail:no", "No, sold");
-  if (/as sold\?/.test(r)) r = await tap(`sold:yes:${plot!.id}`, "Yes, sold");
+  r = await tap(`avail:no:${plot!.id}`, "No, sold"); // template button payload: sold straight away
   p = await db.property.findUniqueOrThrow({ where: { id: plot!.id } });
   check("'No, sold' marks it sold", p.status === "SOLD", { status: p.status, reply: r.slice(0, 160) });
   r = await text("SOLD");

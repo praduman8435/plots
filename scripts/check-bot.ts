@@ -308,6 +308,19 @@ async function main() {
   const reachable = new Set(STATE_REGIONS.flatMap((x) => x.states));
   check("States: all 36 states and UTs are in a region, none twice", reachable.size === INDIAN_STATES.length && STATE_REGIONS.every((x) => x.states.length <= 10) && STATE_REGIONS.reduce((n, x) => n + x.states.length, 0) === INDIAN_STATES.length);
 
+  // ── Templates: variables in exactly the order the approved templates define.
+  const { TEMPLATE_PARAMS, buildAvailabilityCheckMessage } = await import("../src/server/whatsapp/notify");
+  const plotT = { id: "p1", title: "2 acres Agricultural land in Dakha", locality: "Near Pakhowal Road", village: "Dakha", price: 4500000, area: 2, areaUnit: "ACRE" as const, landType: "AGRICULTURAL" as const, city: { name: "Ludhiana" } };
+  check("template registration_complete: name, Seller ID", JSON.stringify(TEMPLATE_PARAMS.registrationComplete({ name: "Meera Sharma", code: "SLR-ABC123" })) === JSON.stringify(["Meera", "SLR-ABC123"]));
+  const live = TEMPLATE_PARAMS.listingLive({ sellerName: "Meera Sharma", landType: "AGRICULTURAL", where: "Dakha, Ludhiana", area: 2, areaUnit: "ACRE", url: "https://instaplots.com/property/x", sellerCode: "SLR-ABC123" });
+  check("template listing_live: name, type, location, size, URL, Seller ID", live.length === 6 && live[0] === "Meera" && live[1] === "Agricultural land" && live[2] === "Dakha, Ludhiana" && /2 acres?/i.test(live[3]) && live[4].startsWith("https://") && live[5] === "SLR-ABC123", live);
+  const enq = TEMPLATE_PARAMS.enquiryReceived({ sellerName: "Meera Sharma", listing: plotT.title, buyerName: "Rohit Verma", buyerPhone: "+919812345678", code: "P-ABC123" });
+  check("template enquiry_received: name, listing, buyer, phone, listing ID", enq.length === 5 && enq[0] === "Meera" && enq[1] === plotT.title && enq[2] === "Rohit Verma" && enq[3] === "98123 45678" && enq[4] === "P-ABC123", enq);
+  const one = buildAvailabilityCheckMessage([plotT], "en", "Meera Sharma");
+  check("template availability_check: name, listing, location + per-plot buttons", one.templateKey === "AVAILABILITY_CHECK" && one.templateParams.length === 3 && one.templateParams[0] === "Meera" && /2 acres? agricultural land/i.test(one.templateParams[1]) && one.templateParams[2] === "Dakha, Ludhiana" && JSON.stringify(one.templateButtons) === JSON.stringify(["avail:yes:p1", "avail:no:p1"]), one);
+  const many = buildAvailabilityCheckMessage([plotT, { ...plotT, id: "p2", village: "Mullanpur" }], "en", "Meera Sharma");
+  check("template availability_check_multi: name, count, list + two buttons", many.templateKey === "AVAILABILITY_CHECK_MULTI" && many.templateParams.length === 3 && many.templateParams[0] === "Meera" && many.templateParams[1] === "2" && /Dakha, .*Mullanpur/.test(many.templateParams[2]) && JSON.stringify(many.templateButtons) === JSON.stringify(["avail:yes", "avail:no"]), many);
+
   const fresh = newPhone();
   r = await text(fresh, "Hi");
   check("New chat: first message picks a language", r.ids.includes("lang:en"), r.ids);

@@ -34,8 +34,13 @@ export class WhatsAppOtpProvider implements OtpProvider {
   }
 }
 
+/** The approved Authentication template ("{{1}} is your verification code…" + Copy code button). */
+function otpTemplateName(): string | undefined {
+  return process.env.WHATSAPP_TEMPLATE_LOGIN_CODE?.trim() || process.env.WHATSAPP_OTP_TEMPLATE_NAME?.trim() || undefined;
+}
+
 export function isWhatsAppOtpConfigured(): boolean {
-  return isWhatsAppConfigured() && Boolean(process.env.WHATSAPP_OTP_TEMPLATE_NAME);
+  return isWhatsAppConfigured() && Boolean(otpTemplateName());
 }
 
 /**
@@ -48,9 +53,9 @@ export function getOtpProvider(): OtpProvider {
     (process.env.NODE_ENV === "production" && !(isDemoMode() && !isWhatsAppOtpConfigured()));
   if (!wantsWhatsApp) return new ConsoleOtpProvider();
 
-  const templateName = process.env.WHATSAPP_OTP_TEMPLATE_NAME;
+  const templateName = otpTemplateName();
   if (!isWhatsAppConfigured() || !templateName) {
-    throw new Error("WhatsApp OTP is not configured — set WHATSAPP_API_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_OTP_TEMPLATE_NAME.");
+    throw new Error("WhatsApp OTP is not configured — set WHATSAPP_API_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TEMPLATE_LOGIN_CODE.");
   }
-  return new WhatsAppOtpProvider(templateName, process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE || "en");
+  return new WhatsAppOtpProvider(templateName, process.env.WHATSAPP_OTP_TEMPLATE_LANGUAGE || process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en");
 }

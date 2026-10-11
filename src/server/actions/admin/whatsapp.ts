@@ -111,7 +111,7 @@ export async function simulatorAvailabilityCheck(phoneInput: string): Promise<Ch
   await requireAdmin();
   const phone = normalizePhoneNumber(phoneInput);
   if (!phone.valid) return emptyState(phoneInput, "Enter a valid 10-digit Indian mobile number.");
-  const seller = await db.seller.findUnique({ where: { phone: phone.normalized }, select: { id: true } });
+  const seller = await db.seller.findUnique({ where: { phone: phone.normalized }, select: { id: true, name: true } });
   if (!seller) return { ...(await loadState(phone.normalized)), error: "This number isn't a seller yet — list a plot first." };
 
   const now = new Date();
@@ -130,7 +130,7 @@ export async function simulatorAvailabilityCheck(phoneInput: string): Promise<Ch
     orderBy: { createdAt: "asc" },
   });
   const conv = await db.whatsAppConversation.findUnique({ where: { phone: phone.normalized }, select: { language: true } });
-  const { message } = buildAvailabilityCheckMessage(plots, toLang(conv?.language));
+  const { message } = buildAvailabilityCheckMessage(plots, toLang(conv?.language), seller.name);
   const messageId = await recordOutboundOnly(phone.normalized, message, "system");
   return loadState(phone.normalized, [{ messageId, message }]);
 }

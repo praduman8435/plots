@@ -1,9 +1,11 @@
 import "server-only";
+import type { AreaUnit, LandType } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { log } from "@/lib/log";
-import { placeName } from "@/lib/land";
+import { LAND_TYPES, placeName } from "@/lib/land";
 import { formatPhone } from "@/lib/phone";
 import { site } from "@/lib/site";
+import { formatArea } from "@/lib/units";
 import type { OutgoingMessage } from "./client";
 import { copy, price, toLang, type Lang } from "./copy";
 import { getOrCreateConversation, isServiceWindowOpen, sendAndRecord } from "./messaging";
@@ -15,13 +17,53 @@ import { isWhatsAppConfigured } from "./config";
  *
  * Delivery: WhatsApp allows free-form messages only within 24h of the
  * seller's last message. Outside that window we use an approved template
- * named by env WHATSAPP_TEMPLATE_<KEY> (body params listed per message
- * below), in the seller's language (WHATSAPP_TEMPLATE_LANGUAGE for English,
- * WHATSAPP_TEMPLATE_LANGUAGE_HI for Hindi; if the Hindi version isn't
- * approved, the English one is tried). No template → "not delivered", and
- * callers that start timers (availability) know it wasn't received.
+ * named by env WHATSAPP_TEMPLATE_<KEY>, with its {{n}} variables in exactly
+ * the order the approved template defines (see TEMPLATE_PARAMS below), in
+ * WHATSAPP_TEMPLATE_LANGUAGE (default "en"). A Hindi version is tried first
+ * for Hindi chats only when WHATSAPP_TEMPLATE_LANGUAGE_HI is set. No
+ * template → "not delivered", and callers that start timers (availability)
+ * know it wasn't received.
  */
-type Delivery = { message: OutgoingMessage; templateKey: string; templateParams: string[] };
+type Delivery = { message: OutgoingMessage; templateKey: string; templateParams: string[]; templateButtons?: string[] };
+
+const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
+const listingName = (p: { area: number; areaUnit: AreaUnit; landType: LandType }) =>
+  `${formatArea(p.area, p.areaUnit)} ${LAND_TYPES[p.landType].label.toLowerCase()}`;
+
+/**
+ * Body variables of each approved template, {{1}}, {{2}}… in order. Must match
+ * the templates in WhatsApp Manager exactly: Meta rejects a send whose
+ * variable count differs, and a wrong order puts values in the wrong place.
+ */
+export const TEMPLATE_PARAMS = {
+  // "Namaste {{1}}, your InstaPlots seller account has been created successfully. Account reference: {{2}}. …"
+  registrationComplete: (s: { name: string; code: string }) => [firstName(s.name), s.code],
+  // "Hello {{1}}, your listing {{2}} in {{3}} ({{4}}) is now live on InstaPlots. View it here: {{5}}. Your Seller ID is {{6}}. …"
+  listingLive: (p: { sellerName: string; landType: LandType; where: string; area: number; areaUnit: AreaUnit; url: string; sellerCode: string }) => [
+    firstName(p.sellerName),
+    LAND_TYPES[p.landType].label,
+    p.where,
+    formatArea(p.area, p.areaUnit),
+    p.url,
+    p.sellerCode,
+  ],
+  // "Hello {{1}}, a buyer has sent an enquiry about your listing {{2}}. Buyer name: {{3}}, phone: {{4}}. Listing ID: {{5}}. …"
+  enquiryReceived: (e: { sellerName: string; listing: string; buyerName: string; buyerPhone: string; code: string }) => [
+    firstName(e.sellerName),
+    e.listing,
+    e.buyerName,
+    formatPhone(e.buyerPhone),
+    e.code,
+  ],
+  // "Hello {{1}}, please confirm: is your listing {{2}} in {{3}} still available for sale? …"  [Yes, available] [No, sold]
+  availabilityCheck: (sellerName: string, p: AvailabilityCheckPlot) => [firstName(sellerName), listingName(p), `${placeName(p)}, ${p.city.name}`],
+  // "Hello {{1}}, you have {{2}} listings on InstaPlots: {{3}}. Please confirm …"  [Yes, all available] [One is sold]
+  availabilityCheckMulti: (sellerName: string, plots: AvailabilityCheckPlot[]) => {
+    const shown = plots.slice(0, 5).map((p) => `${listingName(p)} in ${placeName(p)}`);
+    const more = plots.length > shown.length ? `, and ${plots.length - shown.length} more` : "";
+    return [firstName(sellerName), String(plots.length), `${shown.join(", ")}${more}`];
+  },
+};
 
 async function deliver(phone: string, build: (lang: Lang) => Delivery): Promise<boolean> {
   const conversation = await getOrCreateConversation(phone);
@@ -29,13 +71,14 @@ async function deliver(phone: string, build: (lang: Lang) => Delivery): Promise<
   const d = build(lang);
   const template = process.env[`WHATSAPP_TEMPLATE_${d.templateKey}`]?.trim();
   if (isWhatsAppConfigured() && !isServiceWindowOpen(conversation.lastInboundAt) && template) {
-    const send = (language: string) => sendAndRecord(phone, { type: "template", templateName: template, language, bodyParameters: d.templateParams }, "system");
-    const en = process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en";
-    if (lang === "hi") {
-      if (await send(process.env.WHATSAPP_TEMPLATE_LANGUAGE_HI || "hi")) return true;
+    const send = (language: string) =>
+      sendAndRecord(phone, { type: "template", templateName: template, language, bodyParameters: d.templateParams, quickReplyPayloads: d.templateButtons }, "system");
+    const hi = process.env.WHATSAPP_TEMPLATE_LANGUAGE_HI?.trim();
+    if (lang === "hi" && hi) {
+      if (await send(hi)) return true;
       log("warn", "whatsapp.template_hi_fallback", { template: d.templateKey });
     }
-    return send(en);
+    return send(process.env.WHATSAPP_TEMPLATE_LANGUAGE?.trim() || "en");
   }
   return sendAndRecord(phone, d.message, "system");
 }
@@ -50,7 +93,7 @@ export async function notifyRegistrationComplete(sellerId: string): Promise<bool
   return safe(() =>
     deliver(s.phone, (lang) => ({
       templateKey: "REGISTRATION_COMPLETE",
-      templateParams: [s.name.split(" ")[0], s.code],
+      templateParams: TEMPLATE_PARAMS.registrationComplete(s),
       message: { type: "text", text: copy(lang).nRegistered({ name: s.name, code: s.code, url: site.url }) },
     })),
   );
@@ -105,7 +148,15 @@ export async function notifySeller(propertyId: string, event: SellerNotification
       },
       LISTING_LIVE: {
         templateKey: "LISTING_LIVE",
-        templateParams: [p.seller.code, p.title, where, price("en", p.price), link(p.slug)],
+        templateParams: TEMPLATE_PARAMS.listingLive({
+          sellerName: p.seller.name,
+          landType: p.landType,
+          where,
+          area: p.area,
+          areaUnit: p.areaUnit,
+          url: link(p.slug),
+          sellerCode: p.seller.code,
+        }),
         message: { type: "text", previewUrl: true, text: c.nLive({ title: p.title, where, price: amount, link: link(p.slug), code: p.seller.code }) },
       },
       LISTING_REJECTED: {
@@ -135,7 +186,13 @@ export async function notifyEnquiry(enquiryId: string): Promise<boolean> {
   return safe(() =>
     deliver(e.property.seller.phone, (lang) => ({
       templateKey: "ENQUIRY_RECEIVED",
-      templateParams: [e.buyerName, formatPhone(e.buyerPhone), e.property.title, e.property.code],
+      templateParams: TEMPLATE_PARAMS.enquiryReceived({
+        sellerName: e.property.seller.name,
+        listing: e.property.title,
+        buyerName: e.buyerName,
+        buyerPhone: e.buyerPhone,
+        code: e.property.code,
+      }),
       message: {
         type: "text",
         text: copy(lang).nEnquiry({
@@ -165,11 +222,21 @@ export async function sendAvailabilityCheck(sellerId: string, propertyIds: strin
   });
   if (plots.length === 0) return false;
 
-  return safe(() => deliver(seller.phone, (lang) => buildAvailabilityCheckMessage(plots, lang)));
+  return safe(() => deliver(seller.phone, (lang) => buildAvailabilityCheckMessage(plots, lang, seller.name)));
 }
 
 /** A plot as the weekly check describes it. */
-export type AvailabilityCheckPlot = { title: string; locality: string; village?: string | null; price: bigint | number; city: { name: string } };
+export type AvailabilityCheckPlot = {
+  id: string;
+  title: string;
+  locality: string;
+  village?: string | null;
+  price: bigint | number;
+  area: number;
+  areaUnit: AreaUnit;
+  landType: LandType;
+  city: { name: string };
+};
 
 /**
  * The weekly check's content (free-form message + template fallback), pure —
@@ -177,7 +244,7 @@ export type AvailabilityCheckPlot = { title: string; locality: string; village?:
  * sending it. Plots must be in the order we number them (oldest first,
  * like plotsAwaitingAvailability).
  */
-export function buildAvailabilityCheckMessage(plots: AvailabilityCheckPlot[], lang: Lang = "en"): Delivery {
+export function buildAvailabilityCheckMessage(plots: AvailabilityCheckPlot[], lang: Lang = "en", sellerName = ""): Delivery {
   const c = copy(lang);
   const line = (p: AvailabilityCheckPlot) => `${p.title}\n${placeName(p)}, ${p.city.name} · ${price(lang, p.price)}`;
 
@@ -185,7 +252,9 @@ export function buildAvailabilityCheckMessage(plots: AvailabilityCheckPlot[], la
     const p = plots[0];
     return {
       templateKey: "AVAILABILITY_CHECK",
-      templateParams: [p.title, `${placeName(p)}, ${p.city.name}`, price("en", p.price)],
+      templateParams: TEMPLATE_PARAMS.availabilityCheck(sellerName, p),
+      // The template's [Yes, available] [No, sold]: payloads carry the plot, so a tap answers for that plot.
+      templateButtons: [`avail:yes:${p.id}`, `avail:no:${p.id}`],
       message: {
         type: "buttons",
         body: c.nCheckOne({ line: line(p) }),
@@ -201,7 +270,9 @@ export function buildAvailabilityCheckMessage(plots: AvailabilityCheckPlot[], la
   const list = plots.map((p, i) => `${i + 1}. ${p.title} — ${price(lang, p.price)}`).join("\n");
   return {
     templateKey: "AVAILABILITY_CHECK_MULTI",
-    templateParams: [String(plots.length), plots.map((p, i) => `${i + 1}. ${p.title} — ${price("en", p.price)}`).join(" · ")],
+    templateParams: TEMPLATE_PARAMS.availabilityCheckMulti(sellerName, plots),
+    // [Yes, all available] [One is sold]
+    templateButtons: ["avail:yes", "avail:no"],
     message: {
       type: "buttons",
       body: c.nCheckMany({ list }),

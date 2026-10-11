@@ -106,6 +106,20 @@ async function pure() {
   check("whatsapp: number sent without +", otp.to === "919876543210");
   const plain = toMetaPayload("+919876543210", { type: "template", templateName: "availability_check", bodyParameters: ["x"] }) as { template: { components: { type: string }[] } };
   check("whatsapp: other templates have no button component", plain.template.components.every((c) => c.type !== "button"));
+  const quick = toMetaPayload("+919876543210", {
+    type: "template",
+    templateName: "availability_check",
+    bodyParameters: ["Meera", "2 acres\nagricultural   land", ""],
+    quickReplyPayloads: ["avail:yes:abc", "avail:no:abc"],
+  }) as { template: { components: { type: string; sub_type?: string; index?: string; parameters: { type: string; text?: string; payload?: string }[] }[] } };
+  const qb = quick.template.components.filter((c) => c.type === "button");
+  check(
+    "whatsapp: quick-reply payloads go out as buttons 0 and 1",
+    qb.length === 2 && qb[0].sub_type === "quick_reply" && qb[0].index === "0" && qb[0].parameters[0].payload === "avail:yes:abc" && qb[1].index === "1" && qb[1].parameters[0].payload === "avail:no:abc",
+    qb,
+  );
+  const qbody = quick.template.components.find((c) => c.type === "body")!.parameters.map((x) => x.text);
+  check("whatsapp: template variables have no newlines or runs of spaces, never empty", qbody[1] === "2 acres agricultural land" && qbody[2] === "-", qbody);
   const { checkProductionEnv } = await import("../src/lib/env-check");
   const bad = checkProductionEnv({});
   check("env check: missing DATABASE_URL/SESSION_SECRET are errors", bad.errors.length === 2);

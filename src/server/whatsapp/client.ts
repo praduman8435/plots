@@ -33,7 +33,14 @@ export type OutgoingMessage =
       bodyParameters: string[];
       /** Authentication templates: the code again for the "Copy code" button (Meta rejects the send without it). */
       copyCode?: string;
+      /** Quick-reply buttons, in order: the payload WhatsApp sends back when each one is tapped. */
+      quickReplyPayloads?: string[];
     };
+
+/** Meta refuses template parameters with newlines, tabs or long runs of spaces, and empty ones. */
+function templateText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 900) || "-";
+}
 
 /** Builds Meta's request body. Exported for tests. */
 export function toMetaPayload(to: string, message: OutgoingMessage): Record<string, unknown> {
@@ -87,8 +94,14 @@ export function toMetaPayload(to: string, message: OutgoingMessage): Record<stri
           name: message.templateName,
           language: { code: message.language ?? "en" },
           components: [
-            { type: "body", parameters: message.bodyParameters.map((text) => ({ type: "text", text })) },
+            { type: "body", parameters: message.bodyParameters.map((text) => ({ type: "text", text: templateText(text) })) },
             ...(message.copyCode ? [{ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: message.copyCode }] }] : []),
+            ...(message.quickReplyPayloads ?? []).map((payload, i) => ({
+              type: "button",
+              sub_type: "quick_reply",
+              index: String(i),
+              parameters: [{ type: "payload", payload }],
+            })),
           ],
         },
       };

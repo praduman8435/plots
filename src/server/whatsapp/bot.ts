@@ -404,8 +404,10 @@ async function handle(t: Turn, input: BotInput) {
     if (replyId === "menu:continue") return reprompt(t);
   }
   if (replyId?.startsWith("sold:")) return handleSoldReply(t, replyId);
-  if (replyId === "avail:yes") return withResume(t, () => confirmAvailability(t));
+  // Availability buttons: "avail:yes" / "avail:no", or from the template, with the plot ("avail:no:<propertyId>").
+  if (replyId === "avail:yes" || replyId?.startsWith("avail:yes:")) return withResume(t, () => confirmAvailability(t));
   if (replyId === "avail:no") return withResume(t, () => answerNo(t, null));
+  if (replyId?.startsWith("avail:no:")) return withResume(t, () => answerNoFor(t, replyId.slice("avail:no:".length)));
   if (replyId?.startsWith("nosold:")) return withResume(t, () => pickSold(t, replyId.slice(7)));
   if (replyId === "confirm:cancel") return cancel(t);
   if (replyId === "confirm:submit" && (t.step === "IDLE" || t.step === "SUBMITTING")) {
@@ -732,6 +734,14 @@ async function answerNo(t: Turn, number: number | null) {
   if (picked) return askSoldConfirm(t, picked);
   if (plots.length === 1) return askSoldConfirm(t, plots[0]);
   return askWhichSold(t, plots);
+}
+
+/** "No, sold" tapped on the template for one plot: mark that plot sold if it's still waiting on its answer. */
+async function answerNoFor(t: Turn, propertyId: string) {
+  const seller = await t.loadSeller();
+  const plot = seller ? (await plotsAwaitingAvailability(seller.id)).find((p) => p.id === propertyId) : undefined;
+  if (seller && plot) return markSold(t, seller.id, plot);
+  return answerNo(t, null); // already answered or paused: the careful path asks first
 }
 
 /** "Which property is sold?" — tap a row, or (outside a listing) reply with the number. */
