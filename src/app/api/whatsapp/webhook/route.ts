@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { after, type NextRequest } from "next/server";
+import { db } from "@/lib/db";
 import { log } from "@/lib/log";
-import { normalizePhoneNumber } from "@/lib/phone";
+import { maskPhoneForLogging, normalizePhoneNumber } from "@/lib/phone";
 import { processInbound, type InboundMessage } from "@/server/whatsapp/inbound";
 
 /**
@@ -50,6 +51,9 @@ export async function POST(request: Request) {
   }
 
   const messages = parseWebhookPayload(payload);
+  const failures = parseDeliveryFailures(payload);
+  // Meta accepts a send first and reports "failed" later, here: log why, and mark it in the admin inbox.
+  if (failures.length) after(() => recordDeliveryFailures(failures));
   if (messages.length) after(async () => {
     for (const msg of messages) {
       try {
@@ -92,11 +96,55 @@ type MetaMessage = {
   location?: { latitude?: number | string; longitude?: number | string; name?: string; address?: string };
 };
 
+type MetaStatus = {
+  id?: string;
+  status?: string;
+  recipient_id?: string;
+  errors?: { code?: number; title?: string; message?: string; error_data?: { details?: string } }[];
+};
+
 type MetaValue = {
   contacts?: { wa_id?: string; profile?: { name?: string } }[];
   messages?: MetaMessage[];
-  statuses?: unknown[];
+  statuses?: MetaStatus[];
 };
+
+type DeliveryFailure = { waMessageId: string; to: string; code: number | null; title: string; details: string };
+
+/** "failed" delivery statuses (e.g. 131042 payment issue, 131026 undeliverable, 132001 template missing). */
+function parseDeliveryFailures(payload: unknown): DeliveryFailure[] {
+  const out: DeliveryFailure[] = [];
+  for (const entry of (payload as MetaPayload)?.entry ?? []) {
+    for (const change of entry?.changes ?? []) {
+      for (const st of change?.value?.statuses ?? []) {
+        if (st?.status !== "failed" || !st.id) continue;
+        const e = st.errors?.[0];
+        out.push({
+          waMessageId: st.id,
+          to: st.recipient_id ?? "",
+          code: typeof e?.code === "number" ? e.code : null,
+          title: String(e?.title ?? e?.message ?? "Message failed").slice(0, 200),
+          details: String(e?.error_data?.details ?? "").slice(0, 300),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+async function recordDeliveryFailures(failures: DeliveryFailure[]) {
+  for (const f of failures) {
+    log("warn", "whatsapp.delivery_failed", { to: maskPhoneForLogging(`+${f.to}`), code: f.code, title: f.title, details: f.details });
+    try {
+      const msg = await db.whatsAppMessage.findFirst({ where: { waMessageId: f.waMessageId }, select: { id: true, body: true } });
+      if (msg && !msg.body?.includes("⚠️ Not delivered")) {
+        await db.whatsAppMessage.update({ where: { id: msg.id }, data: { body: `${msg.body ?? ""}\n\n⚠️ Not delivered: ${f.title}${f.code ? ` (${f.code})` : ""}` } });
+      }
+    } catch (err) {
+      log("error", "whatsapp.delivery_failed_record", { err });
+    }
+  }
+}
 
 type MetaPayload = {
   object?: string;
