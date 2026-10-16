@@ -9,20 +9,23 @@ export type AiMessage = { role: "user" | "assistant"; content: string };
 /**
  * One chat completion. Returns the model's text, or null on any failure
  * (timeout, HTTP error, odd response) — callers always have a non-AI fallback.
- * A call that hangs or hits a provider hiccup (5xx) is tried once more within
- * the same overall time budget: providers sometimes stall a single request
- * that a fresh one answers in a second. Never logs prompts or replies (they
- * contain seller messages).
+ * When the model is overloaded, busy or missing, the next fallback model is
+ * tried (up to three models); with no fallbacks, a call that hangs or hits a
+ * provider hiccup (5xx) is tried once more on the same model. Never logs
+ * prompts or replies (they contain seller messages).
  */
 export async function complete(
   cfg: AiConfig,
   input: { system: string; messages: AiMessage[]; maxTokens?: number; json?: boolean; temperature?: number },
   fetchImpl: typeof fetch = fetch,
 ): Promise<string | null> {
-  const perAttemptMs = Math.max(2500, Math.floor(cfg.timeoutMs / 2));
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const result = await attemptOnce(cfg, input, fetchImpl, perAttemptMs, attempt);
+  const perAttemptMs = Math.max(3000, Math.floor(cfg.timeoutMs * 0.6));
+  const plan = cfg.fallbackModels.length ? [cfg.model, ...cfg.fallbackModels].slice(0, 3) : [cfg.model, cfg.model];
+  for (let i = 0; i < plan.length; i++) {
+    const result = await attemptOnce({ ...cfg, model: plan[i] }, input, fetchImpl, perAttemptMs, i + 1);
     if (result.text !== null || !result.retry) return result.text;
+    // The same model again only helps when it stalled or hiccupped, not when it is missing or out of quota.
+    if (plan[i + 1] === plan[i] && result.status !== undefined && result.status < 500) return null;
   }
   return null;
 }
@@ -33,7 +36,7 @@ async function attemptOnce(
   fetchImpl: typeof fetch,
   timeoutMs: number,
   attempt: number,
-): Promise<{ text: string | null; retry: boolean }> {
+): Promise<{ text: string | null; retry: boolean; status?: number }> {
   const started = Date.now();
   const maxTokens = input.maxTokens ?? 300;
   const temperature = input.temperature ?? 0.3;
@@ -65,9 +68,9 @@ async function attemptOnce(
       });
     }
     if (!res.ok) {
-      log("warn", "ai.http_error", { provider: cfg.provider, status: res.status, ms: Date.now() - started, attempt });
-      // A provider hiccup is worth one more try; a bad key or a rate limit is not.
-      return { text: null, retry: res.status >= 500 };
+      log("warn", "ai.http_error", { provider: cfg.provider, model: cfg.model, status: res.status, ms: Date.now() - started, attempt });
+      // Overloaded (5xx), busy (429) or unknown model (404): another model may answer. A bad key or request won't.
+      return { text: null, retry: res.status >= 500 || res.status === 429 || res.status === 404, status: res.status };
     }
     const data = (await res.json()) as {
       content?: { type?: string; text?: string }[];
@@ -77,10 +80,10 @@ async function attemptOnce(
       cfg.provider === "anthropic"
         ? data.content?.filter((c) => c.type === "text").map((c) => c.text ?? "").join("")
         : data.choices?.[0]?.message?.content;
-    log("info", "ai.call", { provider: cfg.provider, ok: Boolean(text), ms: Date.now() - started, attempt });
+    log("info", "ai.call", { provider: cfg.provider, model: cfg.model, ok: Boolean(text), ms: Date.now() - started, attempt });
     return { text: text?.trim() || null, retry: false };
   } catch (err) {
-    log("warn", "ai.failed", { provider: cfg.provider, ms: Date.now() - started, attempt, err });
+    log("warn", "ai.failed", { provider: cfg.provider, model: cfg.model, ms: Date.now() - started, attempt, err });
     return { text: null, retry: true };
   }
 }

@@ -11,6 +11,8 @@ import "server-only";
  *   AI_API_KEY=…
  *   AI_MODEL=…            (optional; empty or "default" = a sensible default per provider)
  *   AI_BASE_URL=…         (only for "compatible", or to override; empty or "default" = provider's URL)
+ *   AI_FALLBACK_MODELS=…  (optional; comma list tried when the main model is overloaded or missing;
+ *                          "default" = the provider's list below, "none" = only the main model)
  *   AI_TIMEOUT_MS=8000
  *   AI_MAX_CALLS_PER_DAY=500            (all chats together)
  *   AI_MAX_CALLS_PER_CHAT_PER_DAY=60    (one seller)
@@ -29,10 +31,18 @@ const DEFAULTS: Record<AiProvider, { baseUrl: string; model: string }> = {
   compatible: { baseUrl: "", model: "" },
 };
 
+// Tried in order when the main model is overloaded, busy or gone. Gemini models each have their own
+// capacity, so when Flash-Lite answers 503 the full Flash usually still replies.
+const FALLBACK_MODELS: Partial<Record<AiProvider, string[]>> = {
+  gemini: ["gemini-flash-latest", "gemini-2.5-flash"],
+};
+
 export type AiConfig = {
   provider: AiProvider;
   apiKey: string;
   model: string;
+  /** Other models to try, in order, when `model` is overloaded or missing. */
+  fallbackModels: string[];
   baseUrl: string;
   timeoutMs: number;
   maxPerDay: number;
@@ -64,10 +74,15 @@ export function getAiConfig(env: Record<string, string | undefined> = process.en
   const model = pick(env.AI_MODEL) || DEFAULTS[provider].model;
   if (!baseUrl.startsWith("https://") && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(baseUrl)) return null;
   if (!model) return null;
+  const fallbackSetting = pick(env.AI_FALLBACK_MODELS);
+  const fallbackModels = /^none$/i.test(fallbackSetting)
+    ? []
+    : (fallbackSetting ? fallbackSetting.split(",").map((m) => m.trim()).filter(Boolean) : (FALLBACK_MODELS[provider] ?? [])).filter((m) => m !== model);
   return {
     provider,
     apiKey,
     model,
+    fallbackModels,
     baseUrl,
     timeoutMs: int(env.AI_TIMEOUT_MS, 8000),
     maxPerDay: int(env.AI_MAX_CALLS_PER_DAY, 500),

@@ -176,6 +176,24 @@ async function main() {
   }) as typeof fetch);
   check("AI: a bad key is not retried", authTries === 1, authTries);
   check("AI: HTTP error → null", (await complete(claude!, { system: "s", messages: [{ role: "user", content: "x" }] }, (async () => new Response("no", { status: 500 })) as typeof fetch)) === null);
+  check("Gemini: fallback models by default", gemini?.fallbackModels[0] === "gemini-flash-latest" && !gemini?.fallbackModels.includes(gemini.model), gemini?.fallbackModels);
+  check("AI_FALLBACK_MODELS=none turns fallbacks off", getAiConfig({ AI_ENABLED: "true", AI_PROVIDER: "gemini", AI_API_KEY: "k".repeat(30), AI_FALLBACK_MODELS: "none" })?.fallbackModels.length === 0);
+  check("AI_FALLBACK_MODELS takes a list", getAiConfig({ AI_ENABLED: "true", AI_PROVIDER: "gemini", AI_API_KEY: "k".repeat(30), AI_FALLBACK_MODELS: " a , b " })?.fallbackModels.join() === "a,b");
+  const modelsTried: string[] = [];
+  const overloaded = await complete(quick, { system: "s", messages: [{ role: "user", content: "x" }] }, (async (_u: RequestInfo | URL, init?: RequestInit) => {
+    const model = String(JSON.parse(String(init?.body)).model);
+    modelsTried.push(model);
+    if (modelsTried.length === 1) return new Response("overloaded", { status: 503 });
+    if (modelsTried.length === 2) return new Response("not found", { status: 404 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: "from " + model } }] }), { status: 200 });
+  }) as typeof fetch);
+  check("AI: overloaded and missing models fall through to the next one", overloaded === "from " + quick.fallbackModels[1] && modelsTried.join() === [quick.model, ...quick.fallbackModels].join(), modelsTried);
+  let busyTries = 0;
+  await complete(claude!, { system: "s", messages: [{ role: "user", content: "x" }] }, (async () => {
+    busyTries++;
+    return new Response("slow down", { status: 429 });
+  }) as typeof fetch);
+  check("AI: one model out of quota is not hammered again", busyTries === 1, busyTries);
   check("AI: JSON found inside prose/code fences", JSON.stringify(firstJsonObject('Sure! ```json\n{"area": 2}\n```')) === '{"area":2}');
   check("AI: Aadhaar-like and phone numbers redacted", !/1234|98765/.test(redact("aadhaar 1234 5678 9012, phone +91 98765 43210")));
 
