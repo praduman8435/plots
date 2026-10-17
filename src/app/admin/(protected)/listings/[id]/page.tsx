@@ -361,6 +361,9 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
             Fix details or photos (remove, add, reorder — the first photo is the cover). Saving doesn’t change the status or notify the seller.
           </p>
           <ListingForm
+            // Photos changed from the tools above (order, cover, remove) or a save: start from what's stored now,
+            // so the form never saves an old photo order back over the new one.
+            key={`${p.updatedAt.getTime()}:${p.images.map((img) => img.id).join(".")}`}
             mode="admin"
             cities={cities}
             submitLabel="Save changes"
