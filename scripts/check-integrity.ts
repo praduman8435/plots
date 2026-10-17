@@ -27,7 +27,7 @@ function check(name: string, ok: boolean, detail?: unknown) {
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
 async function main() {
-  const { changeListingStatus, updateListing } = await import("../src/server/listings/service");
+  const { changeListingStatus, updateListing, setListingPhotos, removeListingPhoto, makeListingCover, setListingPrice } = await import("../src/server/listings/service");
   const city = await db.city.findFirstOrThrow({ where: { isLive: true } });
   const stamp = Date.now().toString(36);
   const seller = await db.seller.create({
@@ -170,6 +170,25 @@ async function main() {
     await updateListing(edited.id, input as never, { city, images: [{ url: "/media/ok.webp", width: 10, height: 10 }], backToReview: true });
     const saved = await db.property.findUniqueOrThrow({ where: { id: edited.id }, include: { images: true } });
     check("good edit: fields + photos + back to review together", saved.title === "Changed title" && saved.status === "PENDING" && saved.images.length === 1);
+
+    // ── Photos and price on their own ──
+    const shown = await plot("ACTIVE");
+    const photo = (name: string) => ({ url: `/media/${name}.webp`, width: 10, height: 10 });
+    await setListingPhotos(shown.id, [photo("a"), photo("b"), photo("c")]);
+    const order = async () => (await db.propertyImage.findMany({ where: { propertyId: shown.id }, orderBy: { position: "asc" } })).map((i) => `${i.url.slice(7, 8)}${i.position}`).join();
+    check("photos: saved in order, positions 0..n", (await order()) === "a0,b1,c2", await order());
+    check("photos: a live plot stays live", (await db.property.findUniqueOrThrow({ where: { id: shown.id } })).status === "ACTIVE");
+    const [, b, c] = await db.propertyImage.findMany({ where: { propertyId: shown.id }, orderBy: { position: "asc" } });
+    check("cover: chosen photo first, others keep their order", (await makeListingCover(shown.id, c.id))?.url === "/media/c.webp" && (await order()) === "c0,a1,b2", await order());
+    check("remove: photo gone, the rest renumbered", (await removeListingPhoto(shown.id, b.id))?.url === "/media/b.webp" && (await order()) === "c0,a1", await order());
+    check("remove: a photo of another plot is refused", (await removeListingPhoto(pending.id, c.id)) === null && (await order()) === "c0,a1");
+    check("remove: twice is a no-op", (await removeListingPhoto(shown.id, b.id)) === null);
+    await setListingPrice(shown.id, 1_850_000, false);
+    const repriced = await db.property.findUniqueOrThrow({ where: { id: shown.id } });
+    check("price: changed, still live", repriced.price === BigInt(1_850_000) && !repriced.priceNegotiable && repriced.status === "ACTIVE");
+    await setListingPhotos(shown.id, [photo("d")], { backToReview: true });
+    const reviewed = await db.property.findUniqueOrThrow({ where: { id: shown.id } });
+    check("photos + review: back to pending together", reviewed.status === "PENDING" && (await order()) === "d0");
 
     // ── Pruning ──
     const { pruneExpiredData } = await import("../src/server/maintenance");

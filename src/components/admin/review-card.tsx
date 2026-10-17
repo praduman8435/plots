@@ -9,6 +9,7 @@ import { DuplicateWarning } from "./duplicate-warning";
 import { landTypeLabel, timeAgo } from "./format";
 import { ReviewActions } from "./listing-actions";
 import { ListingThumb } from "./listing-thumb";
+import { PhotoTools } from "./photo-tools";
 
 /** A pending listing in the review queue: everything needed to decide, plus one-tap Approve / Reject / Edit. */
 export function ReviewCard({ p }: { p: ReviewQueueItem }) {
@@ -86,9 +87,12 @@ function Photos({ p }: { p: ReviewQueueItem }) {
   }
   if (p.images.length === 1) {
     return (
-      <a href={p.images[0].url} target="_blank" rel="noreferrer" className="relative block aspect-[16/10] bg-mist">
-        <Image src={p.images[0].url} alt={`Photo of ${p.title}`} fill sizes="(min-width: 1280px) 560px, 100vw" className="object-cover" />
-      </a>
+      <div className="relative aspect-[16/10] bg-mist">
+        <a href={p.images[0].url} target="_blank" rel="noreferrer" className="absolute inset-0" aria-label="Open photo">
+          <Image src={p.images[0].url} alt={`Photo of ${p.title}`} fill sizes="(min-width: 1280px) 560px, 100vw" className="object-cover" />
+        </a>
+        <PhotoTools propertyId={p.id} imageId={p.images[0].id} isCover />
+      </div>
     );
   }
   return (
@@ -99,6 +103,7 @@ function Photos({ p }: { p: ReviewQueueItem }) {
             <a href={img.url} target="_blank" rel="noreferrer" className="absolute inset-0">
               <Image src={img.url} alt={`Photo ${i + 1} of ${p.title}`} fill sizes="(min-width: 640px) 280px, 78vw" className="object-cover" />
             </a>
+            <PhotoTools propertyId={p.id} imageId={img.id} isCover={i === 0} />
           </li>
         ))}
       </ul>

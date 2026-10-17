@@ -1,15 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { hitRateLimit } from "@/lib/rate-limit";
 import { requireSeller } from "@/lib/seller/require";
 import type { ListingFormPayload, ListingFormResult } from "@/components/listing/types";
-import { listingInputSchema } from "@/lib/validation/listing";
+import { listingInputSchema, priceSchema } from "@/lib/validation/listing";
 import { isKycAvailable } from "@/server/kyc/provider";
 import { resolveCity } from "@/server/cities";
 import { listingImagesSchema } from "@/server/listings/images";
-import { changeListingStatus, createListing, updateListing, type StatusAction } from "@/server/listings/service";
+import { changeListingStatus, createListing, setListingPhotos, setListingPrice, updateListing, type StatusAction } from "@/server/listings/service";
 
 type SellerAction = "MARK_SOLD" | "CONFIRM_AVAILABLE" | "HIDE" | "UNHIDE" | "REMOVE";
 
@@ -119,4 +120,68 @@ export async function updateSellerListing(propertyId: string, payload: ListingFo
   revalidatePath("/");
   revalidatePath("/admin", "layout");
   return { ok: true, redirectTo: `/seller/properties/submitted?code=${p.code}&edited=1` };
+}
+
+/** One of the seller's own plots that can still be changed (not removed, not sold). */
+async function editablePlot(sellerId: string, propertyId: unknown) {
+  if (typeof propertyId !== "string" || propertyId.length > 64) return null;
+  const p = await db.property.findFirst({ where: { id: propertyId, sellerId }, select: { id: true, slug: true, code: true, status: true, removedAt: true } });
+  return p && !p.removedAt ? p : null;
+}
+
+function revalidatePlot(slug: string) {
+  revalidatePath("/seller/dashboard");
+  revalidatePath(`/property/${slug}`);
+  revalidatePath("/");
+  revalidatePath("/search");
+  revalidatePath("/[city]", "page");
+  revalidatePath("/admin", "layout");
+}
+
+const sellerPriceSchema = z.object({ price: priceSchema, priceNegotiable: z.boolean() });
+
+/**
+ * "Change price" from the dashboard. A live plot stays live: the price is the
+ * seller's to set and needs no re-check (unlike photos or the description).
+ */
+export async function updateSellerPrice(propertyId: string, input: { price: number; priceNegotiable: boolean }): Promise<{ ok: boolean; message?: string }> {
+  const seller = await requireSeller();
+  const p = await editablePlot(seller.id, propertyId);
+  if (!p) return { ok: false, message: "Property not found." };
+  if (p.status === "SOLD") return { ok: false, message: "Sold properties can't be changed. Make it live again first." };
+  const parsed = sellerPriceSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Enter the total price in ₹." };
+
+  const limited = await hitRateLimit("listingUpdatePerSeller", seller.id);
+  if (!limited.ok) return { ok: false, message: "Too many edits in a short time. Please try again in a little while." };
+
+  await setListingPrice(p.id, parsed.data.price, parsed.data.priceNegotiable);
+  revalidatePlot(p.slug);
+  return { ok: true };
+}
+
+/**
+ * "Edit photos" (add, remove, reorder; first = cover). Removing or reordering
+ * keeps a live plot live. A new photo, or any change to a plot that wasn't
+ * approved, goes to our team first — the same as a full edit.
+ */
+export async function updateSellerPhotos(propertyId: string, images: unknown): Promise<{ ok: boolean; message?: string; review?: boolean }> {
+  const seller = await requireSeller();
+  const p = await editablePlot(seller.id, propertyId);
+  if (!p) return { ok: false, message: "Property not found." };
+  if (p.status === "SOLD") return { ok: false, message: "Sold properties can't be changed. Make it live again first." };
+  const photos = listingImagesSchema.safeParse(images);
+  if (!photos.success) return { ok: false, message: "One of the photos couldn't be used. Please upload it again." };
+  if (photos.data.length === 0) return { ok: false, message: "Keep at least one photo — buyers rarely open plots without photos." };
+
+  const limited = await hitRateLimit("listingUpdatePerSeller", seller.id);
+  if (!limited.ok) return { ok: false, message: "Too many edits in a short time. Please try again in a little while." };
+
+  const current = new Set((await db.propertyImage.findMany({ where: { propertyId: p.id }, select: { url: true } })).map((i) => i.url));
+  const added = photos.data.some((img) => !current.has(img.url));
+  const review = p.status !== "PENDING" && (added || p.status === "REJECTED");
+
+  await setListingPhotos(p.id, photos.data, { backToReview: review });
+  revalidatePlot(p.slug);
+  return { ok: true, review };
 }

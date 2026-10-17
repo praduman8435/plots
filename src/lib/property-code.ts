@@ -8,3 +8,4 @@ export function propertyCodeFromParam(param: string): string | null {
 }
 
 export const editPropertyPath = (code: string) => `/seller/properties/${code.toLowerCase()}/edit`;
+export const propertyPhotosPath = (code: string) => `/seller/properties/${code.toLowerCase()}/photos`;

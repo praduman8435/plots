@@ -186,6 +186,12 @@ export default async function SellerDashboard(props: PageProps<"/seller/dashboar
               </nav>
             )}
 
+            {(sp.photos === "saved" || sp.photos === "review") && (
+              <p role="status" className="mt-4 rounded-2xl bg-brand-50 px-4 py-3 text-sm font-medium text-brand-900 ring-1 ring-brand-100">
+                {sp.photos === "review" ? "Photos saved. Our team will check the new photos and put the listing live again." : "Photos saved."}
+              </p>
+            )}
+
             {plots.length === 0 ? (
               <div className="mt-4 rounded-3xl border border-dashed border-line-strong bg-white p-10 text-center">
                 <Sprout className="mx-auto size-8 text-brand-600" aria-hidden />
@@ -236,7 +242,17 @@ export default async function SellerDashboard(props: PageProps<"/seller/dashboar
                       {awaiting && <Note tone="amber">Is it still available? Let buyers know with one tap.</Note>}
 
                       <div className="mt-3 border-t border-line pt-3">
-                        <PlotActions id={p.id} code={p.code} slug={p.slug} title={p.title} status={p.status} hiddenReason={p.hiddenReason} awaitingReply={awaiting} />
+                        <PlotActions
+                          id={p.id}
+                          code={p.code}
+                          slug={p.slug}
+                          title={p.title}
+                          status={p.status}
+                          hiddenReason={p.hiddenReason}
+                          awaitingReply={awaiting}
+                          price={Number(p.price)}
+                          priceNegotiable={p.priceNegotiable}
+                        />
                       </div>
                     </li>
                   );

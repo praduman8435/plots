@@ -1,13 +1,14 @@
 "use client";
 
-import { CheckCircle2, ExternalLink, EyeOff, MoreHorizontal, Pencil, RotateCcw, Tag, Trash2, X } from "lucide-react";
+import { CheckCircle2, ExternalLink, EyeOff, Images, IndianRupee, MoreHorizontal, Pencil, RotateCcw, Tag, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { editPropertyPath } from "@/lib/property-code";
-import { sellerListingAction } from "@/server/actions/seller/listings";
+import { formatPrice } from "@/lib/format";
+import { editPropertyPath, propertyPhotosPath } from "@/lib/property-code";
+import { sellerListingAction, updateSellerPrice } from "@/server/actions/seller/listings";
 
 type Action = Parameters<typeof sellerListingAction>[1];
 
@@ -19,6 +20,8 @@ type Props = {
   status: "PENDING" | "ACTIVE" | "HIDDEN" | "SOLD" | "REJECTED";
   hiddenReason: string | null;
   awaitingReply: boolean;
+  price: number;
+  priceNegotiable: boolean;
 };
 
 type Confirm = { action: Action; title: string; text: string; cta: string; danger?: boolean };
@@ -26,13 +29,15 @@ type Confirm = { action: Action; title: string; text: string; cta: string; dange
 /**
  * What a seller does with one property: the one action that matters right now
  * (confirm it's available, or bring it back), Edit, and everything else in a
- * "More" sheet — including Remove listing, which asks first.
+ * "More" sheet — Change price, Edit photos, and Remove listing, which asks first.
  */
-export function PlotActions({ id, code, slug, title, status, hiddenReason, awaitingReply }: Props) {
+export function PlotActions({ id, code, slug, title, status, hiddenReason, awaitingReply, price, priceNegotiable }: Props) {
   const sheet = useRef<HTMLDialogElement>(null);
   const [pending, start] = useTransition();
   const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [editingPrice, setEditingPrice] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
 
   const reactivatable = status === "SOLD" || (status === "HIDDEN" && hiddenReason !== "BY_ADMIN");
   const viewable = status === "ACTIVE" || status === "SOLD";
@@ -47,7 +52,9 @@ export function PlotActions({ id, code, slug, title, status, hiddenReason, await
   }
   const open = () => {
     setConfirm(null);
+    setEditingPrice(false);
     setError(null);
+    setSaved(null);
     sheet.current?.showModal();
   };
   const close = () => sheet.current?.close();
@@ -75,6 +82,11 @@ export function PlotActions({ id, code, slug, title, status, hiddenReason, await
         </Button>
       </div>
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      {saved && (
+        <p role="status" className="mt-2 text-sm font-medium text-brand-700">
+          {saved}
+        </p>
+      )}
 
       <dialog
         ref={sheet}
@@ -87,13 +99,34 @@ export function PlotActions({ id, code, slug, title, status, hiddenReason, await
         <div className="pb-safe px-5 pt-3 sm:p-6">
           <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line-strong sm:hidden" aria-hidden />
           <div className="flex items-start justify-between gap-3">
-            <p className="line-clamp-2 font-semibold text-ink">{confirm ? confirm.title : title}</p>
+            <p className="line-clamp-2 font-semibold text-ink">{confirm ? confirm.title : editingPrice ? "Change price" : title}</p>
             <button type="button" onClick={close} className="-mt-1 -mr-2 flex size-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-mist" aria-label="Close">
               <X className="size-5" />
             </button>
           </div>
 
-          {confirm ? (
+          {editingPrice ? (
+            <PriceForm
+              initial={price}
+              initialNegotiable={priceNegotiable}
+              live={status === "ACTIVE"}
+              pending={pending}
+              error={error}
+              onCancel={() => {
+                setError(null);
+                setEditingPrice(false);
+              }}
+              onSave={(next, negotiable) => {
+                setError(null);
+                start(async () => {
+                  const r = await updateSellerPrice(id, { price: next, priceNegotiable: negotiable });
+                  if (!r.ok) return setError(r.message ?? "Something went wrong. Please try again.");
+                  setSaved(`Price updated to ${formatPrice(next)}.`);
+                  close();
+                });
+              }}
+            />
+          ) : confirm ? (
             <div className="mt-2 pb-3">
               <p className="text-sm leading-relaxed text-muted">{confirm.text}</p>
               {error && <p className="mt-3 text-sm text-danger">{error}</p>}
@@ -117,6 +150,16 @@ export function PlotActions({ id, code, slug, title, status, hiddenReason, await
               {viewable && (
                 <SheetItem as="link" href={`/property/${slug}`} icon={<ExternalLink />}>
                   View on InstaPlots
+                </SheetItem>
+              )}
+              {status !== "SOLD" && (
+                <SheetItem icon={<IndianRupee />} onClick={() => setEditingPrice(true)}>
+                  Change price
+                </SheetItem>
+              )}
+              {status !== "SOLD" && (
+                <SheetItem as="link" href={propertyPhotosPath(code)} icon={<Images />}>
+                  Edit photos
                 </SheetItem>
               )}
               {status === "ACTIVE" && !awaitingReply && (
@@ -157,6 +200,75 @@ export function PlotActions({ id, code, slug, title, status, hiddenReason, await
         </div>
       </dialog>
     </>
+  );
+}
+
+/** Total price in ₹ with a live "₹18 Lakh" read-back, so a missing zero is easy to spot. */
+function PriceForm({
+  initial,
+  initialNegotiable,
+  live,
+  pending,
+  error,
+  onCancel,
+  onSave,
+}: {
+  initial: number;
+  initialNegotiable: boolean;
+  live: boolean;
+  pending: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onSave: (price: number, negotiable: boolean) => void;
+}) {
+  const [digits, setDigits] = useState(String(initial));
+  const [negotiable, setNegotiable] = useState(initialNegotiable);
+  const value = Number(digits || 0);
+  const tooLow = value > 0 && value < 10_000;
+  const unchanged = value === initial && negotiable === initialNegotiable;
+
+  return (
+    <form
+      className="mt-2 pb-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (value >= 10_000 && !unchanged) onSave(value, negotiable);
+      }}
+    >
+      <label htmlFor="new-price" className="text-sm font-medium text-ink-soft">
+        Total price (₹)
+      </label>
+      <div className="mt-1.5 flex h-12 items-center rounded-xl bg-white px-3.5 ring-1 ring-line-strong focus-within:ring-2 focus-within:ring-brand-500">
+        <span className="mr-1.5 text-muted">₹</span>
+        <input
+          id="new-price"
+          inputMode="numeric"
+          autoComplete="off"
+          autoFocus
+          value={digits ? new Intl.NumberFormat("en-IN").format(value) : ""}
+          onChange={(e) => setDigits(e.target.value.replace(/\D/g, "").replace(/^0+/, "").slice(0, 11))}
+          className="tabular h-full w-full bg-transparent text-lg font-semibold text-ink outline-none"
+          aria-describedby="new-price-hint"
+        />
+      </div>
+      <p id="new-price-hint" className={cn("mt-1.5 text-sm", tooLow ? "text-danger" : "text-muted")}>
+        {tooLow ? "Price looks too low — enter the total price in ₹" : value ? formatPrice(value) : "Enter the total price for the whole land"}
+      </p>
+      <label className="mt-4 flex min-h-11 items-center gap-3 text-[15px] text-ink">
+        <input type="checkbox" checked={negotiable} onChange={(e) => setNegotiable(e.target.checked)} className="size-5 accent-brand-600" />
+        Price is negotiable
+      </label>
+      {live && <p className="mt-2 text-[13px] text-muted">Your listing stays live — buyers see the new price right away.</p>}
+      {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+      <div className="mt-5 grid gap-2.5">
+        <Button type="submit" size="lg" disabled={pending || value < 10_000 || unchanged} className="w-full">
+          {pending ? "Saving…" : "Save price"}
+        </Button>
+        <Button type="button" size="lg" variant="ghost" onClick={onCancel} className="w-full">
+          Go back
+        </Button>
+      </div>
+    </form>
   );
 }
 

@@ -119,6 +119,9 @@ export async function createListing(params: {
  * live half-applied or skip re-review. The city is resolved by the caller
  * (it may call a geocoder, which must not run inside a transaction).
  */
+/** What "send it back to our team" sets: pending review, with any old hide/reject state cleared. */
+const BACK_TO_REVIEW = { status: "PENDING", hiddenReason: null, rejectionReason: null, availabilityCheckSentAt: null } as const;
+
 export async function updateListing(
   propertyId: string,
   input: ListingInput & { title?: string },
@@ -147,7 +150,7 @@ export async function updateListing(
         areaSqft: toSqft(input.area, input.areaUnit, city.bighaInSqft, city.marlaInSqft),
         price: BigInt(input.price),
         priceNegotiable: input.priceNegotiable,
-        ...(opts.backToReview ? { status: "PENDING", hiddenReason: null, rejectionReason: null, availabilityCheckSentAt: null } : {}),
+        ...(opts.backToReview ? BACK_TO_REVIEW : {}),
       },
     });
     if (opts.images) {
@@ -157,6 +160,45 @@ export async function updateListing(
       });
     }
   });
+}
+
+// ─── Photos and price on their own ───
+
+type PhotoInput = { url: string; width?: number | null; height?: number | null };
+
+/** Replaces a listing's photos (first = cover), optionally sending it back to review in the same transaction. */
+export async function setListingPhotos(propertyId: string, images: PhotoInput[], opts: { backToReview?: boolean } = {}) {
+  await db.$transaction(async (tx) => {
+    await tx.propertyImage.deleteMany({ where: { propertyId } });
+    if (images.length) {
+      await tx.propertyImage.createMany({
+        data: images.map((img, position) => ({ propertyId, url: img.url, width: img.width || null, height: img.height || null, position })),
+      });
+    }
+    if (opts.backToReview) await tx.property.update({ where: { id: propertyId }, data: BACK_TO_REVIEW });
+  });
+}
+
+/** Puts one photo first (or drops it) and renumbers the rest in their old order. Null when the photo isn't on this listing. */
+async function reorderPhotos(propertyId: string, imageId: string, mode: "remove" | "cover"): Promise<{ url: string } | null> {
+  return db.$transaction(async (tx) => {
+    const images = await tx.propertyImage.findMany({ where: { propertyId }, orderBy: { position: "asc" }, select: { id: true, url: true } });
+    const target = images.find((i) => i.id === imageId);
+    if (!target) return null;
+    const rest = images.filter((i) => i.id !== imageId);
+    if (mode === "remove") await tx.propertyImage.delete({ where: { id: target.id } });
+    const order = mode === "cover" ? [target, ...rest] : rest;
+    for (const [position, img] of order.entries()) await tx.propertyImage.update({ where: { id: img.id }, data: { position } });
+    return { url: target.url };
+  });
+}
+
+export const removeListingPhoto = (propertyId: string, imageId: string) => reorderPhotos(propertyId, imageId, "remove");
+export const makeListingCover = (propertyId: string, imageId: string) => reorderPhotos(propertyId, imageId, "cover");
+
+/** The asking price alone. Doesn't touch the status: the price is the seller's to set. */
+export async function setListingPrice(propertyId: string, price: number, priceNegotiable: boolean) {
+  await db.property.update({ where: { id: propertyId }, data: { price: BigInt(price), priceNegotiable } });
 }
 
 export type StatusAction =

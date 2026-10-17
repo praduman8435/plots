@@ -24,6 +24,7 @@ import { StatusPanelActions } from "@/components/admin/listing-actions";
 import { ListingThumb } from "@/components/admin/listing-thumb";
 import { PageHeader } from "@/components/admin/page-header";
 import { ListingForm } from "@/components/listing/listing-form";
+import { PhotoTools } from "@/components/admin/photo-tools";
 import { ButtonLink } from "@/components/ui/button";
 import { requireAdmin } from "@/lib/admin/require";
 import { db } from "@/lib/db";
@@ -153,31 +154,31 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
           ) : (
             <div className="grid grid-cols-4 gap-2">
               {p.images.map((img, i) => (
-                <a
+                <div
                   key={img.id}
-                  href={img.url}
-                  target="_blank"
-                  rel="noreferrer"
                   className={
                     i === 0
                       ? "relative col-span-4 aspect-[16/10] overflow-hidden rounded-2xl bg-mist"
                       : "relative aspect-square overflow-hidden rounded-xl bg-mist"
                   }
                 >
-                  <Image
-                    src={img.url}
-                    alt={`Photo ${i + 1} of ${p.title}`}
-                    fill
-                    sizes={i === 0 ? "(min-width: 1024px) 60vw, 100vw" : "(min-width: 1024px) 15vw, 25vw"}
-                    className="object-cover transition hover:scale-[1.02]"
-                    priority={i === 0}
-                  />
+                  <a href={img.url} target="_blank" rel="noreferrer" className="absolute inset-0" aria-label={`Open photo ${i + 1}`}>
+                    <Image
+                      src={img.url}
+                      alt={`Photo ${i + 1} of ${p.title}`}
+                      fill
+                      sizes={i === 0 ? "(min-width: 1024px) 60vw, 100vw" : "(min-width: 1024px) 15vw, 25vw"}
+                      className="object-cover transition hover:scale-[1.02]"
+                      priority={i === 0}
+                    />
+                  </a>
                   {i === 0 && (
-                    <span className="absolute top-3 left-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-ink shadow-soft">
+                    <span className="pointer-events-none absolute top-3 left-3 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-ink shadow-soft">
                       Cover · {p.images.length} photo{p.images.length === 1 ? "" : "s"}
                     </span>
                   )}
-                </a>
+                  <PhotoTools propertyId={p.id} imageId={img.id} isCover={i === 0} />
+                </div>
               ))}
             </div>
           )}

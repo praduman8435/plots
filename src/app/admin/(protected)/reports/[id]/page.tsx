@@ -32,6 +32,8 @@ const ACTION_LABELS: Record<string, string> = {
   "listing.CONFIRM_AVAILABLE": "Plot confirmed available",
   "listing.AVAILABILITY_CHECK": "Availability check sent",
   "listing.EDIT": "Plot edited by admin",
+  "listing.PHOTO_REMOVED": "Photo removed by admin",
+  "listing.PHOTO_COVER": "Cover photo changed by admin",
   "seller.block": "Seller suspended",
   "seller.unblock": "Seller suspension lifted",
 };

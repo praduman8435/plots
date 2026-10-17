@@ -12,6 +12,13 @@ const optionalText = z
 const optionalCoord = (min: number, max: number) =>
   z.preprocess((v) => (v === "" || v === null || v === undefined ? undefined : Number(v)), z.number().min(min).max(max).optional());
 
+/** Total asking price in ₹ — the listing forms and the seller's quick "Change price". */
+export const priceSchema = z.coerce
+  .number({ message: "Enter the expected price" })
+  .int()
+  .min(10_000, "Price looks too low — enter the total price in ₹")
+  .max(10_000_000_000);
+
 /** Shared by the seller "Add plot" form, the admin form and the WhatsApp assistant. */
 export const listingInputSchema = z.object({
   /** An existing city… */
@@ -22,11 +29,7 @@ export const listingInputSchema = z.object({
   landType: z.enum(Object.values(LandType) as [LandType, ...LandType[]], { message: "Choose the land type" }),
   area: z.coerce.number({ message: "Enter the land size" }).positive("Enter the land size").max(10_000_000),
   areaUnit: z.enum(Object.values(AreaUnit) as [AreaUnit, ...AreaUnit[]]),
-  price: z.coerce
-    .number({ message: "Enter the expected price" })
-    .int()
-    .min(10_000, "Price looks too low — enter the total price in ₹")
-    .max(10_000_000_000),
+  price: priceSchema,
   priceNegotiable: z.coerce.boolean().default(true),
   locality: z.string().trim().min(2, "Enter the area or locality").max(120),
   village: optionalText,

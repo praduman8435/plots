@@ -9,7 +9,15 @@ import { db } from "@/lib/db";
 import { resolveCity } from "@/server/cities";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { listingInputSchema, sellerInputSchema } from "@/lib/validation/listing";
-import { changeListingStatus, createListing, findOrCreateSeller, runAvailabilityChecks, updateListing } from "@/server/listings/service";
+import {
+  changeListingStatus,
+  createListing,
+  findOrCreateSeller,
+  makeListingCover,
+  removeListingPhoto,
+  runAvailabilityChecks,
+  updateListing,
+} from "@/server/listings/service";
 import { trackEvent } from "@/server/analytics";
 import { cleanContext, recordAudit } from "@/server/audit";
 import { isWhatsAppConfigured } from "@/server/whatsapp/config";
@@ -234,6 +242,41 @@ export async function updateListingAction(propertyId: string, payload: ListingFo
   await revalidateListing(existing.id);
   await recordAudit(admin, { action: "listing.EDIT", targetType: "listing", targetId: existing.id, propertyId: existing.id, sellerId: existing.sellerId });
   return { ok: true, redirectTo: `/admin/listings/${existing.id}?saved=1` };
+}
+
+// ───────────────────────────── Photos ─────────────────────────────
+
+/** Removes one photo straight from the review screen. The listing's status doesn't change and the seller isn't messaged. */
+export async function removeListingPhotoAction(propertyId: string, imageId: string): Promise<AdminActionResult> {
+  return photoAction(propertyId, imageId, "remove");
+}
+
+/** Makes one photo the cover (first photo) without opening the edit form. */
+export async function makeListingCoverAction(propertyId: string, imageId: string): Promise<AdminActionResult> {
+  return photoAction(propertyId, imageId, "cover");
+}
+
+async function photoAction(propertyId: string, imageId: string, mode: "remove" | "cover"): Promise<AdminActionResult> {
+  const admin = await requireAdmin();
+  const id = idSchema.safeParse(propertyId);
+  const photo = idSchema.safeParse(imageId);
+  if (!id.success || !photo.success) return { ok: false, message: "Unknown photo." };
+  const p = await db.property.findUnique({ where: { id: id.data }, select: { id: true, sellerId: true } });
+  if (!p) return { ok: false, message: "This listing no longer exists." };
+
+  const done = mode === "remove" ? await removeListingPhoto(p.id, photo.data) : await makeListingCover(p.id, photo.data);
+  if (!done) return { ok: false, message: "That photo is no longer on this listing. Refresh the page." };
+
+  await revalidateListing(p.id);
+  await recordAudit(admin, {
+    action: mode === "remove" ? "listing.PHOTO_REMOVED" : "listing.PHOTO_COVER",
+    targetType: "listing",
+    targetId: p.id,
+    propertyId: p.id,
+    sellerId: p.sellerId,
+    meta: { url: done.url },
+  });
+  return { ok: true, message: mode === "remove" ? "Photo removed." : "Cover photo changed." };
 }
 
 export type AdminSellerLookup =
