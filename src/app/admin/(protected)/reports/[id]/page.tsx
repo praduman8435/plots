@@ -34,6 +34,7 @@ const ACTION_LABELS: Record<string, string> = {
   "listing.EDIT": "Plot edited by admin",
   "listing.PHOTO_REMOVED": "Photo removed by admin",
   "listing.PHOTO_COVER": "Cover photo changed by admin",
+  "listing.PHOTO_MOVED": "Photo order changed by admin",
   "seller.block": "Seller suspended",
   "seller.unblock": "Seller suspension lifted",
 };

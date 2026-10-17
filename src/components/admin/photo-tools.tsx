@@ -1,17 +1,32 @@
 "use client";
 
-import { Loader2, Star, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Star, Trash2 } from "lucide-react";
 import { useTransition } from "react";
 import { cn } from "@/lib/cn";
-import { makeListingCoverAction, removeListingPhotoAction, type AdminActionResult } from "@/server/actions/admin/listings";
+import { makeListingCoverAction, moveListingPhotoAction, removeListingPhotoAction, type AdminActionResult } from "@/server/actions/admin/listings";
 import { toast } from "./toast";
 
 /**
- * "Make cover" and "Remove" on a photo, right where the reviewer looks at it,
- * so a bad photo can go before approving. Sits on top of the photo (never
- * inside its link) and saves at once; the status doesn't change.
+ * Move earlier / later, "Make cover" and "Remove" on a photo, right where the
+ * reviewer looks at it, so the order is right and a bad photo is gone before
+ * approving. Sits on top of the photo (never inside its link) and saves at
+ * once; the status doesn't change.
  */
-export function PhotoTools({ propertyId, imageId, isCover, className }: { propertyId: string; imageId: string; isCover: boolean; className?: string }) {
+export function PhotoTools({
+  propertyId,
+  imageId,
+  index,
+  count,
+  className,
+}: {
+  propertyId: string;
+  imageId: string;
+  /** Position in the current order (0 = cover) and how many photos there are. */
+  index: number;
+  count: number;
+  className?: string;
+}) {
+  const isCover = index === 0;
   const [pending, start] = useTransition();
 
   function run(fn: () => Promise<AdminActionResult>) {
@@ -26,7 +41,17 @@ export function PhotoTools({ propertyId, imageId, isCover, className }: { proper
   }
 
   return (
-    <div className={cn("absolute top-2 right-2 z-10 flex gap-1.5", className)}>
+    <div className={cn("pointer-events-none absolute top-2 right-2 left-2 z-10 flex flex-wrap justify-end gap-1.5", className)}>
+      {count > 1 && (
+        <>
+          <ToolButton label="Move this photo earlier" disabled={pending || isCover} onClick={() => run(() => moveListingPhotoAction(propertyId, imageId, "earlier"))}>
+            <ChevronLeft />
+          </ToolButton>
+          <ToolButton label="Move this photo later" disabled={pending || index === count - 1} onClick={() => run(() => moveListingPhotoAction(propertyId, imageId, "later"))}>
+            <ChevronRight />
+          </ToolButton>
+        </>
+      )}
       {!isCover && (
         <ToolButton label="Make this the cover photo" disabled={pending} onClick={() => run(() => makeListingCoverAction(propertyId, imageId))}>
           <Star />
@@ -55,7 +80,7 @@ function ToolButton({ label, danger, disabled, onClick, children }: { label: str
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "flex size-9 items-center justify-center rounded-full bg-white/95 shadow-soft ring-1 ring-black/5 backdrop-blur transition disabled:opacity-60 [&_svg]:size-4",
+        "pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/95 shadow-soft ring-1 ring-black/5 backdrop-blur transition disabled:opacity-60 [&_svg]:size-4",
         danger ? "text-danger hover:bg-red-50" : "text-ink-soft hover:bg-white hover:text-brand-800",
       )}
     >

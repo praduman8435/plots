@@ -114,6 +114,41 @@ async function main() {
   r = await text(legacySeller, "owner");
   check("chat paused on the removed owner/broker question moves on", (await step(legacySeller)) === "ASK_LAND_TYPE", await step(legacySeller));
 
+  // ── A real chat that went wrong: business profile name, taps mid-listing, a person stepping in ──
+  const { profileNameToOffer } = await import("../src/server/whatsapp/parse");
+  const { pauseForHuman, resumeFromHuman } = await import("../src/server/whatsapp/bot");
+  check("profile name: a business name is never offered", profileNameToOffer("real estate") === null && profileNameToOffer("Mathura Properties") === null && profileNameToOffer("Shiv Builders & Developers") === null);
+  check("profile name: a person's name is offered", profileNameToOffer("asheesh yadav") === "Asheesh Yadav" && profileNameToOffer("Ravi 9876543210") === null);
+  const real = newPhone();
+  const asReal = (t: string) => send(real, { kind: "text", text: t, profileName: "real estate" });
+  await asReal("SELL");
+  r = await send(real, { kind: "interactive", replyId: "lang:en", replyTitle: "English", profileName: "real estate" });
+  check("business profile: no 'Should we use Real Estate?' button", (await step(real)) === "ASK_NAME" && !r.ids.includes("name:profile") && !/Real/.test(r.body), r);
+  await asReal("Asheesh Yadav");
+  r = await tap(real, "type:RESIDENTIAL_PLOT", "Residential plot");
+  check("name + land type → state list (sent once)", (await step(real)) === "ASK_STATE" && r.body.includes("36. "), r.body.slice(0, 80));
+  r = await tap(real, "type:RESIDENTIAL_PLOT", "Residential plot");
+  check("old land-type button tapped again: 'already noted', short re-ask, no list repeat", (await step(real)) === "ASK_STATE" && /already noted/.test(r.body) && !r.body.includes("36. ") && !/didn't recognise/.test(r.body), r.body.slice(0, 200));
+  r = await tap(real, "menu:list", "List my land");
+  const kept = (await db.whatsAppConversation.findUnique({ where: { phone: real } }))?.draft as Record<string, unknown> | null;
+  check("'List my land' mid-listing continues — nothing asked again", (await step(real)) === "ASK_STATE" && kept?.name === "Asheesh Yadav" && kept?.landType === "RESIDENTIAL_PLOT" && !/what is your name/i.test(r.body) && /nothing you told us is lost/.test(r.body), r.body.slice(0, 200));
+  r = await asReal("SELL");
+  check("'SELL' mid-listing continues too", (await step(real)) === "ASK_STATE" && !/what is your name/i.test(r.body) && !r.ids.includes("menu:status"), r.body.slice(0, 160));
+  // A person takes over from the admin inbox, then hands back.
+  const convo = await db.whatsAppConversation.findUniqueOrThrow({ where: { phone: real } });
+  await db.whatsAppConversation.update({ where: { id: convo.id }, data: pauseForHuman(convo.step, convo.draft) });
+  r = await asReal("Fine");
+  check("taken over by a person: the assistant stays silent", r.body === "" && (await step(real)) === "HUMAN", r.body);
+  const paused = await db.whatsAppConversation.findUniqueOrThrow({ where: { phone: real } });
+  await db.whatsAppConversation.update({ where: { id: paused.id }, data: resumeFromHuman(paused.draft) });
+  check("handed back: the listing question we were on, not IDLE", (await step(real)) === "ASK_STATE");
+  r = await asReal(city.state);
+  const after = (await db.whatsAppConversation.findUnique({ where: { phone: real } }))?.draft as Record<string, unknown> | null;
+  check("handed back: carries on, every answer kept, no menu", (await step(real)) === "ASK_CITY" && after?.name === "Asheesh Yadav" && after?.landType === "RESIDENTIAL_PLOT" && !r.ids.includes("menu:status"), { step: await step(real), body: r.body.slice(0, 120) });
+  await asReal("cancel");
+  r = await asReal("SELL");
+  check("after CANCEL, a new listing doesn't ask the name again", (await step(real)) === "ASK_LAND_TYPE" && !/what is your name/i.test(r.body), { step: await step(real), body: r.body.slice(0, 120) });
+
   // ── Weekly check answered in Hindi by an existing seller ──
   if (hiSeller) {
     await db.property.update({ where: { id: hiSeller.properties[0].id }, data: { status: "ACTIVE", publishedAt: new Date(), availabilityCheckSentAt: new Date() } });

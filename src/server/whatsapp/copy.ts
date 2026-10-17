@@ -175,6 +175,11 @@ function catalog(lang: Lang) {
             `सब कुछ ऑनलाइन देखें: ${v.url}/seller/dashboard`,
           ].join("\n"),
     continueListing: en ? "👇 Let's continue your listing." : "👇 चलिए, आपकी लिस्टिंग आगे बढ़ाते हैं।",
+    continueWhereLeft: en
+      ? "👍 We're already filling in your listing — nothing you told us is lost. Let's carry on from here."
+      : "👍 आपकी लिस्टिंग पहले से भरी जा रही है — आपकी दी हुई कोई जानकारी नहीं खोई। यहीं से आगे बढ़ते हैं।",
+    alreadyNoted: (v: Vars) => (en ? `${v.item} ✓ — already noted.` : `${v.item} ✓ — पहले ही नोट है।`),
+    stateListAbove: en ? "(The numbered list is just above.)" : "(नंबर वाली सूची ठीक ऊपर है।)",
     greetingMidListing: en ? "Namaste 🙏 We were in the middle of your listing." : "नमस्ते जी 🙏 हम आपकी लिस्टिंग भर रहे थे।",
     cancelled: en
       ? "Okay, I've stopped this listing. Nothing was sent.\n\nWhenever you're ready, tap *List my land*."

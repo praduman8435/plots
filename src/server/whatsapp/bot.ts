@@ -35,6 +35,7 @@ import {
   parseLanguage,
   parseListNumber,
   parseName,
+  profileNameToOffer,
   parseNumber,
   parsePrice,
   parseUnit,
@@ -188,6 +189,8 @@ const draftSchema = z
     soldChoices: z.array(z.string()),
     /** What to do once the seller picks a language. */
     afterLanguage: z.enum(["START", "MENU"]),
+    /** The listing question we were on when a person took the chat over; picked up again when they hand it back. */
+    pausedStep: z.string(),
   })
   .partial();
 export type BotDraft = z.infer<typeof draftSchema>;
@@ -195,6 +198,31 @@ export type BotDraft = z.infer<typeof draftSchema>;
 function readDraft(value: Prisma.JsonValue | null): BotDraft {
   const parsed = draftSchema.safeParse(value ?? {});
   return parsed.success ? parsed.data : {};
+}
+
+/** True when the draft holds answers about a plot (not just the seller's name). */
+function hasListingData(d: BotDraft): boolean {
+  return Boolean(d.landType || d.cityState || d.cityId || d.locality || d.area || d.price || d.photos?.length);
+}
+
+/**
+ * A person takes the chat over: remember which listing question we were on, so
+ * handing it back continues the listing instead of dropping it (the draft stays).
+ */
+export function pauseForHuman(step: string | null | undefined, draft: Prisma.JsonValue | null): { step: "HUMAN"; draft: Prisma.InputJsonValue | typeof Prisma.DbNull } {
+  const current = toBotStep(step);
+  const d = readDraft(draft);
+  if (current === "HUMAN") return { step: "HUMAN", draft: Object.keys(d).length ? (d as Prisma.InputJsonValue) : Prisma.DbNull };
+  const paused = isInFlow(current) && current !== "SUBMITTING" ? { ...d, pausedStep: current } : d;
+  return { step: "HUMAN", draft: Object.keys(paused).length ? (paused as Prisma.InputJsonValue) : Prisma.DbNull };
+}
+
+/** Handing a chat back to the assistant: the paused listing question, or IDLE. The rest of the draft is kept. */
+export function resumeFromHuman(draft: Prisma.JsonValue | null): { step: BotStep; draft: Prisma.InputJsonValue | typeof Prisma.DbNull } {
+  const { pausedStep, ...rest } = readDraft(draft);
+  const step = toBotStep(pausedStep);
+  const resumed: BotStep = isInFlow(step) && step !== "SUBMITTING" ? step : "IDLE";
+  return { step: resumed, draft: Object.keys(rest).length ? (rest as Prisma.InputJsonValue) : Prisma.DbNull };
 }
 
 // ───────────────────────────── Turn input / output ─────────────────────────────
@@ -381,7 +409,13 @@ async function handle(t: Turn, input: BotInput) {
   // ── A person from our team is handling this chat: stay silent unless asked back.
   if (t.step === "HUMAN") {
     if (command === "MENU" || command === "START" || replyId === "menu:list" || replyId === "menu:bot") {
-      await t.save("IDLE", null);
+      const { pausedStep, ...rest } = t.draft;
+      const back = toBotStep(pausedStep);
+      if (isInFlow(back) && back !== "SUBMITTING") {
+        await t.save(back, rest);
+        return reprompt(t, t.c.continueWhereLeft);
+      }
+      await t.save("IDLE", rest.name ? { name: rest.name } : null);
       if (command === "START" || replyId === "menu:list") return startListing(t);
       return sendMenu(t, t.c.backWithAssistant);
     }
@@ -509,8 +543,8 @@ async function handleCommand(t: Turn, command: BotCommand, text: string): Promis
         await acceptPrice(t, t.draft.suggestedPrice);
         return true;
       }
-      if (t.step === "ASK_NAME" && t.conv.profileName && parseName(t.conv.profileName)) {
-        await acceptName(t, parseName(t.conv.profileName)!);
+      if (t.step === "ASK_NAME" && profileNameToOffer(t.conv.profileName)) {
+        await acceptName(t, profileNameToOffer(t.conv.profileName)!);
         return true;
       }
       await withResume(t, () => confirmAvailability(t));
@@ -587,7 +621,8 @@ async function sendMenuOrNudge(t: Turn) {
 
 async function cancel(t: Turn) {
   const hadDraft = isInFlow(t.step);
-  await t.save("IDLE", null);
+  // The listing goes; the seller's name stays, so a fresh start never asks it again.
+  await t.save("IDLE", t.draft.name ? { name: t.draft.name } : null);
   await t.reply({
     type: "buttons",
     body: hadDraft ? t.c.cancelled : t.c.whenReady,
@@ -599,7 +634,7 @@ async function cancel(t: Turn) {
 }
 
 async function handOverToHuman(t: Turn) {
-  await t.save("HUMAN", t.draft);
+  await t.save("HUMAN", isInFlow(t.step) && t.step !== "SUBMITTING" ? { ...t.draft, pausedStep: t.step } : t.draft);
   await t.text(t.c.human);
 }
 
@@ -900,9 +935,20 @@ async function startListing(t: Turn, prefill: BotDraft = {}, lead?: string) {
     await t.text(t.c.blocked);
     return;
   }
+  const who: BotDraft = seller ? { name: seller.name, sellerType: seller.sellerType } : t.draft.name ? { name: t.draft.name } : {};
+
+  // Already filling one in ("List my land" tapped again, or the AI heard "I want to sell" mid-way):
+  // keep every answer, add anything new, and ask what's still missing. Never start over.
+  const inProgress = isInFlow(t.step) && t.step !== "SUBMITTING";
+  if (inProgress || hasListingData(t.draft)) {
+    const draft: BotDraft = { ...t.draft, ...prefill, ...who };
+    const from = inProgress ? t.step : "ASK_NAME";
+    return goTo(t, from, draft, lead ?? t.c.continueWhereLeft);
+  }
+
   if (!t.isSimulation) await trackEvent("listing_started", { sellerId: seller?.id ?? null, props: { via: "whatsapp", lang: t.lang } });
   const intro = seller ? t.c.startReturning({ name: seller.name, code: seller.code }) : t.c.startNew;
-  const draft: BotDraft = { ...prefill, ...(seller ? { name: seller.name, sellerType: seller.sellerType } : {}) };
+  const draft: BotDraft = { ...prefill, ...who };
   await goTo(t, "ASK_NAME", draft, lead ? `${intro}\n\n${lead}` : intro);
 }
 
@@ -967,6 +1013,17 @@ async function reprompt(t: Turn, lead?: string, ask?: string) {
   await t.reply(await promptFor(t, t.step, lead, ask));
 }
 
+/** True when the numbered list of states went out in the last few messages. */
+async function stateListShownRecently(t: Turn): Promise<boolean> {
+  const recent = await db.whatsAppMessage.findMany({
+    where: { conversationId: t.conv.id, direction: "OUTBOUND", createdAt: { gte: new Date(Date.now() - 30 * 60_000) } },
+    orderBy: { createdAt: "desc" },
+    take: 3,
+    select: { body: true },
+  });
+  return recent.some((m) => m.body?.includes("36. "));
+}
+
 /** True when the main menu went out in the last few messages: chatting on then shouldn't resend it every time. */
 async function menuShownRecently(t: Turn): Promise<boolean> {
   const recent = await db.whatsAppMessage.findMany({
@@ -1009,8 +1066,8 @@ async function promptFor(t: Turn, step: BotStep, lead?: string, ask?: string): P
   const c = t.c;
   switch (step) {
     case "ASK_NAME": {
-      const suggested = t.conv.profileName ? parseName(t.conv.profileName) : null;
-      if (suggested && suggested.length <= 40) {
+      const suggested = profileNameToOffer(t.conv.profileName);
+      if (suggested) {
         return { type: "buttons", body: `${pre}${c.askNameSuggested({ name: suggested })}`, buttons: [{ id: "name:profile", title: c.btnUseName({ name: suggested }).slice(0, 20) }] };
       }
       return { type: "text", text: `${pre}${q(c.askName)}` };
@@ -1024,7 +1081,9 @@ async function promptFor(t: Turn, step: BotStep, lead?: string, ask?: string): P
       };
     case "ASK_STATE":
       // A WhatsApp list holds only 10 rows, so every state and UT goes in one numbered message:
-      // all 36 visible at once, answered with the number or the name.
+      // all 36 visible at once, answered with the number or the name. Sent once; a re-ask moments
+      // later points at it instead of filling the screen again.
+      if (await stateListShownRecently(t)) return { type: "text", text: `${pre}${q(c.askState)} ${c.stateListAbove}\n\n${c.replyStateNumber}` };
       return { type: "text", text: `${pre}${q(c.askState)}\n\n${numberedStateList(t.lang)}\n\n${c.replyStateNumber}` };
     case "ASK_CITY": {
       const cities = d.cityState ? await citiesInState(d.cityState) : [];
@@ -1349,6 +1408,11 @@ async function aiAgent(t: Turn, text: string): Promise<boolean> {
       await startListing(t, draft, joinLead(u.reply, items.length ? c.understood({ items: items.join(" · ") }) : undefined));
       return true;
     }
+    // A listing was interrupted (e.g. a person stepped in): carry on with it rather than showing the menu.
+    if (hasListingData(t.draft)) {
+      await startListing(t, {}, u.reply);
+      return true;
+    }
     if (!u.reply) return false;
     if (await menuShownRecently(t)) await t.text(u.reply);
     else await sendMenu(t, u.reply);
@@ -1367,7 +1431,10 @@ async function aiAgent(t: Turn, text: string): Promise<boolean> {
   const correcting = u.intent === "correction" || t.step === "CONFIRM";
   const { draft, items } = await mergeExtracted(t, u.fields, correcting);
   const newName = t.step === "ASK_NAME" && draft.name && draft.name !== t.draft.name ? draft.name : null;
-  const noted = newName ? c.thanksName({ name: newName }) : items.length ? c.understood({ items: items.join(" · ") }) : undefined;
+  // The AI's reply already says what it understood, so our fixed "Noted / Thank you" line would say it twice.
+  // A correction keeps it: the exact new value is what the seller needs to see.
+  const quiet = Boolean(u.reply) && !correcting;
+  const noted = quiet ? undefined : newName ? c.thanksName({ name: newName }) : items.length ? c.understood({ items: items.join(" · ") }) : undefined;
   if (t.step === "CONFIRM" && items.length) {
     await goTo(t, "CONFIRM", draft, joinLead(u.reply, noted));
     return true;
@@ -1376,7 +1443,7 @@ async function aiAgent(t: Turn, text: string): Promise<boolean> {
     await advance(t, t.step, draft, joinLead(u.reply, noted));
     return true;
   }
-  if (noted) {
+  if (noted || items.length || newName) {
     await t.save(t.step, draft);
     await reprompt(t, joinLead(u.reply, noted), u.ask);
     return true;
@@ -1400,6 +1467,20 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
   const d = t.draft;
   const c = t.c;
 
+  // An answer to a question we already asked (an old button tapped, or the same answer sent again):
+  // say it's noted and ask the current question, instead of "I didn't understand".
+  if (isInFlow(t.step) && t.step !== "SUBMITTING" && t.step !== "ASK_LAND_TYPE" && t.step !== "CONFIRM") {
+    const typeFromId = replyId?.startsWith("type:") ? replyId.slice(5) : null;
+    const earlierType = typeFromId && Object.hasOwn(LAND_TYPES, typeFromId) ? (typeFromId as LandType) : !replyId && text && t.step !== "ASK_DESCRIPTION" ? parseLandType(text) : null;
+    if (earlierType && (replyId || normalizeInput(text ?? "") === normalizeInput(landLabel(t.lang, earlierType)))) {
+      const label = landLabel(t.lang, earlierType);
+      if (earlierType === d.landType) return reprompt(t, c.alreadyNoted({ item: label }));
+      await t.save(t.step, { ...d, landType: earlierType });
+      return reprompt(t, `${label} ✓`);
+    }
+    if (replyId === "name:profile" && t.step !== "ASK_NAME") return reprompt(t);
+  }
+
   switch (t.step) {
     case "ASK_SOLD_WHICH":
       return reprompt(t);
@@ -1408,11 +1489,12 @@ async function handleStep(t: Turn, input: BotInput & { text?: string }) {
     case "SUBMITTING":
       if (input.kind === "location") return sendMenu(t, c.thanksLocationIdle);
       if (t.step === "IDLE" && input.kind === "text" && (await aiAssist(t, text))) return;
+      if (t.step === "IDLE" && hasListingData(d)) return startListing(t);
       return sendMenuOrNudge(t);
 
     case "ASK_NAME": {
       let name: string | null = null;
-      if (replyId === "name:profile" || (text && /^(?:yes|haan|han|हाँ|हां)\b/i.test(text))) name = t.conv.profileName ? parseName(t.conv.profileName) : null;
+      if (replyId === "name:profile" || (text && /^(?:yes|haan|han|हाँ|हां)\b/i.test(text))) name = profileNameToOffer(t.conv.profileName);
       if (!name && text) name = parseName(text);
       if (!name) return (await aiAssist(t, text)) || reprompt(t, c.typeName);
       return acceptName(t, name);

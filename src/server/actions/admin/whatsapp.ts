@@ -6,7 +6,7 @@ import { requireAdmin } from "@/lib/admin/require";
 import { placeName } from "@/lib/land";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { changeListingStatus, plotsAwaitingAvailability } from "@/server/listings/service";
-import { toBotStep, type BotReply } from "@/server/whatsapp/bot";
+import { pauseForHuman, resumeFromHuman, toBotStep, type BotReply } from "@/server/whatsapp/bot";
 import { emptyChatState, inboundFromForm, loadChatState, type ChatState } from "@/server/whatsapp/chat-state";
 import type { OutgoingMessage } from "@/server/whatsapp/client";
 import { processInbound } from "@/server/whatsapp/inbound";
@@ -38,13 +38,23 @@ export async function sendAdminReply(formData: FormData): Promise<void> {
   refresh();
 }
 
-/** "Take over" (HUMAN: the bot stays silent) or "Hand back to the assistant" (IDLE). */
+/**
+ * "Take over" (HUMAN: the bot stays silent) or "Hand back to the assistant".
+ * A listing half-filled when a person stepped in is kept and picked up again
+ * at the same question on hand-back — never dropped back to the menu.
+ */
 export async function setConversationMode(formData: FormData): Promise<void> {
   await requireAdmin();
   const conversationId = String(formData.get("conversationId") ?? "");
   const mode = formData.get("mode") === "HUMAN" ? "HUMAN" : "IDLE";
   if (!conversationId) return;
-  await db.whatsAppConversation.updateMany({ where: { id: conversationId }, data: { step: mode } });
+  const conversation = await db.whatsAppConversation.findUnique({ where: { id: conversationId }, select: { id: true, step: true, draft: true } });
+  if (!conversation) return;
+  if (mode === "HUMAN") {
+    await db.whatsAppConversation.update({ where: { id: conversation.id }, data: pauseForHuman(conversation.step, conversation.draft) });
+  } else if (toBotStep(conversation.step) === "HUMAN") {
+    await db.whatsAppConversation.update({ where: { id: conversation.id }, data: resumeFromHuman(conversation.draft) });
+  }
   refresh();
 }
 

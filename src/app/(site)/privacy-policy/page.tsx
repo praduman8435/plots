@@ -69,7 +69,11 @@ const sections: LegalSection[] = [
             messages can be sent).
           </li>
         </ul>
-        <p>We do not use advertising or tracking cookies, and we do not run third-party analytics or ad networks on the site.</p>
+        <p>
+          We do not use advertising or tracking cookies, and we do not run ad networks on the site. To count visits we use Vercel Web Analytics, from our
+          hosting provider: it uses no cookies, doesn&apos;t follow you to other websites, and gives us only totals such as page views, countries and device
+          types.
+        </p>
       </>
     ),
   },
@@ -106,7 +110,7 @@ const sections: LegalSection[] = [
         <p>We use trusted companies to run {site.name}. They process data only on our instructions:</p>
         <ul>
           <li>
-            <strong>Vercel</strong>: website hosting and photo storage.
+            <strong>Vercel</strong>: website hosting, photo storage and visit counts (Web Analytics, without cookies).
           </li>
           <li>
             <strong>Supabase</strong>: our database.

@@ -91,7 +91,7 @@ function Photos({ p }: { p: ReviewQueueItem }) {
         <a href={p.images[0].url} target="_blank" rel="noreferrer" className="absolute inset-0" aria-label="Open photo">
           <Image src={p.images[0].url} alt={`Photo of ${p.title}`} fill sizes="(min-width: 1280px) 560px, 100vw" className="object-cover" />
         </a>
-        <PhotoTools propertyId={p.id} imageId={p.images[0].id} isCover />
+        <PhotoTools propertyId={p.id} imageId={p.images[0].id} index={0} count={1} />
       </div>
     );
   }
@@ -103,7 +103,7 @@ function Photos({ p }: { p: ReviewQueueItem }) {
             <a href={img.url} target="_blank" rel="noreferrer" className="absolute inset-0">
               <Image src={img.url} alt={`Photo ${i + 1} of ${p.title}`} fill sizes="(min-width: 640px) 280px, 78vw" className="object-cover" />
             </a>
-            <PhotoTools propertyId={p.id} imageId={img.id} isCover={i === 0} />
+            <PhotoTools propertyId={p.id} imageId={img.id} index={i} count={p._count.images} />
           </li>
         ))}
       </ul>

@@ -177,7 +177,7 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
                       Cover · {p.images.length} photo{p.images.length === 1 ? "" : "s"}
                     </span>
                   )}
-                  <PhotoTools propertyId={p.id} imageId={img.id} isCover={i === 0} />
+                  <PhotoTools propertyId={p.id} imageId={img.id} index={i} count={p.images.length} />
                 </div>
               ))}
             </div>

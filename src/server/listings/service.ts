@@ -179,15 +179,27 @@ export async function setListingPhotos(propertyId: string, images: PhotoInput[],
   });
 }
 
-/** Puts one photo first (or drops it) and renumbers the rest in their old order. Null when the photo isn't on this listing. */
-async function reorderPhotos(propertyId: string, imageId: string, mode: "remove" | "cover"): Promise<{ url: string } | null> {
+type PhotoMove = "remove" | "cover" | "earlier" | "later";
+
+/**
+ * Drops one photo, puts it first, or swaps it with its neighbour, then renumbers
+ * every photo 0..n in one transaction. Null when the photo isn't on this listing.
+ */
+async function reorderPhotos(propertyId: string, imageId: string, mode: PhotoMove): Promise<{ url: string } | null> {
   return db.$transaction(async (tx) => {
     const images = await tx.propertyImage.findMany({ where: { propertyId }, orderBy: { position: "asc" }, select: { id: true, url: true } });
-    const target = images.find((i) => i.id === imageId);
-    if (!target) return null;
+    const index = images.findIndex((i) => i.id === imageId);
+    if (index < 0) return null;
+    const target = images[index];
     const rest = images.filter((i) => i.id !== imageId);
     if (mode === "remove") await tx.propertyImage.delete({ where: { id: target.id } });
-    const order = mode === "cover" ? [target, ...rest] : rest;
+    let order = mode === "cover" ? [target, ...rest] : mode === "remove" ? rest : images;
+    if (mode === "earlier" || mode === "later") {
+      const to = mode === "earlier" ? index - 1 : index + 1;
+      if (to < 0 || to >= images.length) return { url: target.url };
+      order = [...images];
+      [order[index], order[to]] = [order[to], order[index]];
+    }
     for (const [position, img] of order.entries()) await tx.propertyImage.update({ where: { id: img.id }, data: { position } });
     return { url: target.url };
   });
@@ -195,6 +207,7 @@ async function reorderPhotos(propertyId: string, imageId: string, mode: "remove"
 
 export const removeListingPhoto = (propertyId: string, imageId: string) => reorderPhotos(propertyId, imageId, "remove");
 export const makeListingCover = (propertyId: string, imageId: string) => reorderPhotos(propertyId, imageId, "cover");
+export const moveListingPhoto = (propertyId: string, imageId: string, direction: "earlier" | "later") => reorderPhotos(propertyId, imageId, direction);
 
 /** The asking price alone. Doesn't touch the status: the price is the seller's to set. */
 export async function setListingPrice(propertyId: string, price: number, priceNegotiable: boolean) {

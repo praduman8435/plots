@@ -14,6 +14,7 @@ import {
   createListing,
   findOrCreateSeller,
   makeListingCover,
+  moveListingPhoto,
   removeListingPhoto,
   runAvailabilityChecks,
   updateListing,
@@ -256,7 +257,13 @@ export async function makeListingCoverAction(propertyId: string, imageId: string
   return photoAction(propertyId, imageId, "cover");
 }
 
-async function photoAction(propertyId: string, imageId: string, mode: "remove" | "cover"): Promise<AdminActionResult> {
+/** Moves one photo a place earlier or later in the order buyers see (first = cover). */
+export async function moveListingPhotoAction(propertyId: string, imageId: string, direction: "earlier" | "later"): Promise<AdminActionResult> {
+  if (direction !== "earlier" && direction !== "later") return { ok: false, message: "Unknown move." };
+  return photoAction(propertyId, imageId, direction);
+}
+
+async function photoAction(propertyId: string, imageId: string, mode: "remove" | "cover" | "earlier" | "later"): Promise<AdminActionResult> {
   const admin = await requireAdmin();
   const id = idSchema.safeParse(propertyId);
   const photo = idSchema.safeParse(imageId);
@@ -264,19 +271,24 @@ async function photoAction(propertyId: string, imageId: string, mode: "remove" |
   const p = await db.property.findUnique({ where: { id: id.data }, select: { id: true, sellerId: true } });
   if (!p) return { ok: false, message: "This listing no longer exists." };
 
-  const done = mode === "remove" ? await removeListingPhoto(p.id, photo.data) : await makeListingCover(p.id, photo.data);
+  const done =
+    mode === "remove"
+      ? await removeListingPhoto(p.id, photo.data)
+      : mode === "cover"
+        ? await makeListingCover(p.id, photo.data)
+        : await moveListingPhoto(p.id, photo.data, mode);
   if (!done) return { ok: false, message: "That photo is no longer on this listing. Refresh the page." };
 
   await revalidateListing(p.id);
   await recordAudit(admin, {
-    action: mode === "remove" ? "listing.PHOTO_REMOVED" : "listing.PHOTO_COVER",
+    action: mode === "remove" ? "listing.PHOTO_REMOVED" : mode === "cover" ? "listing.PHOTO_COVER" : "listing.PHOTO_MOVED",
     targetType: "listing",
     targetId: p.id,
     propertyId: p.id,
     sellerId: p.sellerId,
     meta: { url: done.url },
   });
-  return { ok: true, message: mode === "remove" ? "Photo removed." : "Cover photo changed." };
+  return { ok: true, message: mode === "remove" ? "Photo removed." : mode === "cover" ? "Cover photo changed." : "Photo order changed." };
 }
 
 export type AdminSellerLookup =

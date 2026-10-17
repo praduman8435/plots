@@ -27,7 +27,7 @@ function check(name: string, ok: boolean, detail?: unknown) {
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
 async function main() {
-  const { changeListingStatus, updateListing, setListingPhotos, removeListingPhoto, makeListingCover, setListingPrice } = await import("../src/server/listings/service");
+  const { changeListingStatus, updateListing, setListingPhotos, removeListingPhoto, makeListingCover, moveListingPhoto, setListingPrice } = await import("../src/server/listings/service");
   const city = await db.city.findFirstOrThrow({ where: { isLive: true } });
   const stamp = Date.now().toString(36);
   const seller = await db.seller.create({
@@ -183,6 +183,13 @@ async function main() {
     check("remove: photo gone, the rest renumbered", (await removeListingPhoto(shown.id, b.id))?.url === "/media/b.webp" && (await order()) === "c0,a1", await order());
     check("remove: a photo of another plot is refused", (await removeListingPhoto(pending.id, c.id)) === null && (await order()) === "c0,a1");
     check("remove: twice is a no-op", (await removeListingPhoto(shown.id, b.id)) === null);
+    const a = (await db.propertyImage.findFirstOrThrow({ where: { propertyId: shown.id, url: "/media/a.webp" } })).id;
+    await moveListingPhoto(shown.id, a, "earlier");
+    check("move: a photo swaps with the one before it", (await order()) === "a0,c1", await order());
+    await moveListingPhoto(shown.id, a, "earlier");
+    check("move: the first photo can't go earlier", (await order()) === "a0,c1", await order());
+    await moveListingPhoto(shown.id, a, "later");
+    check("move: later swaps back", (await order()) === "c0,a1", await order());
     await setListingPrice(shown.id, 1_850_000, false);
     const repriced = await db.property.findUniqueOrThrow({ where: { id: shown.id } });
     check("price: changed, still live", repriced.price === BigInt(1_850_000) && !repriced.priceNegotiable && repriced.status === "ACTIVE");

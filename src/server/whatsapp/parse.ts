@@ -500,6 +500,25 @@ export function parseName(text: string): string | null {
   return t;
 }
 
+/** Words that make a WhatsApp profile name a business ("Real Estate", "Shiv Builders"), not a person. */
+const BUSINESS_NAME_WORDS = new Set(
+  "real estate estates realty realtor realtors realestate property properties prop builder builders developer developers infra infratech construction constructions group enterprise enterprises associate associates land lands plot plots farm farms agro consultant consultants consultancy agency agencies service services solution solutions trader traders trading company co pvt ltd llp inc home homes housing investment investments dealer dealers broker brokers official team shop store mart india digital media studio office admin business colony township project projects venture ventures society finance capital zameen jameen".split(" "),
+);
+
+/**
+ * The profile name to offer as a one-tap answer to "What is your name?", or null.
+ * Business and page names ("real estate", "Mathura Properties") are never offered:
+ * calling someone "Real ji" is worse than asking.
+ */
+export function profileNameToOffer(profileName: string | null | undefined): string | null {
+  if (!profileName || /[\p{Extended_Pictographic}\d]/u.test(profileName)) return null;
+  const name = parseName(profileName);
+  if (!name || name.length > 40) return null;
+  const words = name.toLowerCase().split(/[\s.&,-]+/).filter(Boolean);
+  if (words.some((w) => BUSINESS_NAME_WORDS.has(w))) return null;
+  return name;
+}
+
 function round(n: number, digits: number): number {
   const f = 10 ** digits;
   return Math.round(n * f) / f;
