@@ -42,14 +42,6 @@ const siteLd = [
   },
 ];
 
-/** Cover photos for city cards: a stable pick per city until cities get their own images. */
-const CITY_COVERS = ["/demo/land-090.webp", "/demo/land-097.webp", "/demo/land-118.webp", "/demo/land-174.webp", "/demo/land-045.webp", "/demo/land-182.webp", "/demo/land-057.webp", "/demo/land-096.webp"];
-function cityCover(slug: string) {
-  let h = 0;
-  for (const ch of slug) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return CITY_COVERS[h % CITY_COVERS.length];
-}
-
 export default async function HomePage() {
   const [cities, latest, stats, spots, demand, places] = await Promise.all([
     getCitiesWithCounts(8),
@@ -92,20 +84,32 @@ export default async function HomePage() {
             </Link>
           }
         />
-        <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 sm:overflow-visible sm:px-0">
+        {/* Just the place and how much land is there: a photo would only be a stock picture of somewhere else. */}
+        <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
           {cities.map((c) => (
-            <li key={c.id} className="w-[44%] shrink-0 snap-start sm:w-auto">
-              <IntentLink href={`/${c.slug}`} className="group relative block aspect-[4/5] overflow-hidden rounded-3xl bg-mist sm:aspect-[4/3]">
-                <Image src={cityCover(c.slug)} alt="" fill sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 44vw" className="object-cover transition duration-500 group-hover:scale-[1.04]" />
-                <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-                  <p className="text-lg font-bold">{c.name}</p>
-                  <p className="text-sm text-white/80">{c.live} {c.live === 1 ? "plot" : "plots"} available</p>
-                </div>
+            <li key={c.id}>
+              <IntentLink
+                href={`/${c.slug}`}
+                className="group flex h-full items-center gap-3 rounded-2xl bg-white p-3.5 ring-1 ring-line transition hover:-translate-y-0.5 hover:shadow-soft hover:ring-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500 sm:gap-3.5 sm:p-4"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-brand-100 transition group-hover:bg-brand-600 group-hover:text-white group-hover:ring-brand-600 sm:size-11">
+                  <MapPin className="size-5" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="line-clamp-2 text-[15px] leading-tight font-bold text-ink sm:text-base">{c.name}</span>
+                  {c.state.toLowerCase() !== c.name.toLowerCase() && <span className="mt-0.5 block truncate text-xs text-muted sm:text-[13px]">{c.state}</span>}
+                  <span className="tabular mt-2 inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-800">
+                    {c.live} {c.live === 1 ? "plot" : "plots"}
+                  </span>
+                </span>
+                <ArrowRight className="hidden size-4 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-brand-700 sm:block" aria-hidden />
               </IntentLink>
             </li>
           ))}
         </ul>
+        <Link href="/cities" className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-brand-700 sm:hidden">
+          All cities <ArrowRight className="size-4" aria-hidden />
+        </Link>
       </section>
       )}
 
